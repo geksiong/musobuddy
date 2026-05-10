@@ -1,0 +1,863 @@
+import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
+import { MetronomeSound, DroneTone, BeatPattern, InstrumentType } from '../types.ts';
+
+interface AudioContextType {
+  // Metronome
+  isMetronomePlaying: boolean;
+  metronomeBpm: number;
+  setMetronomeBpm: (bpm: number) => void;
+  startMetronome: () => void;
+  stopMetronome: () => void;
+  metronomePattern: BeatPattern | null;
+  setMetronomePattern: (pattern: BeatPattern) => void;
+  currentBeat: number;
+  metronomeVolume: number;
+  setMetronomeVolume: (volume: number) => void;
+
+  // Drone
+  activeDrones: Record<string, { tone: DroneTone; volume: number; pulseBpm: number }>;
+  isDronePlaying: boolean;
+  setIsDronePlaying: (playing: boolean) => void;
+  userDroneNotes: string[];
+  toggleDroneNote: (note: string) => void;
+  selectedDroneNote: string;
+  setSelectedDroneNote: (note: string) => void;
+  droneTone: DroneTone;
+  setDroneTone: (tone: DroneTone) => void;
+  droneVolume: number;
+  setDroneVolume: (volume: number) => void;
+  dronePulseBpm: number;
+  setDronePulseBpm: (bpm: number) => void;
+  stopAllDrones: () => void;
+
+  // Reference Notes (Tuner)
+  playingRefNote: string | null;
+  playRefNote: (note: string) => void;
+  stopRefNote: () => void;
+
+  // Chord Player
+  playChord: (chord: string, instrument?: InstrumentType, volume?: number) => void;
+  playNote: (noteIndex: number, duration?: number, instrument?: InstrumentType, volume?: number) => void;
+}
+
+const AudioContext = createContext<AudioContextType | null>(null);
+
+const LOOKAHEAD = 25.0;
+const SCHEDULE_AHEAD_TIME = 0.1;
+
+const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+const CHORD_INTERVALS: Record<string, number[]> = {
+  'major': [0, 4, 7],
+  'minor': [0, 3, 7],
+  '7': [0, 4, 7, 10],
+  'maj7': [0, 4, 7, 11],
+  'min7': [0, 3, 7, 10],
+  'sus2': [0, 2, 7],
+  'sus4': [0, 5, 7],
+  'add9': [0, 4, 7, 14],
+  'dim': [0, 3, 6],
+  'dim7': [0, 3, 6, 9],
+  'm7b5': [0, 3, 6, 10],
+  '69': [0, 4, 7, 9, 14],
+  '9': [0, 4, 7, 10, 14],
+  '11': [0, 4, 7, 10, 14, 17],
+  '13': [0, 4, 7, 10, 14, 17, 21],
+  'aug': [0, 4, 8],
+  'm': [0, 3, 7],
+  'm7': [0, 3, 7, 10],
+  'm6': [0, 3, 7, 9],
+  'm69': [0, 3, 7, 9, 14],
+  'm9': [0, 3, 7, 10, 14],
+  'madd9': [0, 3, 7, 14],
+  'm11': [0, 3, 7, 10, 14, 17],
+  'mmaj7': [0, 3, 7, 11],
+  'mmaj7b5': [0, 3, 6, 11],
+  'mmaj9': [0, 3, 7, 11, 14],
+  '7#9': [0, 4, 7, 10, 15],
+};
+
+const ROOT_OFFSETS: Record<string, number> = {
+  'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+};
+
+function getIntervalsForChord(chordName: string): number[] {
+  let root = '';
+  let suffix = '';
+  
+  if (chordName.length >= 2 && (chordName[1] === '#' || chordName[1] === 'b')) {
+    root = chordName.substring(0, 2);
+    suffix = chordName.substring(2);
+  } else {
+    root = chordName[0];
+    suffix = chordName.substring(1);
+  }
+
+  const offset = ROOT_OFFSETS[root] || 0;
+  
+  // Normalize suffixes
+  let type = suffix === '' ? 'major' : suffix;
+  if (type === 'm') type = 'minor';
+  if (type === 'major') type = 'major';
+  if (type === 'minor') type = 'minor';
+  if (type === 'min7') type = 'm7';
+  if (type === 'major7') type = 'maj7';
+  if (type === 'mmajor7') type = 'mmaj7';
+  
+  const intervals = CHORD_INTERVALS[type] || CHORD_INTERVALS['major'];
+  
+  return intervals.map(v => v + offset);
+}
+
+export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Metronome State
+  const [isMetronomePlaying, setIsMetronomePlaying] = useState(false);
+  const [metronomeBpm, setMetronomeBpm] = useState(120);
+  const [metronomePattern, _setMetronomePattern] = useState<BeatPattern | null>(null);
+  const metronomePatternRef = useRef<BeatPattern | null>(null);
+  const [metronomeVolume, setMetronomeVolume] = useState(0.8);
+  const metronomeVolumeRef = useRef(0.8);
+  const [currentBeat, setCurrentBeat] = useState(0);
+  const metronomeTimerRef = useRef<number | null>(null);
+  const voiceStatesRef = useRef<{ nextNoteTime: number; stepIndex: number }[]>([]);
+
+  // Drone State
+  const [activeDrones, setActiveDrones] = useState<Record<string, { tone: DroneTone; volume: number; pulseBpm: number }>>({});
+  const [isDronePlaying, setIsDronePlaying] = useState(false);
+  const [userDroneNotes, setUserDroneNotes] = useState<string[]>(['D3']);
+  const [selectedDroneNote, setSelectedDroneNote] = useState('D3');
+  const [droneTone, setDroneTone] = useState<DroneTone>(DroneTone.Strings);
+  const [droneVolume, setDroneVolume] = useState(0.5);
+  const [dronePulseBpm, setDronePulseBpm] = useState(0);
+
+  const droneNodesRef = useRef<Map<string, { 
+    osc1: OscillatorNode; 
+    osc2: OscillatorNode; 
+    lfo?: OscillatorNode;
+    lfoGain?: GainNode;
+    gain: GainNode;
+    modGain: GainNode;
+  }>>(new Map());
+
+  // Ref Note State
+  const [playingRefNote, setPlayingRefNote] = useState<string | null>(null);
+  const refOscRef = useRef<OscillatorNode | null>(null);
+  const refGainRef = useRef<GainNode | null>(null);
+
+  const initAudio = () => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  };
+
+  // --- Metronome Logic ---
+  const playClick = (time: number, sound: MetronomeSound, volume: number, isAccent: boolean) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+
+    const startVol = Math.max(0.0001, volume * (isAccent ? 1.0 : 0.6));
+    const masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
+    masterGain.gain.setValueAtTime(startVol, time);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
+
+    switch (sound) {
+      case MetronomeSound.Woodblock: {
+        // Woodblock: Sine with frequency sweep + high-frequency "crack"
+        const osc = ctx.createOscillator();
+        const crack = ctx.createOscillator();
+        const crackGain = ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
+        osc.frequency.exponentialRampToValueAtTime(isAccent ? 600 : 400, time + 0.05);
+        
+        crack.type = 'square';
+        crack.frequency.setValueAtTime(isAccent ? 3000 : 2500, time);
+        crackGain.gain.setValueAtTime(0.1, time);
+        crackGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+        
+        osc.connect(masterGain);
+        crack.connect(crackGain);
+        crackGain.connect(masterGain);
+        
+        osc.start(time);
+        osc.stop(time + 0.3);
+        crack.start(time);
+        crack.stop(time + 0.02);
+        break;
+      }
+      case MetronomeSound.Cowbell: {
+        // Cowbell: Metallic FM-like sound with two frequencies
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        osc1.type = 'square';
+        osc2.type = 'square';
+        osc1.frequency.setValueAtTime(isAccent ? 800 : 540, time);
+        osc2.frequency.setValueAtTime(isAccent ? 540 : 400, time);
+        
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(isAccent ? 800 : 540, time);
+        filter.Q.setValueAtTime(2, time);
+        
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(masterGain);
+        
+        osc1.start(time);
+        osc1.stop(time + 0.3);
+        osc2.start(time);
+        osc2.stop(time + 0.3);
+        break;
+      }
+      case MetronomeSound.Kick: {
+        // Electronic kick: Sine with fast pitch drop
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
+        osc.connect(masterGain);
+        osc.start(time);
+        osc.stop(time + 0.3);
+        break;
+      }
+      case MetronomeSound.HiHat: {
+        // Sharp noise burst
+        const bufferSize = ctx.sampleRate * 0.05;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(8000, time);
+        
+        noise.connect(filter);
+        filter.connect(masterGain);
+        noise.start(time);
+        break;
+      }
+      default: {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(isAccent ? 1000 : 800, time);
+        osc.connect(masterGain);
+        osc.start(time);
+        osc.stop(time + 0.3);
+      }
+    }
+  };
+
+  const isMetronomePlayingRef = useRef(false);
+
+  useEffect(() => {
+    isMetronomePlayingRef.current = isMetronomePlaying;
+  }, [isMetronomePlaying]);
+
+  useEffect(() => {
+    metronomeVolumeRef.current = metronomeVolume;
+  }, [metronomeVolume]);
+
+  const metronomeScheduler = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    const pattern = metronomePatternRef.current;
+    if (!ctx || !pattern) return;
+
+    const masterVoice = pattern.voices[0];
+    const masterLength = masterVoice.pattern?.length || masterVoice.beats || 4;
+    const measureDuration = (60.0 / metronomeBpm) * masterLength;
+
+    pattern.voices.forEach((voice, i) => {
+      if (!voice.active) return;
+      if (!voiceStatesRef.current[i]) {
+        const initialTime = ctx.currentTime + 0.05;
+        voiceStatesRef.current[i] = { nextNoteTime: initialTime, stepIndex: 0 };
+      }
+      
+      const vState = voiceStatesRef.current[i];
+      const length = voice.pattern?.length || voice.beats || 4;
+      const interval = measureDuration / length;
+
+      while (vState.nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD_TIME) {
+        let playValue = 0;
+        if (voice.pattern && voice.pattern.length > 0) {
+          playValue = voice.pattern[vState.stepIndex % voice.pattern.length];
+        } else {
+          playValue = (vState.stepIndex % length === 0) ? 2 : 1;
+        }
+
+        if (playValue > 0 && !voice.muted) {
+          playClick(vState.nextNoteTime, voice.sound, voice.volume * metronomeVolumeRef.current, playValue === 2);
+        }
+
+        // Handle visual update timing: use the exact scheduled time for visual transition
+        if (i === 0) {
+          const beatToUpdate = vState.stepIndex;
+          const timeToUpdate = vState.nextNoteTime;
+          
+          const delay = (timeToUpdate - ctx.currentTime) * 1000;
+          setTimeout(() => {
+            if (isMetronomePlayingRef.current) {
+              setCurrentBeat(beatToUpdate);
+            }
+          }, Math.max(0, delay));
+        }
+
+        vState.nextNoteTime += interval;
+        vState.stepIndex++;
+      }
+    });
+  }, [metronomeBpm]); // isMetronomePlaying contextually is used via the ref now
+
+  const startMetronome = () => {
+    const ctx = initAudio();
+    setIsMetronomePlaying(true);
+    const startTime = ctx.currentTime + 0.05;
+    if (metronomePatternRef.current) {
+      voiceStatesRef.current = metronomePatternRef.current.voices.map(() => ({
+        nextNoteTime: startTime,
+        stepIndex: 0
+      }));
+    }
+    setCurrentBeat(0);
+    if (metronomeTimerRef.current) window.clearInterval(metronomeTimerRef.current);
+    metronomeTimerRef.current = window.setInterval(metronomeScheduler, LOOKAHEAD);
+  };
+
+  const stopMetronome = () => {
+    setIsMetronomePlaying(false);
+    if (metronomeTimerRef.current) {
+      window.clearInterval(metronomeTimerRef.current);
+      metronomeTimerRef.current = null;
+    }
+    voiceStatesRef.current = [];
+    setCurrentBeat(0);
+  };
+
+  const setMetronomePattern = (pattern: BeatPattern) => {
+    metronomePatternRef.current = pattern;
+    _setMetronomePattern(pattern);
+  };
+
+  useEffect(() => {
+    if (isMetronomePlaying) {
+      if (metronomeTimerRef.current) window.clearInterval(metronomeTimerRef.current);
+      metronomeTimerRef.current = window.setInterval(metronomeScheduler, LOOKAHEAD);
+    }
+  }, [metronomeScheduler, isMetronomePlaying]);
+
+  const toggleDroneNote = (note: string) => {
+    setSelectedDroneNote(note);
+    setUserDroneNotes(prev => {
+      const isSelected = prev.includes(note);
+      return isSelected ? prev.filter(n => n !== note) : [...prev, note];
+    });
+  };
+
+  const stopDroneAudio = useCallback((note: string) => {
+    const nodes = droneNodesRef.current.get(note);
+    if (!nodes || !audioCtxRef.current) return;
+
+    const ctx = audioCtxRef.current;
+    const { osc1, osc2, lfo, lfoGain, gain } = nodes;
+
+    try {
+      const now = ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0.0001, now + 0.2);
+      
+      droneNodesRef.current.delete(note);
+      setActiveDrones(prev => {
+        const next = { ...prev };
+        delete next[note];
+        return next;
+      });
+
+      setTimeout(() => {
+        try {
+          const stopTime = ctx.currentTime;
+          osc1.stop(stopTime); osc2.stop(stopTime); lfo?.stop(stopTime);
+          osc1.disconnect(); osc2.disconnect(); lfo?.disconnect(); lfoGain?.disconnect(); gain.disconnect();
+        } catch (e) {}
+      }, 250);
+    } catch (e) {}
+  }, []);
+
+  const stopAllDrones = useCallback(() => {
+    const keys = Array.from(droneNodesRef.current.keys());
+    keys.forEach(note => stopDroneAudio(note));
+  }, [stopDroneAudio]);
+
+  const startDroneAudio = (noteWithOctave: string, tone: DroneTone, volume: number, pulseBpm: number) => {
+    const ctx = initAudio();
+    if (droneNodesRef.current.has(noteWithOctave)) {
+      return;
+    }
+
+    const noteMatch = noteWithOctave.match(/^([A-G]#?)(\d)$/);
+    if (!noteMatch) return;
+    const [, name, octaveStr] = noteMatch;
+    const octave = parseInt(octaveStr);
+    const noteIndex = NOTES.indexOf(name);
+    if (noteIndex === -1) return;
+    
+    const midiNote = (octave + 1) * 12 + noteIndex;
+    const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+    
+    // Main volume gain
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(volume * 0.35, ctx.currentTime + 0.3);
+    
+    // Filter for richness
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, ctx.currentTime);
+    filter.Q.setValueAtTime(1, ctx.currentTime);
+    
+    masterGain.connect(filter);
+    filter.connect(ctx.destination);
+
+    // Modulation gain (for pulse)
+    const modGain = ctx.createGain();
+    modGain.gain.setValueAtTime(1, ctx.currentTime);
+    modGain.connect(masterGain);
+
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const osc3 = ctx.createOscillator(); // Extra harmonic
+    
+    switch (tone) {
+      case DroneTone.Strings:
+        osc1.type = 'sine'; osc2.type = 'triangle'; osc3.type = 'sine';
+        osc2.detune.setValueAtTime(4, ctx.currentTime);
+        osc3.frequency.setValueAtTime(freq * 2, ctx.currentTime);
+        filter.frequency.setValueAtTime(3000, ctx.currentTime);
+        break;
+      case DroneTone.Cello:
+        osc1.type = 'sawtooth'; osc2.type = 'sine'; osc3.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(freq / 2, ctx.currentTime);
+        osc1.detune.setValueAtTime(2, ctx.currentTime);
+        osc3.frequency.setValueAtTime(freq, ctx.currentTime);
+        osc3.detune.setValueAtTime(-2, ctx.currentTime);
+        filter.frequency.setValueAtTime(1200, ctx.currentTime);
+        break;
+      default:
+        osc1.type = 'sine'; osc2.type = 'sine'; osc3.type = 'sine';
+    }
+    
+    osc1.frequency.setValueAtTime(freq, ctx.currentTime);
+    osc2.frequency.setValueAtTime(freq, ctx.currentTime);
+    
+    osc1.connect(modGain);
+    osc2.connect(modGain);
+    osc3.connect(modGain);
+    const now = ctx.currentTime;
+    osc1.start(now);
+    osc2.start(now);
+    osc3.start(now);
+
+    let lfo: OscillatorNode | undefined;
+    let lfoGain: GainNode | undefined;
+
+    if (pulseBpm > 0) {
+      lfo = ctx.createOscillator();
+      lfoGain = ctx.createGain();
+      const lfoFreq = pulseBpm / 60;
+      lfo.type = 'sine';
+      lfo.frequency.setValueAtTime(lfoFreq, now);
+      lfoGain.gain.setValueAtTime(0, now);
+      lfoGain.gain.linearRampToValueAtTime(0.3, now + 0.3); 
+      lfo.connect(lfoGain);
+      lfoGain.connect(modGain.gain);
+      lfo.start(now);
+    }
+
+    droneNodesRef.current.set(noteWithOctave, { 
+      osc1, osc2, lfo, lfoGain, gain: masterGain, modGain 
+    });
+
+    setActiveDrones(prev => ({
+      ...prev,
+      [noteWithOctave]: { tone, volume, pulseBpm }
+    }));
+  };
+
+  useEffect(() => {
+    if (isDronePlaying) {
+      userDroneNotes.forEach(note => {
+        if (!droneNodesRef.current.has(note)) {
+          startDroneAudio(note, droneTone, droneVolume, dronePulseBpm);
+        }
+      });
+      // Cleanup any nodes that are no longer in userDroneNotes
+      const currentNodes = Array.from(droneNodesRef.current.keys());
+      currentNodes.forEach(note => {
+        if (!userDroneNotes.includes(note)) {
+          stopDroneAudio(note);
+        }
+      });
+    } else {
+      stopAllDrones();
+    }
+  }, [isDronePlaying, userDroneNotes, stopAllDrones]);
+
+  // Real-time parameter updates (Volume, Pulse, Tone)
+  useEffect(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    droneNodesRef.current.forEach((nodes, note) => {
+      // Update Volume
+      nodes.gain.gain.setTargetAtTime(droneVolume * 0.4, ctx.currentTime, 0.05);
+
+      // Update Pulse BPM (LFO)
+      if (dronePulseBpm > 0) {
+        if (!nodes.lfo || !nodes.lfoGain) {
+          // Create LFO if it doesn't exist
+          const lfo = ctx.createOscillator();
+          const lfoGain = ctx.createGain();
+          lfo.type = 'sine';
+          lfo.frequency.setValueAtTime(dronePulseBpm / 60, ctx.currentTime);
+          lfoGain.gain.setValueAtTime(0, ctx.currentTime);
+          lfoGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.1);
+          lfo.connect(lfoGain);
+          lfoGain.connect(nodes.modGain.gain);
+          lfo.start();
+          nodes.lfo = lfo;
+          nodes.lfoGain = lfoGain;
+        } else {
+          // Update existing LFO
+          nodes.lfo.frequency.setTargetAtTime(dronePulseBpm / 60, ctx.currentTime, 0.05);
+        }
+      } else if (nodes.lfo && nodes.lfoGain) {
+        // Fade out and stop LFO
+        const lfo = nodes.lfo;
+        const lfoGain = nodes.lfoGain;
+        lfoGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        setTimeout(() => {
+          try {
+            lfo.stop();
+            lfo.disconnect();
+            lfoGain.disconnect();
+          } catch (e) {}
+        }, 100);
+        nodes.lfo = undefined;
+        nodes.lfoGain = undefined;
+      }
+
+      // Update Tone (Oscillator types and scaling)
+      const noteMatch = note.match(/^([A-G]#?)(\d)$/);
+      if (noteMatch) {
+        const [, name, octaveStr] = noteMatch;
+        const octave = parseInt(octaveStr);
+        const noteIndex = NOTES.indexOf(name);
+        const midiNote = (octave + 1) * 12 + noteIndex;
+        const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+
+        switch (droneTone) {
+          case DroneTone.Strings:
+            nodes.osc1.type = 'sine'; nodes.osc2.type = 'triangle';
+            nodes.osc1.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
+            nodes.osc2.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
+            nodes.osc2.detune.setTargetAtTime(2, ctx.currentTime, 0.05);
+            nodes.osc1.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
+            break;
+          case DroneTone.Cello:
+            nodes.osc1.type = 'sawtooth'; nodes.osc2.type = 'sine';
+            nodes.osc1.frequency.setTargetAtTime(freq / 2, ctx.currentTime, 0.05);
+            nodes.osc2.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
+            nodes.osc1.detune.setTargetAtTime(1, ctx.currentTime, 0.05);
+            nodes.osc2.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
+            break;
+          default:
+            nodes.osc1.type = 'sine'; nodes.osc2.type = 'sine';
+            nodes.osc1.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
+            nodes.osc2.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
+            nodes.osc1.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
+            nodes.osc2.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
+        }
+      }
+    });
+  }, [droneVolume, dronePulseBpm, droneTone]);
+
+  // --- Ref Note Logic ---
+  const stopRefNote = useCallback(() => {
+    setPlayingRefNote(null);
+    if (refGainRef.current && audioCtxRef.current) {
+      const ctx = audioCtxRef.current;
+      const g = refGainRef.current;
+      const o = refOscRef.current;
+      try {
+        g.gain.cancelScheduledValues(ctx.currentTime);
+        g.gain.setValueAtTime(g.gain.value, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.1);
+        refGainRef.current = null;
+        refOscRef.current = null;
+        setTimeout(() => {
+          try { o?.stop(); o?.disconnect(); g.disconnect(); } catch (e) {}
+        }, 150);
+      } catch (e) {}
+    }
+  }, []);
+
+  const playRefNote = (noteName: string) => {
+    if (playingRefNote === noteName) {
+      stopRefNote();
+      return;
+    }
+    stopRefNote();
+    const noteMatch = noteName.match(/^([A-G]#?)(\d)$/);
+    if (!noteMatch) return;
+    const [, name, octaveStr] = noteMatch;
+    const octave = parseInt(octaveStr);
+    const noteIndex = NOTES.indexOf(name);
+    if (noteIndex === -1) return;
+    const midiNote = (octave + 1) * 12 + noteIndex;
+    const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
+    const ctx = initAudio();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    refOscRef.current = osc;
+    refGainRef.current = gain;
+    setPlayingRefNote(noteName);
+  };
+
+  // --- Chord Logic ---
+  const applyTone = (osc: OscillatorNode, gain: GainNode, instrument: InstrumentType, freq: number, now: number, duration: number) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+
+    switch (instrument) {
+      case InstrumentType.Piano: {
+        // Piano: Additive synthesis with fast attack and natural decay
+        osc.type = 'triangle';
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(0.2, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        
+        // Harmonics
+        const harmonics = [2, 3, 4];
+        harmonics.forEach((h, idx) => {
+          const hOsc = ctx.createOscillator();
+          const hGain = ctx.createGain();
+          hOsc.type = idx === 0 ? 'sine' : 'triangle';
+          hOsc.frequency.setValueAtTime(freq * h, now);
+          hGain.gain.setValueAtTime(0.0001, now);
+          hGain.gain.linearRampToValueAtTime(0.05 / (idx + 1), now + 0.01);
+          hGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * (0.8 / (idx + 1)));
+          hOsc.connect(hGain);
+          hGain.connect(gain);
+          hOsc.start(now);
+          hOsc.stop(now + duration);
+        });
+        break;
+      }
+
+      case InstrumentType.Organ: {
+        // Organ: Stationary tones with multiple drawbars
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+        gain.gain.linearRampToValueAtTime(0.1, now + duration - 0.1);
+        gain.gain.linearRampToValueAtTime(0, now + duration);
+
+        const drawbars = [0.5, 1.5, 2, 3];
+        drawbars.forEach(d => {
+          const dOsc = ctx.createOscillator();
+          const dGain = ctx.createGain();
+          dOsc.type = 'sine';
+          dOsc.frequency.setValueAtTime(freq * d, now);
+          dGain.gain.setValueAtTime(0, now);
+          dGain.gain.linearRampToValueAtTime(0.04, now + 0.05);
+          dGain.gain.linearRampToValueAtTime(0, now + duration);
+          dOsc.connect(dGain);
+          dGain.connect(gain);
+          dOsc.start(now);
+          dOsc.stop(now + duration);
+        });
+        break;
+      }
+
+      case InstrumentType.Strings: {
+        // Strings: Detuned oscillators with slow attack
+        osc.type = 'sawtooth';
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.08, now + 0.25);
+        gain.gain.linearRampToValueAtTime(0.06, now + duration - 0.25);
+        gain.gain.linearRampToValueAtTime(0, now + duration);
+        osc.detune.setValueAtTime(6, now);
+
+        const ensemble = [1, 2];
+        ensemble.forEach(detune => {
+          const sOsc = ctx.createOscillator();
+          const sGain = ctx.createGain();
+          sOsc.type = 'sawtooth';
+          sOsc.frequency.setValueAtTime(freq, now);
+          sOsc.detune.setValueAtTime(detune * 4, now);
+          sGain.gain.setValueAtTime(0, now);
+          sGain.gain.linearRampToValueAtTime(0.04, now + 0.3);
+          sGain.gain.linearRampToValueAtTime(0, now + duration);
+          sOsc.connect(sGain);
+          sGain.connect(gain);
+          sOsc.start(now);
+          sOsc.stop(now + duration);
+        });
+        break;
+      }
+
+      case InstrumentType.Guitar: {
+        // Guitar: Plucked triangle with high harmonic
+        osc.type = 'triangle';
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(0.25, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.8);
+        
+        const overtone = ctx.createOscillator();
+        const oGain = ctx.createGain();
+        overtone.type = 'sine';
+        overtone.frequency.setValueAtTime(freq * 3, now);
+        oGain.gain.setValueAtTime(0.0001, now);
+        oGain.gain.linearRampToValueAtTime(0.05, now + 0.01);
+        oGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.2);
+        overtone.connect(oGain);
+        oGain.connect(gain);
+        overtone.start(now);
+        overtone.stop(now + duration);
+        break;
+      }
+
+      case InstrumentType.Bass: {
+        // Bass: Deep sine with sub-harmonic and slight "fret" noise
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(0.25, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        
+        const sub = ctx.createOscillator();
+        const subGain = ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(freq * 0.5, now);
+        subGain.gain.setValueAtTime(0.0001, now);
+        subGain.gain.linearRampToValueAtTime(0.2, now + 0.02);
+        subGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.5);
+        sub.connect(subGain);
+        subGain.connect(gain);
+        sub.start(now);
+        sub.stop(now + duration);
+
+        const click = ctx.createOscillator();
+        const clickGain = ctx.createGain();
+        click.type = 'square';
+        click.frequency.setValueAtTime(800, now);
+        clickGain.gain.setValueAtTime(0.02, now);
+        clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.01);
+        click.connect(clickGain);
+        clickGain.connect(gain);
+        click.start(now);
+        click.stop(now + 0.01);
+        break;
+      }
+
+      default:
+        osc.type = 'triangle';
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.1);
+        gain.gain.linearRampToValueAtTime(0, now + duration);
+    }
+  };
+
+  const playChord = (chord: string, instrument: InstrumentType = InstrumentType.Piano, volume: number = 1.0) => {
+    const ctx = initAudio();
+    const intervals = getIntervalsForChord(chord);
+    if (!intervals) return;
+
+    const rootFreq = 261.63; // C4
+    const now = ctx.currentTime;
+    const duration = 1.5;
+
+    intervals.forEach(interval => {
+      const freq = rootFreq * Math.pow(2, interval / 12);
+      const osc = ctx.createOscillator();
+      const voiceGain = ctx.createGain();
+      const volumeGain = ctx.createGain();
+      
+      osc.frequency.setValueAtTime(freq, now);
+      applyTone(osc, voiceGain, instrument, freq, now, duration);
+      
+      // Apply volume scaling via a dedicated gain node
+      volumeGain.gain.setValueAtTime(volume, now);
+      
+      osc.connect(voiceGain);
+      voiceGain.connect(volumeGain);
+      volumeGain.connect(ctx.destination);
+      
+      osc.start(now);
+      osc.stop(now + duration);
+    });
+  };
+
+  // --- Note Logic ---
+  const playNote = (interval: number, duration: number = 0.8, instrument: InstrumentType = InstrumentType.Piano, volume: number = 1.0) => {
+    const ctx = initAudio();
+    const rootFreq = 261.63; // C4
+    const now = ctx.currentTime;
+    const freq = rootFreq * Math.pow(2, interval / 12);
+    
+    const osc = ctx.createOscillator();
+    const voiceGain = ctx.createGain();
+    const volumeGain = ctx.createGain();
+    
+    osc.frequency.setValueAtTime(freq, now);
+    applyTone(osc, voiceGain, instrument, freq, now, duration);
+    
+    // Apply volume scaling via a dedicated gain node
+    volumeGain.gain.setValueAtTime(volume, now);
+    
+    osc.connect(voiceGain);
+    voiceGain.connect(volumeGain);
+    volumeGain.connect(ctx.destination);
+    
+    osc.start(now);
+    osc.stop(now + duration);
+  };
+
+  const value = {
+    isMetronomePlaying, metronomeBpm, setMetronomeBpm, startMetronome, stopMetronome, metronomePattern, setMetronomePattern, currentBeat, metronomeVolume, setMetronomeVolume,
+    activeDrones, isDronePlaying, setIsDronePlaying,
+    userDroneNotes, toggleDroneNote,
+    selectedDroneNote, setSelectedDroneNote, 
+    droneTone, setDroneTone, 
+    droneVolume, setDroneVolume, 
+    dronePulseBpm, setDronePulseBpm,
+    stopAllDrones,
+    playingRefNote, playRefNote, stopRefNote,
+    playChord,
+    playNote
+  };
+
+  return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;
+};
+
+export const useAudio = () => {
+  const context = useContext(AudioContext);
+  if (!context) throw new Error('useAudio must be used within an AudioProvider');
+  return context;
+};

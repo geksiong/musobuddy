@@ -1,0 +1,1002 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Play, Pause, Plus, Minus, Trash2, RotateCcw, Volume2, VolumeX,
+  X, SlidersHorizontal, Music, ChevronUp, ChevronDown, Save, Edit2
+} from 'lucide-react';
+import { useMetronome } from '../../hooks/useMetronome.ts';
+import { DEFAULT_PRESETS, TEMPO_NAMES } from '../../constants.ts';
+import { BeatPattern, MetronomeSound, TimeSignatureType } from '../../types.ts';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '../../lib/utils.ts';
+import { useTheme } from '../../contexts/ThemeContext.tsx';
+
+export default function MetronomeView() {
+  const { isPlaying, bpm, setBpm, start, stop, setActivePattern, activePattern, currentBeat, metronomeVolume, setMetronomeVolume } = useMetronome();
+  const { resolvedTheme } = useTheme();
+  const [displayMode, setDisplayMode] = useState<'circular' | 'rings' | 'linear'>('circular');
+  const [showEditor, setShowEditor] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [userPresets, setUserPresets] = useState<BeatPattern[]>(() => {
+    try {
+      const saved = localStorage.getItem('metronome_user_presets');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const tapTimesRef = useRef<number[]>([]);
+  const [rotation, setRotation] = useState(0);
+
+  const masterVoice = activePattern?.voices[0];
+  const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+
+  useEffect(() => {
+    if (!isPlaying) {
+      setRotation(0);
+      return;
+    }
+    let frame: number;
+    const startT = performance.now();
+    const update = () => {
+      const elapsed = (performance.now() - startT) / 1000;
+      const measureDuration = (60 / bpm) * masterLength;
+      const revs = elapsed / measureDuration;
+      setRotation(revs * 360);
+      frame = requestAnimationFrame(update);
+    };
+    update();
+    return () => cancelAnimationFrame(frame);
+  }, [isPlaying, bpm, masterLength]);
+
+  useEffect(() => {
+    if (!activePattern && DEFAULT_PRESETS.length > 0) {
+      setActivePattern(DEFAULT_PRESETS[0]);
+    }
+  }, [activePattern, setActivePattern]);
+
+  const handleTap = () => {
+    const now = performance.now();
+    tapTimesRef.current.push(now);
+    if (tapTimesRef.current.length > 4) tapTimesRef.current.shift();
+    
+    if (tapTimesRef.current.length >= 2) {
+      const diffs = [];
+      for (let i = 1; i < tapTimesRef.current.length; i++) {
+        diffs.push(tapTimesRef.current[i] - tapTimesRef.current[i-1]);
+      }
+      const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+      setBpm(Math.round(60000 / avg));
+    }
+  };
+
+  const handleSavePreset = () => {
+    if (!activePattern) return;
+    const finalName = activePattern.name.trim() || `Preset ${userPresets.length + 1}`;
+    const newId = `user-${Date.now()}`;
+    const newPreset: BeatPattern = {
+      ...activePattern,
+      id: newId,
+      name: finalName,
+      isUserPreset: true,
+      bpm,
+    };
+    const next = [...userPresets, newPreset];
+    setUserPresets(next);
+    localStorage.setItem('metronome_user_presets', JSON.stringify(next));
+    setActivePattern(newPreset);
+    setShowEditor(false);
+  };
+
+  const handleEditPresetName = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingId(id);
+  };
+
+  const handleSaveName = (id: string, newName: string) => {
+    const next = userPresets.map(p => p.id === id ? { ...p, name: newName.trim() || p.name } : p);
+    setUserPresets(next);
+    localStorage.setItem('metronome_user_presets', JSON.stringify(next));
+    if (activePattern?.id === id) {
+      setActivePattern({ ...activePattern, name: newName.trim() || activePattern.name });
+    }
+    setRenamingId(null);
+  };
+
+  const handleDeletePreset = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = userPresets.filter(p => p.id !== id);
+    setUserPresets(next);
+    localStorage.setItem('metronome_user_presets', JSON.stringify(next));
+    if (activePattern?.id === id) {
+      setActivePattern(DEFAULT_PRESETS[0]);
+    }
+  };
+
+  const getTempoName = (currentBpm: number) => {
+    return TEMPO_NAMES.find(t => currentBpm >= t.min && currentBpm < t.max)?.name || 'Custom';
+  };
+
+  const offset = activePattern?.displayOffset || 0;
+  const displayBeat = (Math.floor(((rotation % 360) / 360) * masterLength) + offset) % masterLength;
+
+  return (
+    <div className={cn(
+      "min-h-full flex flex-col md:flex-row gap-6 p-4 md:p-8 selection:bg-orange-500/30 transition-colors",
+      resolvedTheme === 'dark' ? "bg-black" : "bg-[#f8f9fa]"
+    )}>
+      {/* Sidebar - Controls & Presets */}
+      <div className="w-full md:w-80 flex flex-col gap-6">
+        {/* Playback Controls in Sidebar */}
+        <div className={cn(
+          "rounded-2xl border p-6 flex flex-col gap-6 shadow-md transition-colors",
+          resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5"
+        )}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="w-16" /> {/* Spacer to help center the play button */}
+            
+            <button 
+              onClick={isPlaying ? stop : start}
+              className={cn(
+                "w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 group relative shadow-2xl shrink-0",
+                isPlaying 
+                  ? resolvedTheme === 'dark' ? "bg-white text-black scale-95 shadow-white/10" : "bg-slate-900 text-white scale-95 shadow-slate-900/40" 
+                  : "bg-[#FF4E00] text-white hover:scale-105 shadow-[#FF4E00]/40"
+              )}
+            >
+              <div className={cn(
+                "absolute inset-0 rounded-full blur-2xl opacity-40 transition-opacity",
+                isPlaying 
+                  ? resolvedTheme === 'dark' ? "bg-white" : "bg-slate-900" 
+                  : "bg-[#FF4E00] group-hover:opacity-60"
+              )} />
+              {isPlaying ? <Pause className="w-10 h-10 relative z-10 fill-current" /> : <Play className="w-10 h-10 relative z-10 translate-x-1 fill-current" />}
+            </button>
+
+            <div className="flex flex-col gap-3 items-end w-16">
+              <button onClick={handleTap} className={cn(
+                "w-14 h-14 border rounded-xl flex flex-col items-center justify-center gap-1 transition-all group shrink-0",
+                resolvedTheme === 'dark' ? "bg-white/5 hover:bg-white/10 border-white/10" : "bg-slate-100 border-black/5 shadow-sm hover:bg-slate-200"
+              )}>
+                 <div className="w-1.5 h-1.5 rounded-full bg-[#FF4E00] group-active:scale-150 transition-transform" />
+                 <span className={cn("text-[8px] font-black uppercase tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tap</span>
+              </button>
+              <button onClick={() => setBpm(120)} className={cn(
+                "w-14 h-14 border rounded-xl flex flex-col items-center justify-center gap-1 transition-all group shrink-0",
+                resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-black/5 shadow-sm hover:bg-slate-200 text-slate-400 hover:text-slate-900"
+              )}>
+                 <RotateCcw className="w-3.5 h-3.5 group-hover:rotate-[-45deg] transition-transform" />
+                 <span className="text-[8px] font-black uppercase tracking-widest italic leading-none">Reset</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+             <div className="flex items-center justify-between">
+                <button 
+                  onClick={() => setBpm(bpm - 1)}
+                  className={cn(
+                    "p-2.5 rounded-xl border transition-all",
+                    resolvedTheme === 'dark' ? "bg-white/5 hover:bg-white/10 border-white/5 text-white/40 hover:text-white" : "bg-slate-100 border-black/5 hover:bg-slate-200 text-slate-400 hover:text-slate-900 shadow-sm"
+                  )}
+                >
+                  <Minus className="w-5 h-5" />
+                </button>
+                <div className="flex flex-col items-center">
+                  <span className={cn("text-5xl font-black italic tracking-tighter tabular-nums leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>{bpm}</span>
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#FF4E00]/60 mt-1 italic">{getTempoName(bpm)}</span>
+                </div>
+                <button 
+                  onClick={() => setBpm(bpm + 1)}
+                  className={cn(
+                    "p-2.5 rounded-xl border transition-all",
+                    resolvedTheme === 'dark' ? "bg-white/5 hover:bg-white/10 border-white/5 text-white/40 hover:text-white" : "bg-slate-100 border-black/5 hover:bg-slate-200 text-slate-400 hover:text-slate-900 shadow-sm"
+                  )}
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+             </div>
+             
+             <div className="flex flex-col gap-2">
+                <div className={cn("flex justify-between text-[7px] font-black uppercase tracking-[0.3em] italic px-1", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")}>
+                  <span>Lento</span>
+                  <span>{getTempoName(bpm)}</span>
+                  <span>Presto</span>
+                </div>
+                <input 
+                  type="range" min="40" max="240" 
+                  value={bpm} 
+                  onChange={(e) => setBpm(parseInt(e.target.value))}
+                  className={cn(
+                    "w-full h-1 rounded-full appearance-none cursor-pointer accent-[#FF4E00]", 
+                    resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
+                  )} 
+                />
+             </div>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+          {[...DEFAULT_PRESETS, ...userPresets].map(preset => (
+            <div 
+              key={preset.id}
+              onClick={() => {
+                setActivePattern(preset);
+                setBpm(preset.bpm);
+              }}
+              className={cn(
+                "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2 group relative overflow-hidden cursor-pointer",
+                activePattern?.id === preset.id 
+                  ? resolvedTheme === 'dark'
+                    ? "bg-white/10 border-[#FF4E00]/50 shadow-[0_20px_40px_rgba(255,78,0,0.15)]" 
+                    : "bg-white border-[#FF4E00]/30 shadow-xl shadow-[#FF4E00]/10"
+                  : resolvedTheme === 'dark'
+                    ? "bg-white/5 border-white/5 hover:border-white/10" 
+                    : "bg-white border-black/5 hover:border-black/10 shadow-sm"
+              )}
+            >
+              {activePattern?.id === preset.id && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF4E00]/10 blur-3xl -mr-16 -mt-16 pointer-events-none" />
+              )}
+              <div className="flex items-center justify-between relative z-10">
+                {renamingId === preset.id ? (
+                  <input
+                    autoFocus
+                    className={cn(
+                      "border rounded px-2 py-1 text-sm font-black uppercase tracking-tight focus:outline-none focus:border-[#FF4E00] w-full mr-4 italic",
+                      resolvedTheme === 'dark' ? "bg-white/10 border-white/20 text-white" : "bg-slate-50 border-black/10 text-slate-900"
+                    )}
+                    defaultValue={preset.name}
+                    onBlur={(e) => handleSaveName(preset.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveName(preset.id, e.currentTarget.value);
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span className={cn(
+                    "text-sm font-black uppercase tracking-tight transition-colors italic",
+                    activePattern?.id === preset.id 
+                      ? "text-[#FF4E00]" 
+                      : resolvedTheme === 'dark' ? "text-white group-hover:text-white/80" : "text-slate-900 group-hover:text-slate-700"
+                  )}>
+                    {preset.name}
+                  </span>
+                )}
+                <div className="flex items-center gap-2 relative z-20">
+                  <span className={cn("text-[9px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>{preset.timeSignature}</span>
+                  {preset.isUserPreset && (
+                    <div className="flex items-center gap-2 relative z-50">
+                      <button 
+                        type="button"
+                        onClick={(e) => handleEditPresetName(preset.id, e)}
+                        className={cn(
+                          "p-2 rounded-xl transition-all",
+                          resolvedTheme === 'dark' ? "bg-white/10 text-white/50 hover:text-white hover:bg-white/20" : "bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200"
+                        )}
+                        title="Rename Preset"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={(e) => handleDeletePreset(preset.id, e)}
+                        className="p-2 bg-red-500/10 text-red-500/50 hover:text-red-500 hover:bg-red-500/20 rounded-xl transition-all"
+                        title="Delete Preset"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={cn("text-[10px] font-bold uppercase tracking-widest leading-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>{preset.bpm} BPM</span>
+                <div className={cn("w-1 h-1 rounded-full", resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200")} />
+                <span className={cn("text-[10px] font-bold uppercase tracking-widest leading-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                  {preset.voices.length} {preset.voices.length === 1 ? 'Layer' : 'Layers'}
+                  {preset.isUserPreset && <span className="ml-2 text-[8px] border border-white/10 px-1 rounded text-white/20">Custom</span>}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Display */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        <div className={cn(
+          "min-h-[500px] rounded-2xl border flex flex-col items-center justify-center p-12 relative overflow-hidden backdrop-blur-md transition-colors",
+          resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl shadow-black/5"
+        )}>
+          {/* Top Indicators */}
+          <div className="absolute top-10 left-12 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[#FF4E00] animate-pulse" />
+            <span className="text-[10px] font-bold text-[#FF4E00] uppercase tracking-[0.2em] italic">Live Pulse</span>
+          </div>
+
+          <div className="flex items-center gap-6 absolute top-10 right-12 z-20">
+             <div className="flex items-center gap-3 mr-4 group">
+               <button 
+                 onClick={() => setMetronomeVolume(metronomeVolume === 0 ? 0.8 : 0)}
+                 className={cn(
+                   "p-2 rounded-lg transition-colors", 
+                   resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-400 hover:text-slate-900"
+                 )}
+               >
+                 {metronomeVolume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+               </button>
+               <div className="relative w-24 h-6 flex items-center">
+                 <input 
+                   type="range" min="0" max="1" step="0.01"
+                   value={metronomeVolume}
+                   onChange={(e) => setMetronomeVolume(parseFloat(e.target.value))}
+                   className={cn(
+                     "w-full h-1 rounded-full appearance-none cursor-pointer accent-[#FF4E00] opacity-30 group-hover:opacity-100 transition-opacity", 
+                     resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
+                   )} 
+                 />
+               </div>
+             </div>
+
+             <div className="flex gap-4">
+               <button 
+                 onClick={() => setDisplayMode('circular')}
+                 className={cn(
+                   "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", 
+                   displayMode === 'circular' 
+                     ? resolvedTheme === 'dark' ? "bg-white text-black underline decoration-2 underline-offset-4" : "bg-slate-900 text-white shadow-lg" 
+                     : resolvedTheme === 'dark' ? "bg-white/5 text-white/40 hover:bg-white/10" : "bg-slate-100 text-slate-400 hover:text-slate-600"
+                 )}
+               >
+                 Circular
+               </button>
+               <button 
+                 onClick={() => setDisplayMode('rings')}
+                 className={cn(
+                   "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", 
+                   displayMode === 'rings' 
+                     ? resolvedTheme === 'dark' ? "bg-white text-black underline decoration-2 underline-offset-4" : "bg-slate-900 text-white shadow-lg" 
+                     : resolvedTheme === 'dark' ? "bg-white/5 text-white/40 hover:bg-white/10" : "bg-slate-100 text-slate-400 hover:text-slate-600"
+                 )}
+               >
+                 Rings
+               </button>
+               <button 
+                 onClick={() => setDisplayMode('linear')}
+                 className={cn(
+                   "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", 
+                   displayMode === 'linear' 
+                     ? resolvedTheme === 'dark' ? "bg-white text-black underline decoration-2 underline-offset-4" : "bg-slate-900 text-white shadow-lg" 
+                     : resolvedTheme === 'dark' ? "bg-white/5 text-white/40 hover:bg-white/10" : "bg-slate-100 text-slate-400 hover:text-slate-600"
+                 )}
+               >
+                 Linear
+               </button>
+               <button 
+                 onClick={() => setShowEditor(true)}
+                 className="p-3 bg-[#FF4E00] text-black rounded-xl hover:scale-105 transition-all shadow-[0_10px_20px_rgba(255,78,0,0.2)]"
+                 title="Rhythm Editor"
+               >
+                 <SlidersHorizontal className="w-4 h-4" />
+               </button>
+             </div>
+          </div>
+
+          <div className="relative z-10 w-full flex flex-col items-center">
+            {displayMode === 'circular' ? (
+              <CircularVisualizer isPlaying={isPlaying} pattern={activePattern} rotation={rotation} displayBeat={displayBeat} resolvedTheme={resolvedTheme} />
+            ) : displayMode === 'rings' ? (
+              <RingsVisualizer isPlaying={isPlaying} pattern={activePattern} rotation={rotation} displayBeat={displayBeat} resolvedTheme={resolvedTheme} />
+            ) : (
+              <LinearVisualizer isPlaying={isPlaying} pattern={activePattern} rotation={rotation} resolvedTheme={resolvedTheme} />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Editor Modal */}
+      <AnimatePresence>
+         {showEditor && activePattern && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className={cn(
+                "border rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl transition-colors",
+                resolvedTheme === 'dark' ? "bg-[#111] border-white/10" : "bg-white border-black/5"
+              )}
+            >
+              <div className={cn(
+                "px-10 py-8 border-b flex justify-between items-center transition-colors",
+                resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-black/5"
+              )}>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#FF4E00] rounded-2xl flex items-center justify-center">
+                    <SlidersHorizontal className="w-6 h-6 text-black" />
+                  </div>
+                  <div>
+                    <input 
+                      type="text"
+                      value={activePattern.name}
+                      onChange={(e) => setActivePattern({ ...activePattern, name: e.target.value })}
+                      placeholder="Preset Name"
+                      className={cn(
+                        "bg-transparent text-2xl font-black uppercase italic tracking-tighter border-b focus:border-[#FF4E00] focus:outline-none w-full max-w-sm transition-colors",
+                        resolvedTheme === 'dark' ? "text-white border-white/10" : "text-slate-900 border-black/10"
+                      )}
+                    />
+                    <p className={cn("text-[9px] font-black uppercase tracking-[0.4em] mt-1", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>Design & Layer your beats</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={handleSavePreset}
+                    className={cn(
+                      "flex items-center gap-3 px-6 py-4 rounded-2xl hover:scale-105 transition-all group font-black uppercase text-[10px] tracking-widest italic shadow-lg",
+                      resolvedTheme === 'dark' ? "bg-white text-black" : "bg-slate-900 text-white"
+                    )}
+                  >
+                    <Save className="w-4 h-4" />
+                    Save Preset
+                  </button>
+                  <button 
+                    onClick={() => setShowEditor(false)}
+                    className={cn(
+                      "p-4 rounded-2xl transition-all group",
+                      resolvedTheme === 'dark' ? "bg-white/5 text-white/40 hover:text-white hover:bg-white/10" : "bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200"
+                    )}
+                  >
+                    <X className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
+                {/* Global Pattern Controls */}
+                <div className={cn(
+                  "flex items-center gap-8 p-8 rounded-[2rem] border transition-colors",
+                  resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-slate-100/50 border-black/5"
+                )}>
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[9px] font-black text-[#FF4E00] uppercase tracking-[0.3em]">Start Sequence At</span>
+                    <div className={cn(
+                      "flex items-center gap-3 p-1.5 rounded-xl border transition-colors",
+                      resolvedTheme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
+                    )}>
+                      <button 
+                        onClick={() => {
+                          const next = { ...activePattern };
+                          const currentOffset = next.displayOffset || 0;
+                          next.displayOffset = (currentOffset - 1 + masterLength) % masterLength;
+                          setActivePattern(next);
+                        }}
+                        className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <div className="min-w-[3rem] text-center">
+                        <span className={cn("text-xl font-black italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900 text-slate-900")}>{(activePattern.displayOffset || 0) + 1}</span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          const next = { ...activePattern };
+                          const currentOffset = next.displayOffset || 0;
+                          next.displayOffset = (currentOffset + 1) % masterLength;
+                          setActivePattern(next);
+                        }}
+                        className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className={cn("w-[1px] h-12", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
+
+                  <div className="flex flex-col gap-1 flex-1 min-w-[150px]">
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-[9px] font-black uppercase tracking-[0.3em]", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>Tempo (BPM)</span>
+                      <div className="flex items-center gap-2">
+                         <button onClick={() => setBpm(bpm - 1)} className={cn("p-1 rounded-md transition-colors", resolvedTheme === 'dark' ? "hover:bg-white/10 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}>
+                           <Minus className="w-3 h-3" />
+                         </button>
+                         <span className="text-sm font-black italic text-[#FF4E00] w-8 text-center">{bpm}</span>
+                         <button onClick={() => setBpm(bpm + 1)} className={cn("p-1 rounded-md transition-colors", resolvedTheme === 'dark' ? "hover:bg-white/10 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}>
+                           <Plus className="w-3 h-3" />
+                         </button>
+                      </div>
+                    </div>
+                    <input 
+                      type="range" min="40" max="240" 
+                      value={bpm} 
+                      onChange={(e) => setBpm(parseInt(e.target.value))}
+                      className={cn(
+                        "w-full h-1 rounded-full appearance-none cursor-pointer accent-[#FF4E00]", 
+                        resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
+                      )} 
+                    />
+                  </div>
+                  
+                  <div className={cn("w-[1px] h-12", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
+                  
+                  <div className="flex flex-col gap-1">
+                    <span className={cn("text-[9px] font-black uppercase tracking-[0.3em]", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>Signature</span>
+                    <input 
+                      type="text"
+                      value={activePattern.timeSignature}
+                      onChange={(e) => setActivePattern({ ...activePattern, timeSignature: e.target.value })}
+                      className={cn(
+                        "bg-transparent text-xl font-black italic uppercase tracking-tighter tabular-nums border-b focus:border-[#FF4E00] focus:outline-none w-24 transition-colors",
+                        resolvedTheme === 'dark' ? "text-white border-white/5" : "text-slate-900 border-black/5"
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {activePattern.voices.map((voice, vIndex) => (
+                  <div key={voice.id} className={cn(
+                    "flex flex-col gap-6 p-8 rounded-[2rem] border transition-colors",
+                    resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/5 hover:border-white/10" : "bg-white border-black/5 hover:border-black/10 shadow-sm"
+                  )}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="flex items-center gap-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] font-black text-[#FF4E00] uppercase tracking-[0.3em]">Layer {vIndex + 1}</span>
+                          <select 
+                            value={voice.sound}
+                            onChange={(e) => {
+                              const next = { ...activePattern };
+                              next.voices[vIndex].sound = e.target.value as MetronomeSound;
+                              setActivePattern({ ...next });
+                            }}
+                            className={cn(
+                              "bg-transparent font-black uppercase text-sm focus:outline-none cursor-pointer hover:text-[#FF4E00] transition-colors",
+                              resolvedTheme === 'dark' ? "text-white" : "text-slate-900"
+                            )}
+                          >
+                            {Object.values(MetronomeSound).map(s => (
+                              <option key={s} value={s} className={cn(resolvedTheme === 'dark' ? "bg-black text-white" : "bg-white text-slate-900")}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div className={cn("w-[1px] h-8", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
+
+                        <div className="flex items-center gap-4">
+                          <button 
+                            onClick={() => {
+                              const next = { ...activePattern };
+                              next.voices[vIndex].muted = !voice.muted;
+                              setActivePattern({ ...next });
+                            }}
+                            className={cn(
+                              "p-3 rounded-xl transition-all border",
+                              voice.muted ? "bg-red-500/10 border-red-500/20 text-red-500" : (resolvedTheme === 'dark' ? "bg-white/5 border-white/5 text-white/40 hover:text-white" : "bg-slate-100 border-black/5 text-slate-400 hover:text-slate-900")
+                            )}
+                          >
+                            {voice.muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                          </button>
+                          
+                          <div className="flex flex-col gap-1 w-24">
+                            <span className={cn("text-[8px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>Volume {Math.round(voice.volume * 100)}%</span>
+                            <input 
+                              type="range" min="0" max="1" step="0.01"
+                              value={voice.volume}
+                              onChange={(e) => {
+                                const next = { ...activePattern };
+                                next.voices[vIndex].volume = parseFloat(e.target.value);
+                                setActivePattern({ ...next });
+                              }}
+                              className={cn("w-full h-0.5 rounded-full appearance-none cursor-pointer accent-[#FF4E00]", resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200")}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "flex items-center gap-2 p-1 rounded-xl border transition-colors",
+                          resolvedTheme === 'dark' ? "bg-black/40 border-white/5" : "bg-slate-100 border-black/5"
+                        )}>
+                           <button 
+                             onClick={() => {
+                               const next = { ...activePattern };
+                               const oldLen = next.voices[vIndex].pattern?.length || next.voices[vIndex].beats || 4;
+                               const newLen = Math.max(1, oldLen - 1);
+                               next.voices[vIndex].pattern = (next.voices[vIndex].pattern || Array(oldLen).fill(1)).slice(0, newLen);
+                               next.voices[vIndex].beats = newLen;
+                               setActivePattern({ ...next });
+                             }}
+                             className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}
+                           >
+                             <Minus className="w-3 h-3" />
+                           </button>
+                           <span className={cn("w-8 text-center text-xs font-black italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>{voice.pattern?.length || voice.beats}</span>
+                           <button 
+                             onClick={() => {
+                               const next = { ...activePattern };
+                               const oldLen = next.voices[vIndex].pattern?.length || next.voices[vIndex].beats || 4;
+                               const newLen = Math.min(16, oldLen + 1);
+                               const newArray = [...(next.voices[vIndex].pattern || Array(oldLen).fill(1))];
+                               if (newLen > oldLen) newArray.push(1);
+                               next.voices[vIndex].pattern = newArray;
+                               next.voices[vIndex].beats = newLen;
+                               setActivePattern({ ...next });
+                             }}
+                             className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}
+                           >
+                             <Plus className="w-3 h-3" />
+                           </button>
+                        </div>
+
+                        {vIndex > 0 && (
+                          <button 
+                            onClick={() => {
+                              const next = { ...activePattern };
+                              next.voices.splice(vIndex, 1);
+                              setActivePattern({ ...next });
+                            }}
+                            className={cn(
+                              "p-4 rounded-2xl transition-all shadow-sm",
+                              resolvedTheme === 'dark' ? "bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-black shadow-red-500/10" : "bg-red-50 text-red-500 hover:bg-red-500 hover:text-white shadow-red-500/5"
+                            )}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={cn("flex flex-wrap gap-2 pt-4 border-t transition-colors", resolvedTheme === 'dark' ? "border-white/5" : "border-black/5")}>
+                      {voice.pattern?.map((val, i) => {
+                        // Highlight based on current master rotation
+                        const length = voice.pattern?.length || 4;
+                        const isCurrent = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              const newPattern = [...(voice.pattern || [])];
+                              newPattern[i] = (newPattern[i] + 1) % 3;
+                              const next = { ...activePattern };
+                              next.voices[vIndex].pattern = newPattern;
+                              setActivePattern({ ...next });
+                            }}
+                            className={cn(
+                              "w-12 h-12 rounded-xl transition-all flex flex-col items-center justify-center font-black text-[9px] border relative overflow-hidden",
+                              voice.muted ? "opacity-30 pointer-events-none grayscale" : (
+                                val === 2 ? "bg-[#FF4E00] border-[#FF4E00] text-white shadow-lg shadow-[#FF4E00]/20" :
+                                val === 1 ? (resolvedTheme === 'dark' ? "bg-white/10 border-white/5 text-white" : "bg-slate-300 border-black/5 text-slate-900") :
+                                (resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/5 text-white/5 hover:border-white/20" : "bg-slate-50 border-black/5 text-slate-200 hover:border-black/20")
+                              )
+                            )}
+                          >
+                            {isCurrent && !voice.muted && <div className="absolute inset-0 bg-white/40 animate-pulse" />}
+                            <span className="relative z-10">{val === 2 ? 'ACC' : val === 1 ? 'BEAT' : ''}</span>
+                            <span className={cn("absolute bottom-1 right-1 text-[7px]", resolvedTheme === 'dark' ? "text-white/10" : "text-black/10")}>{((i + (activePattern?.displayOffset || 0)) % (voice.pattern?.length || 4)) + 1}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                
+                <button 
+                  onClick={() => {
+                    if (!activePattern) return;
+                    const firstVoice = activePattern.voices[0];
+                    const next = { ...activePattern };
+                    const newVoice = {
+                      id: Date.now(),
+                      sound: MetronomeSound.HiHat,
+                      volume: 0.6,
+                      beats: firstVoice.pattern?.length || firstVoice.beats || 4,
+                      active: true,
+                      muted: false,
+                      pattern: Array(firstVoice.pattern?.length || firstVoice.beats || 4).fill(0)
+                    };
+                    next.voices.push(newVoice);
+                    setActivePattern({ ...next });
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-center gap-3 p-10 border border-dashed rounded-2xl transition-all group shadow-sm",
+                    resolvedTheme === 'dark' ? "bg-white/[0.02] hover:bg-white/[0.05] border-white/10" : "bg-slate-50 hover:bg-slate-100 border-black/10"
+                  )}
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#FF4E00]/10 flex items-center justify-center text-[#FF4E00] group-hover:scale-110 transition-transform">
+                    <Plus className="w-5 h-5" />
+                  </div>
+                  <span className={cn("text-[10px] font-black uppercase tracking-[0.3em] italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Add New Rhythm Layer</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTheme }: { isPlaying: boolean, pattern: BeatPattern | null, rotation: number, displayBeat: number, resolvedTheme: 'dark' | 'light' }) {
+  const voices = pattern?.voices || [];
+  const masterVoice = voices[0];
+  const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+  const radius = 140;
+
+  // Vibrant high-contrast colors for different layers
+  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+
+  return (
+    <div className="relative w-80 h-80 flex items-center justify-center">
+      <div className={cn("absolute inset-0 rounded-full blur-3xl opacity-10", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
+      
+      {/* Tracker line - stays on top */}
+      <div 
+        className={cn(
+          "absolute w-[2px] h-[160px] z-50 origin-bottom rounded-full pointer-events-none",
+          resolvedTheme === 'dark' ? "bg-white shadow-[0_0_15px_white]" : "bg-slate-900 shadow-[0_0_15px_rgba(0,0,0,0.2)]"
+        )}
+        style={{ 
+          transform: `rotate(${rotation % 360}deg)`,
+          top: '0',
+          left: '50%',
+          marginLeft: '-1px',
+          transformOrigin: '50% 160px'
+        }}
+      />
+
+      <div className="relative w-full h-full flex items-center justify-center">
+        {/* Single guide ring */}
+        <svg className="absolute w-full h-full rotate-[-90deg]">
+          <circle 
+            cx="160" cy="160" r={radius} 
+            className={cn("fill-none", resolvedTheme === 'dark' ? "stroke-white/[0.05]" : "stroke-black/[0.05]")}
+            strokeWidth="1"
+          />
+        </svg>
+
+        {/* Draw voices in reverse order so higher numbered (larger radii) voices are drawn first (behind) */}
+        {[...voices].reverse().map((voice, reversedVIndex) => {
+          const vIndex = voices.length - 1 - reversedVIndex;
+          const length = voice.pattern?.length || voice.beats || 4;
+          const color = voiceColors[vIndex % voiceColors.length];
+          
+          // \"higher number voices have larger radii\" (dot sizes)
+          const dotRadius = 4 + (vIndex * 4); 
+          
+          return (
+            <div key={voice.id} className="absolute inset-0 pointer-events-none">
+              {Array.from({ length }).map((_, i) => {
+                const angle = (i * 360) / length;
+                const val = voice.pattern ? voice.pattern[i] : (i === 0 ? 2 : 1);
+                const isOver = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
+                
+                if (val === 0 && !isOver) return null;
+
+                return (
+                  <div 
+                    key={i}
+                    className="absolute left-1/2 -ml-[1px] w-[2px] pointer-events-none"
+                    style={{ 
+                      top: `${160 - radius}px`,
+                      height: `${radius}px`,
+                      transform: `rotate(${angle}deg)`,
+                      transformOrigin: '50% 100%'
+                    }}
+                  >
+                    <div 
+                      className={cn(
+                        "absolute left-1/2 rounded-full transition-all",
+                        voice.muted ? "opacity-10" : "",
+                        isOver && !voice.muted ? "z-20" : ""
+                      )}
+                      style={{
+                        width: `${dotRadius * 2}px`,
+                        height: `${dotRadius * 2}px`,
+                        top: 0,
+                        transform: `translate(-50%, -50%) ${isOver && !voice.muted ? 'scale(1.25)' : 'scale(1)'}`,
+                        backgroundColor: !voice.muted ? (
+                          isOver ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : `${color}22`)
+                        ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                        border: !voice.muted && val === 2 ? `1px solid ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}` : 'none',
+                        boxShadow: !voice.muted ? (
+                          isOver ? `0 0 20px ${resolvedTheme === 'dark' ? '#FFFFFF' : '#000000'}, 0 0 40px ${color}` : (val === 2 ? `0 0 15px ${color}66` : 'none')
+                        ) : 'none'
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+         <motion.div 
+           animate={{
+             scale: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? 1.05 : 1,
+             borderColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.5)" : (resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)"),
+             backgroundColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.05)" : (resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)"),
+             boxShadow: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "0 0 40px rgba(255, 78, 0, 0.2)" : (resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)")
+           }}
+           transition={{ duration: 0.1 }}
+           className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center"
+         >
+           <div className={cn("text-4xl font-black font-mono tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
+             {((displayBeat % masterLength) + 1).toString().padStart(2, '0')}
+           </div>
+         </motion.div>
+      </div>
+    </div>
+  );
+}
+
+function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTheme }: { isPlaying: boolean, pattern: BeatPattern | null, rotation: number, displayBeat: number, resolvedTheme: 'dark' | 'light' }) {
+  const voices = pattern?.voices || [];
+  const masterVoice = voices[0];
+  const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+
+  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+
+  return (
+    <div className="relative w-80 h-80 flex items-center justify-center">
+      <div className={cn("absolute inset-0 rounded-full blur-3xl opacity-10", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
+      
+      <div 
+        className={cn(
+          "absolute w-[2px] h-[160px] z-30 origin-bottom rounded-full",
+          resolvedTheme === 'dark' ? "bg-white shadow-[0_0_15px_white]" : "bg-slate-900 shadow-[0_0_15px_rgba(0,0,0,0.2)]"
+        )}
+        style={{ 
+          transform: `rotate(${rotation % 360}deg)`,
+          top: '0',
+          left: '50%',
+          marginLeft: '-1px',
+          transformOrigin: '50% 160px'
+        }}
+      />
+
+      <div className="relative w-full h-full flex items-center justify-center">
+        {voices.map((voice, vIndex) => {
+          const radius = 148 - (vIndex * 32); 
+          if (radius < 40) return null; 
+          const length = voice.pattern?.length || voice.beats || 4;
+          const color = voiceColors[vIndex % voiceColors.length];
+          
+          return (
+            <div key={voice.id} className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <svg className="absolute w-full h-full rotate-[-90deg]">
+                <circle 
+                  cx="160" cy="160" r={radius} 
+                  className={cn(
+                    "fill-none transition-colors",
+                    voice.muted 
+                      ? resolvedTheme === 'dark' ? "stroke-white/[0.01]" : "stroke-black/[0.01]"
+                      : resolvedTheme === 'dark' ? "stroke-white/[0.05]" : "stroke-black/[0.05]"
+                  )}
+                  strokeWidth="1"
+                />
+              </svg>
+
+              {Array.from({ length }).map((_, i) => {
+                const angle = (i * 360) / length;
+                const val = voice.pattern ? voice.pattern[i] : (i === 0 ? 2 : 1);
+                const isOver = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
+                
+                return (
+                  <div 
+                    key={i}
+                    className="absolute left-1/2 -ml-[1px] w-[2px] pointer-events-none"
+                    style={{ 
+                      top: `${160 - radius}px`,
+                      height: `${radius}px`,
+                      transform: `rotate(${angle}deg)`,
+                      transformOrigin: '50% 100%'
+                    }}
+                  >
+                    <div 
+                      className={cn(
+                        "absolute left-1/2 w-4 h-4 rounded-full transition-all",
+                        voice.muted ? "opacity-10" : "",
+                        isOver && !voice.muted ? "z-20" : ""
+                      )} 
+                      style={{
+                        top: 0,
+                        transform: `translate(-50%, -50%) ${isOver && !voice.muted ? 'scale(1.5)' : 'scale(1)'}`,
+                        backgroundColor: !voice.muted ? (
+                          isOver ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : `${color}22`)
+                        ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                        boxShadow: !voice.muted ? (
+                          isOver ? `0 0 20px ${resolvedTheme === 'dark' ? '#FFFFFF' : '#000000'}, 0 0 40px ${color}` : (val === 2 ? `0 0 15px ${color}66` : 'none')
+                        ) : 'none'
+                      }} 
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+         <motion.div 
+           animate={{
+             scale: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? 1.05 : 1,
+             borderColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.5)" : (resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)"),
+             backgroundColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.05)" : (resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)"),
+             boxShadow: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "0 0 40px rgba(255, 78, 0, 0.2)" : (resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)")
+           }}
+           transition={{ duration: 0.1 }}
+           className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center"
+         >
+           <div className={cn("text-4xl font-black font-mono tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
+             {((displayBeat % masterLength) + 1).toString().padStart(2, '0')}
+           </div>
+         </motion.div>
+      </div>
+    </div>
+  );
+}
+
+function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isPlaying: boolean, pattern: BeatPattern | null, rotation: number, resolvedTheme: 'dark' | 'light' }) {
+  const voices = pattern?.voices || [];
+  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+  
+  return (
+    <div className="w-full flex flex-col gap-6 items-center py-8">
+      {voices.map((voice, vIndex) => {
+        const length = voice.pattern?.length || voice.beats || 4;
+        const displayPattern = voice.pattern || Array(length).fill(1);
+        const color = voiceColors[vIndex % voiceColors.length];
+        
+        return (
+          <div key={voice.id} className="flex flex-col items-center gap-1 w-full max-w-2xl">
+            <div className="flex justify-between w-full px-2">
+              <span className={cn("text-[8px] font-black uppercase tracking-widest italic opacity-60", resolvedTheme === 'dark' ? "" : "opacity-80")} style={{ color }}>Layer {vIndex + 1}</span>
+            </div>
+            <div className="flex gap-2 w-full justify-center overflow-x-auto py-2">
+              {displayPattern.map((val, i) => {
+                const isCurrent = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
+                
+                return (
+                  <motion.div
+                    key={i}
+                    initial={false}
+                    animate={{
+                      scale: isCurrent && !voice.muted ? 1.1 : 1,
+                      opacity: voice.muted ? 0.3 : (val === 0 && !isCurrent ? 0.1 : 1),
+                      backgroundColor: !voice.muted ? (
+                        isCurrent ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : (val === 1 ? `${color}22` : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)')))
+                      ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                      boxShadow: !voice.muted && isCurrent ? `0 0 20px ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.2)'}, 0 0 40px ${color}` : (val === 2 && !voice.muted ? `0 0 10px ${color}44` : 'none')
+                    }}
+                    transition={{ duration: 0.1 }}
+                    className={cn(
+                      "w-6 h-10 rounded-lg border transition-all flex items-center justify-center shrink-0",
+                      isCurrent && !voice.muted ? (resolvedTheme === 'dark' ? "border-white" : "border-black") : (resolvedTheme === 'dark' ? "border-white/5" : "border-black/5")
+                    )}
+                  >
+                     {val === 2 && !isCurrent && (
+                       <div className={cn("w-1.5 h-1.5 rounded-full", resolvedTheme === 'dark' ? "bg-white/50" : "bg-black/30")} />
+                     )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+

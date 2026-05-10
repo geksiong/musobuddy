@@ -1,0 +1,12 @@
+{
+  "name": "MusoBuddy",
+  "description": "A comprehensive music practice tool featuring a high-precision metronome, chromatic tuner, drone patterns, accompaniment, and music score viewer.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "audio_processing",
+    "music_notation",
+    "practice_tools"
+  ]
+}
