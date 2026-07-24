@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { ScoreData } from '../components/Score/types.ts';
+import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 
 interface GlobalAudio {
   url: string;
@@ -22,16 +22,54 @@ interface ScoreContextType {
 
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
 
+const DEFAULT_SCORES: ScoreData[] = [
+  {
+    id: 'cooleys-reel',
+    title: "Cooley's Reel",
+    format: ScoreFormat.ABC,
+    content: `X: 1
+T: Cooley's
+R: reel
+M: 4/4
+L: 1/8
+K: Edor
+|:D2|EBBA B2EB|B2AB defg|AFDF A2FA|B2AF AFEF|
+EBBA B2EB|B2AB defg|afec dBAF|DEFD E2:|
+|:fa|eB B2 efge|eB B2 gedB|A2 FA DAFA|A2 FA defg|
+eB B2 efge|eB B2 defg|afec dBAF|DEFD E2:|`,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    viewMode: 'scroll',
+    selectedTuneIndex: 0,
+    transpose: 0
+  }
+];
+
 export function ScoreProvider({ children }: { children: React.ReactNode }) {
   const [scores, setScores] = useState<ScoreData[]>(() => {
     const saved = localStorage.getItem('studio_buddy_scores');
-    // Note: blob URLs inside ScoreData will be invalid on refresh, 
-    // but the library structure (titles, formats, ABC/Text content) will persist.
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.warn('Failed to parse saved scores:', e);
+      }
+    }
+    return DEFAULT_SCORES;
   });
   
   const [activeScoreId, setActiveScoreId] = useState<string | null>(() => {
-    return localStorage.getItem('studio_buddy_active_score_id');
+    const savedId = localStorage.getItem('studio_buddy_active_score_id');
+    if (savedId) return savedId;
+    const savedScores = localStorage.getItem('studio_buddy_scores');
+    if (savedScores) {
+      try {
+        const parsed = JSON.parse(savedScores);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id;
+      } catch (e) {}
+    }
+    return DEFAULT_SCORES[0]?.id || null;
   });
 
   const [globalAudio, setGlobalAudio] = useState<GlobalAudio | null>(null);

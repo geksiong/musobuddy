@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileText, 
@@ -167,6 +167,36 @@ export default function ScoreView() {
       return ['Tune 1'];
     }
   }, []);
+
+  // Ensure activeScoreId is valid if scores exist
+  useEffect(() => {
+    if (!activeScoreId && scores.length > 0) {
+      setActiveScoreId(scores[0].id);
+    }
+  }, [activeScoreId, scores, setActiveScoreId]);
+
+  // Auto-activate audio engine for loaded score if audioUrl is missing (e.g. after refresh/initial load)
+  useEffect(() => {
+    const currentScore = scores.find(s => s.id === activeScoreId) || scores[0];
+    if (
+      currentScore &&
+      (currentScore.format === ScoreFormat.ABC || (typeof currentScore.content === 'string' && currentScore.content.includes('X:'))) &&
+      (!currentScore.audioUrl || currentScore.audioUrl === '')
+    ) {
+      const midiUrl = generateMidiForAbc(
+        currentScore.content as string,
+        currentScore.selectedTuneIndex || 0,
+        currentScore.transpose || 0
+      );
+      if (midiUrl) {
+        setScores(prev => prev.map(s => s.id === currentScore.id ? {
+          ...s,
+          audioUrl: midiUrl,
+          audioName: `${s.title || 'score'}.mid`
+        } : s));
+      }
+    }
+  }, [activeScoreId, scores, generateMidiForAbc, setScores]);
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const audioFiles: File[] = [];
@@ -406,7 +436,7 @@ export default function ScoreView() {
     }));
   };
 
-  const activeScore = scores.find(s => s.id === activeScoreId);
+  const activeScore = scores.find(s => s.id === activeScoreId) || scores[0];
 
   return (
     <div className="min-h-full flex flex-col md:flex-row gap-0 md:gap-6 p-4 md:p-8 relative">

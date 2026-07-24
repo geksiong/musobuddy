@@ -99,11 +99,21 @@ export default function ScoreAudioPlayer({
 
   const loopModeRef = useRef(loopMode);
   const playbackRateRef = useRef(playbackRate);
+  const pitchRef = useRef(pitch);
+  const volumeStateRef = useRef(volume);
+  const isMutedRef = useRef(isMuted);
+  const channelsRef = useRef(channels);
+  const vocalRemovedRef = useRef(vocalRemoved);
   const nativeTempoRef = useRef(120);
   const midiChannelsRef = useRef<{ [key: number]: { muted: boolean; program?: number; name?: string } }>({});
 
   useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
   useEffect(() => { playbackRateRef.current = playbackRate; }, [playbackRate]);
+  useEffect(() => { pitchRef.current = pitch; }, [pitch]);
+  useEffect(() => { volumeStateRef.current = volume; }, [volume]);
+  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
+  useEffect(() => { channelsRef.current = channels; }, [channels]);
+  useEffect(() => { vocalRemovedRef.current = vocalRemoved; }, [vocalRemoved]);
 
   // Initialize Audio
   useEffect(() => {
@@ -126,11 +136,13 @@ export default function ScoreAudioPlayer({
         setMidiChannels({});
         midiChannelsRef.current = {};
         
-        const pitchShift = new Tone.PitchShift({ pitch: 0 });
+        const pitchShift = new Tone.PitchShift({ pitch: pitchRef.current });
         const analyser = new Tone.Analyser('fft', 256);
-        const vol = new Tone.Volume(0);
+        const vol = new Tone.Volume(isMutedRef.current ? -Infinity : volumeStateRef.current);
         const channel = new Tone.Channel();
-        const vocalFade = new Tone.CrossFade(0);
+        (channel as any).muteL = !channelsRef.current.l;
+        (channel as any).muteR = !channelsRef.current.r;
+        const vocalFade = new Tone.CrossFade(vocalRemovedRef.current ? 1 : 0);
         
         // Signal Flow for Vocal Removal (L - R)
         const splitter = new Tone.Split();
@@ -165,8 +177,10 @@ export default function ScoreAudioPlayer({
           const player = new MidiPlayer.Player((event: any) => {
             try {
               if (event.name === 'Note on') {
-                 if (!midiChannelsRef.current[event.channel]?.muted) {
+                 if (event.velocity > 0 && !midiChannelsRef.current[event.channel]?.muted) {
                    polySynth.triggerAttack(Tone.Frequency(event.noteNumber, 'midi').toNote(), undefined, event.velocity / 127);
+                 } else {
+                   polySynth.triggerRelease(Tone.Frequency(event.noteNumber, 'midi').toNote());
                  }
               } else if (event.name === 'Note off') {
                  polySynth.triggerRelease(Tone.Frequency(event.noteNumber, 'midi').toNote());
@@ -191,9 +205,13 @@ export default function ScoreAudioPlayer({
           });
 
         player.on('endOfFile', () => {
+          synthRef.current?.releaseAll();
+          if ((abcjs as any).synth && (abcjs as any).synth.stopAllNotes) {
+            (abcjs as any).synth.stopAllNotes();
+          }
           if (loopModeRef.current) {
             player.stop();
-            player.skipToTick(0);
+            player.skipToPercent(0);
             player.tempo = nativeTempoRef.current * playbackRateRef.current;
             player.play();
           } else {
@@ -201,11 +219,7 @@ export default function ScoreAudioPlayer({
             setCurrentTime(0);
             onTimeUpdate?.(0);
             player.stop();
-            player.skipToTick(0);
-            synthRef.current?.releaseAll();
-            if ((abcjs as any).synth && (abcjs as any).synth.stopAllNotes) {
-              (abcjs as any).synth.stopAllNotes();
-            }
+            player.skipToPercent(0);
           }
         });
 
@@ -304,34 +318,35 @@ export default function ScoreAudioPlayer({
       }
       setIsPlaying(false);
     } else {
+      if (pitchShiftRef.current) {
+        pitchShiftRef.current.pitch = pitch;
+      }
       if (isMidi) {
         if (midiPlayerRef.current) {
           midiPlayerRef.current.tempo = nativeTempoRef.current * playbackRate;
-          if (!midiPlayerRef.current.isPlaying()) {
-            // Check if we are at the very end (or past it)
-            const currentTick = midiPlayerRef.current.getCurrentTick();
-            const totalTicks = midiPlayerRef.current.totalTicks;
-            if (currentTick >= totalTicks || currentTime >= duration - 0.05) {
-              midiPlayerRef.current.stop();
-              midiPlayerRef.current.skipToTick(0);
-              setCurrentTime(0);
-            }
-            // Small delay to ensure the stop/skip has processed
-            setTimeout(() => {
-              if (midiPlayerRef.current) {
-                midiPlayerRef.current.play();
-                setIsPlaying(true);
-              }
-            }, 10);
-            return;
+          const currentTick = midiPlayerRef.current.getCurrentTick();
+          const totalTicks = midiPlayerRef.current.totalTicks;
+          if (currentTick >= totalTicks || currentTime >= duration - 0.05 || currentTime === 0) {
+            midiPlayerRef.current.stop();
+            midiPlayerRef.current.skipToPercent(0);
+            setCurrentTime(0);
           }
+          synthRef.current?.releaseAll();
+          midiPlayerRef.current.play();
+          setIsPlaying(true);
         }
       }
       else {
-        playerRef.current?.start(undefined, currentTime);
-        (playerRef.current as any)._playbackStartTime = Tone.now() - currentTime / playbackRate;
+        if (currentTime >= duration - 0.05) {
+          setCurrentTime(0);
+          playerRef.current?.start(undefined, 0);
+          (playerRef.current as any)._playbackStartTime = Tone.now();
+        } else {
+          playerRef.current?.start(undefined, currentTime);
+          (playerRef.current as any)._playbackStartTime = Tone.now() - currentTime / playbackRate;
+        }
+        setIsPlaying(true);
       }
-      setIsPlaying(true);
     }
   };
 
