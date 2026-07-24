@@ -5,13 +5,14 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as abcjs from 'abcjs';
+import { toAbcNoteName, getAbcjsTablatureInstrument } from '../../lib/abcUtils.ts';
 
 interface Props {
   abc: string;
   responsive?: boolean;
   tuneIndex?: number;
   transpose?: number;
-  tablature?: 'guitar' | 'ukulele' | 'mandolin' | 'banjo' | 'dadgad' | 'none';
+  tablature?: string;
   tuning?: string[];
   currentTime?: number;
 }
@@ -67,25 +68,37 @@ export const AbcRenderer: React.FC<Props> = ({
           targetAbc = targetAbc.replace(/^%%[^\n]*\n?/gm, '');
         }
 
-        if (tablature && tablature !== 'none') {
-          const instrumentName = tablature === 'dadgad' ? 'guitar' : tablature;
-          const tuningStr = (tuning && tuning.length > 0) ? ` tuning=${tuning.join(',')}` : '';
-          const directive = `%%tablature ${instrumentName}${tuningStr}`;
+        // Clean up any existing %%tablature directives to prevent duplicate or invalid lines
+        targetAbc = targetAbc.replace(/^%%tablature[^\n]*\n?/gm, '');
+
+        const abcjsInstrument = getAbcjsTablatureInstrument(tablature);
+        const abcTuning = (tuning || []).map(toAbcNoteName).filter(Boolean);
+
+        if (abcjsInstrument) {
+          const tuningStr = abcTuning.length > 0 ? ` tuning=${abcTuning.join(',')}` : '';
+          const directive = `%%tablature ${abcjsInstrument}${tuningStr}`;
           
-          // Inject directive after headers
-          if (targetAbc.match(/^K:/m)) {
+          // Inject directive after K: or X:
+          if (targetAbc.match(/^K:[^\n]*/m)) {
             targetAbc = targetAbc.replace(/^(K:[^\n]*)/m, `$1\n${directive}`);
-          } else if (targetAbc.match(/^X:/m)) {
+          } else if (targetAbc.match(/^X:[^\n]*/m)) {
             targetAbc = targetAbc.replace(/^(X:[^\n]*)/m, `$1\n${directive}`);
           } else {
             targetAbc = `${directive}\n${targetAbc}`;
           }
 
           visualOptions.tablature = [{ 
-            instrument: instrumentName,
-            tuning: tuning && tuning.length > 0 ? tuning : undefined,
-            label: 'Tab'
+            instrument: abcjsInstrument,
+            tuning: abcTuning.length > 0 ? abcTuning : undefined,
+            label: tablature + " (%T)"
           }];
+
+          visualOptions.format = {
+            tablabelfont: "Helvetica 10",
+            tabnumberfont: "Helvetica 12"
+          }
+
+          visualOptions.paddingbottom = 50;
         }
 
         const visualObjs = abcjs.renderAbc(divRef.current, targetAbc, visualOptions);
@@ -103,10 +116,16 @@ export const AbcRenderer: React.FC<Props> = ({
                     const highlighted = divRef.current?.querySelectorAll('.abcjs-highlight');
                     highlighted?.forEach(el => el.classList.remove('abcjs-highlight'));
 
-                    event.elements.forEach((group: any) => {
-                      group.forEach((el: any) => {
-                        el.classList.add('abcjs-highlight');
-                      });
+                    event.elements.forEach((groupOrEl: any) => {
+                      if (Array.isArray(groupOrEl)) {
+                        groupOrEl.forEach((el: any) => {
+                          if (el && el.classList) {
+                            el.classList.add('abcjs-highlight');
+                          }
+                        });
+                      } else if (groupOrEl && groupOrEl.classList) {
+                        groupOrEl.classList.add('abcjs-highlight');
+                      }
                     });
                   }
                 },
@@ -126,6 +145,17 @@ export const AbcRenderer: React.FC<Props> = ({
         console.error('ABC Render error:', renderErr);
       }
     }
+
+    return () => {
+      if (timingCallbacksRef.current) {
+        try {
+          timingCallbacksRef.current.stop();
+        } catch (e) {
+          console.warn('Failed to stop timing callbacks on cleanup:', e);
+        }
+        timingCallbacksRef.current = null;
+      }
+    };
   }, [abc, responsive, tuneIndex, transpose, tablature, tuning]);
 
   // Sync highlighting with currentTime

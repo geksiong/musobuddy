@@ -47,30 +47,37 @@ import CodeMirror from '@uiw/react-codemirror';
 import { abc } from '../../lib/abcLanguage.ts';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { transposeAbc } from '../../lib/abcTransposer.ts';
+import { toAbcNoteName } from '../../lib/abcUtils.ts';
 
 const TUNINGS: Record<string, { label: string; value: string[] }[]> = {
   guitar: [
-    { label: 'Standard (EADGBE)', value: ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'] },
-    { label: 'Drop-D (DADGBE)', value: ['D2', 'A2', 'D3', 'G3', 'B3', 'E4'] },
-    { label: 'Open-D (DADF#AD)', value: ['D2', 'A2', 'D3', 'Gb3', 'A3', 'D4'] },
-    { label: 'Open-G (DGDGBD)', value: ['D2', 'G2', 'D3', 'G3', 'B3', 'D4'] },
-    { label: 'DADGAD', value: ['D2', 'A2', 'D3', 'G3', 'A3', 'D4'] },
+    { label: 'Standard (EADGBE)', value: ['E,', 'A,', 'D', 'G', 'B', 'e'] },
+    { label: 'Drop-D (DADGBE)', value: ['D,', 'A,', 'D', 'G', 'B', 'e'] },
+    { label: 'Open-D (DADF#AD)', value: ['D,', 'A,', 'D', '^F', 'A', 'd'] },
+    { label: 'Open-G (DGDGBD)', value: ['D,', 'G,', 'D', 'G', 'B', 'd'] },
+    { label: 'DADGAD', value: ['D,', 'A,', 'D', 'G', 'A', 'd'] },
   ],
   ukulele: [
-    { label: 'Standard (GCEA)', value: ['G4', 'C4', 'E4', 'A4'] },
-    { label: 'Standard (Low-G)', value: ['G3', 'C4', 'E4', 'A4'] },
-    { label: 'Slack-Key (GCEG)', value: ['G4', 'C4', 'E4', 'G4'] },
-    { label: 'D-Tuning (ADF#B)', value: ['A4', 'D4', 'Gb4', 'B4'] },
-    { label: 'Baritone (DGBE)', value: ['D3', 'G3', 'B3', 'E4'] },
+    { label: 'Standard (GCEA)', value: ['G,', 'C', 'E', 'A'] },
+    { label: 'Standard (Low-G)', value: ['G,', 'C', 'E', 'A'] },
+    { label: 'Slack-Key (GCEG)', value: ['G,', 'C', 'E', 'G'] },
+    { label: 'D-Tuning (ADF#B)', value: ['A,', 'D', '^F', 'B'] },
+    { label: 'Baritone (DGBE)', value: ['D', 'G', 'B', 'e'] },
+    { label: 'Baritone Open G (DGBD)', value: ['D', 'G', 'B', 'd'] },
   ],
   mandolin: [
-    { label: 'Standard (GDAE)', value: ['G3', 'D4', 'A4', 'E5'] },
-    { label: 'GDAD', value: ['G3', 'D4', 'A4', 'D5'] },
+    { label: 'Standard (GDAE)', value: ['G,', 'D', 'A', 'e'] },
+    { label: 'GDAD', value: ['G,', 'D', 'A', 'd'] },
   ],
   banjo: [
-    { label: 'Standard (gDGBD)', value: ['G4', 'D3', 'G3', 'B3', 'D4'] },
-    { label: 'Double C (gCGCD)', value: ['G4', 'C3', 'G3', 'C4', 'D4'] },
-    { label: 'Old-Time G (gDGCD)', value: ['G4', 'D3', 'G3', 'C4', 'D4'] },
+    { label: 'Standard (gDGBD)', value: ['G,', 'D', 'G', 'B', 'd'] },
+    { label: 'Old-Time G (gDGCD)', value: ['G,', 'D', 'G', 'c', 'd'] },
+    { label: 'Drop C (gCGCD)', value: ['G,', 'C', 'G', 'c', 'd'] },
+    { label: 'Double C (gCGCD)', value: ['C,', 'G,', 'C', 'G', 'c'] },
+    { label: 'Open D (gCGCD)', value: ['^F,', 'D', '^F', 'A', 'd'] },
+  ],
+  violin: [
+    { label: 'Standard (GDAE)', value: ['G,', 'D', 'A', 'e'] },
   ]
 };
 
@@ -901,6 +908,7 @@ function ScoreDisplay({
                     <option value="ukulele" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Ukulele</option>
                     <option value="mandolin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Mandolin</option>
                     <option value="banjo" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Banjo</option>
+                    <option value="violin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Violin / Fiddle</option>
                   </select>
                 </div>
 
@@ -909,7 +917,7 @@ function ScoreDisplay({
                   <div className="flex flex-col">
                     <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tuning</span>
                     <select 
-                      value={JSON.stringify(score.tuning)}
+                      value={JSON.stringify((score.tuning || []).map(toAbcNoteName))}
                       onChange={(e) => onUpdate({ tuning: JSON.parse(e.target.value) })}
                       className={cn(
                         "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",

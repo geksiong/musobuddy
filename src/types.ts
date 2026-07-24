@@ -92,8 +92,8 @@ export interface ScoreData {
   showEditor?: boolean;
   selectedTuneIndex?: number;
   transpose?: number;
-  tablature?: 'guitar' | 'ukulele' | 'mandolin' | 'banjo' | 'dadgad' | 'none';
-  tuning?: string[]; // Array of strings for string tunings e.g. ['E2', 'A2'...]
+  tablature?: 'guitar' | 'ukulele' | 'mandolin' | 'banjo' | 'violin' | 'fiddle' | 'fiveString' | 'dadgad' | 'none';
+  tuning?: string[]; // Array of strings for string tunings e.g. ['E,', 'A,', 'D'...]
 }
 
 export interface TunerResult {
