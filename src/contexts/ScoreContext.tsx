@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { ScoreData } from '../types.ts';
+import { ScoreData } from '../components/Score/types.ts';
 
 interface GlobalAudio {
   url: string;

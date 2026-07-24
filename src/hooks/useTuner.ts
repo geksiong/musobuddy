@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PitchDetector } from 'pitchy';
-import { TunerResult } from '../types.ts';
+import { TunerResult } from '../components/Tuner/types.ts';
 import { useAudio } from '../contexts/AudioContext.tsx';
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];

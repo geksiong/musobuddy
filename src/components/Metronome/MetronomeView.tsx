@@ -9,8 +9,8 @@ import {
   X, SlidersHorizontal, Music, ChevronUp, ChevronDown, Save, Edit2
 } from 'lucide-react';
 import { useMetronome } from '../../hooks/useMetronome.ts';
-import { DEFAULT_PRESETS, TEMPO_NAMES } from '../../constants.ts';
-import { BeatPattern, MetronomeSound, TimeSignatureType } from '../../types.ts';
+import { DEFAULT_PRESETS, TEMPO_NAMES } from './constants.ts';
+import { BeatPattern, MetronomeSound, TimeSignatureType } from './types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';

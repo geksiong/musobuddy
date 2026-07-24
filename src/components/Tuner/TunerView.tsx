@@ -7,7 +7,7 @@ import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, Music, ChevronLeft, ChevronRight, Settings2 } from 'lucide-react';
 import { useTuner, Temperament } from '../../hooks/useTuner.ts';
-import { INSTRUMENT_TUNINGS } from '../../constants.ts';
+import { INSTRUMENT_TUNINGS } from './constants.ts';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 

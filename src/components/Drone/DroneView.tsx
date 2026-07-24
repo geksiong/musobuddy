@@ -7,8 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Play, Pause, Volume2, Wind } from 'lucide-react';
 import { useDrone } from '../../hooks/useDrone.ts';
-import { DroneTone } from '../../types.ts';
-import { DRONE_TONES } from '../../constants.ts';
+import { DroneTone } from './types.ts';
+import { DRONE_TONES } from './constants.ts';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 
