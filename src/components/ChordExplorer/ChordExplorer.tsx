@@ -325,7 +325,12 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
         <div className="flex gap-2">
           <select 
             value={selectedKey}
-            onChange={(e) => { setSelectedKey(e.target.value); setPositionIndex(0); }}
+            onChange={(e) => { 
+              setSelectedKey(e.target.value); 
+              setPositionIndex(0); 
+              e.target.blur();
+              setTimeout(() => e.target.blur(), 0);
+            }}
             className={cn(
               "flex-1 border rounded-xl px-4 py-2 text-[10px] font-bold outline-none focus:border-emerald-500/50 appearance-none cursor-pointer transition-colors",
               resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/5 text-slate-900"
@@ -335,7 +340,12 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
           </select>
           <select 
             value={selectedSuffix}
-            onChange={(e) => { setSelectedSuffix(e.target.value); setPositionIndex(0); }}
+            onChange={(e) => { 
+              setSelectedSuffix(e.target.value); 
+              setPositionIndex(0); 
+              e.target.blur();
+              setTimeout(() => e.target.blur(), 0);
+            }}
             className={cn(
               "flex-[2] border rounded-xl px-4 py-2 text-[10px] font-bold outline-none focus:border-emerald-500/50 appearance-none cursor-pointer transition-colors",
               resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/5 text-slate-900"

@@ -556,6 +556,8 @@ export default function MetronomeView() {
                               const next = { ...activePattern };
                               next.voices[vIndex].sound = e.target.value as MetronomeSound;
                               setActivePattern({ ...next });
+                              e.target.blur();
+                              setTimeout(() => e.target.blur(), 0);
                             }}
                             className={cn(
                               "bg-transparent font-black uppercase text-sm focus:outline-none cursor-pointer hover:text-[#FF4E00] transition-colors",

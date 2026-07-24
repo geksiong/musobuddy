@@ -829,7 +829,11 @@ function ScoreDisplay({
                   <div className="flex items-center gap-1 group">
                     <select 
                       value={score.selectedTuneIndex || 0}
-                      onChange={(e) => onUpdate({ selectedTuneIndex: parseInt(e.target.value) })}
+                      onChange={(e) => {
+                        onUpdate({ selectedTuneIndex: parseInt(e.target.value) });
+                        e.target.blur();
+                        setTimeout(() => e.target.blur(), 0);
+                      }}
                       className={cn(
                         "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors py-1",
                         resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
@@ -865,7 +869,11 @@ function ScoreDisplay({
                       </button>
                       <select
                         value={score.transpose || 0}
-                        onChange={(e) => onTranspose(parseInt(e.target.value) - (score.transpose || 0))}
+                        onChange={(e) => {
+                          onTranspose(parseInt(e.target.value) - (score.transpose || 0));
+                          e.target.blur();
+                          setTimeout(() => e.target.blur(), 0);
+                        }}
                         className={cn(
                           "bg-transparent text-[11px] font-black tabular-nums outline-none cursor-pointer hover:text-orange-500 transition-colors appearance-none",
                           resolvedTheme === 'dark' ? "text-white/80" : "text-slate-700"
@@ -896,6 +904,8 @@ function ScoreDisplay({
                       const val = e.target.value as any;
                       const defaultTuning = val !== 'none' ? TUNINGS[val]?.[0]?.value : [];
                       onUpdate({ tablature: val, tuning: defaultTuning });
+                      e.target.blur();
+                      setTimeout(() => e.target.blur(), 0);
                     }}
                     className={cn(
                       "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
@@ -917,7 +927,11 @@ function ScoreDisplay({
                     <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tuning</span>
                     <select 
                       value={JSON.stringify((score.tuning || []).map(toAbcNoteName))}
-                      onChange={(e) => onUpdate({ tuning: JSON.parse(e.target.value) })}
+                      onChange={(e) => {
+                        onUpdate({ tuning: JSON.parse(e.target.value) });
+                        e.target.blur();
+                        setTimeout(() => e.target.blur(), 0);
+                      }}
                       className={cn(
                         "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
                         resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"

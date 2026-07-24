@@ -108,7 +108,11 @@ export default function AccompanimentView() {
                 <div className="relative group">
                   <select
                     value={selectedInstrument}
-                    onChange={(e) => setSelectedInstrument(e.target.value as InstrumentType)}
+                    onChange={(e) => {
+                      setSelectedInstrument(e.target.value as InstrumentType);
+                      e.target.blur();
+                      setTimeout(() => e.target.blur(), 0);
+                    }}
                     className={cn(
                       "appearance-none border px-4 pr-10 py-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer outline-none focus:border-emerald-500/50",
                       resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10" : "bg-slate-100 border-black/5 text-slate-600 hover:text-slate-900 hover:bg-slate-200"
@@ -125,7 +129,11 @@ export default function AccompanimentView() {
                 <div className="relative group">
                   <select
                     value={arpeggioPreset}
-                    onChange={(e) => setArpeggioPreset(e.target.value)}
+                    onChange={(e) => {
+                      setArpeggioPreset(e.target.value);
+                      e.target.blur();
+                      setTimeout(() => e.target.blur(), 0);
+                    }}
                     className={cn(
                       "appearance-none border px-4 pr-10 py-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer outline-none focus:border-emerald-500/50",
                       resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10" : "bg-slate-100 border-black/5 text-slate-600 hover:text-slate-900 hover:bg-slate-200"

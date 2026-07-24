@@ -100,7 +100,11 @@ export default function TunerView() {
                 <Settings2 className={cn("w-3 h-3", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
                 <select 
                   value={temperament}
-                  onChange={(e) => setTemperament(e.target.value as Temperament)}
+                  onChange={(e) => {
+                    setTemperament(e.target.value as Temperament);
+                    e.target.blur();
+                    setTimeout(() => e.target.blur(), 0);
+                  }}
                   className={cn(
                     "bg-transparent border-none text-[10px] font-bold uppercase tracking-widest outline-none cursor-pointer hover:text-emerald-400 transition-colors",
                     resolvedTheme === 'dark' ? "text-white/40" : "text-slate-500"
@@ -286,7 +290,11 @@ export default function TunerView() {
                 <div className="relative">
                   <select 
                     value={selectedDeviceId}
-                    onChange={(e) => setSelectedDeviceId(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedDeviceId(e.target.value);
+                      e.target.blur();
+                      setTimeout(() => e.target.blur(), 0);
+                    }}
                     className={cn(
                       "border rounded-xl px-5 py-2.5 text-[9px] font-bold uppercase tracking-widest outline-none focus:border-emerald-500/50 transition-all max-w-[280px] appearance-none text-center pr-10",
                       resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-white border-black/10 text-slate-900 shadow-sm"
