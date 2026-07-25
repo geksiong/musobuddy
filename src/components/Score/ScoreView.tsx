@@ -48,14 +48,14 @@ import CodeMirror from '@uiw/react-codemirror';
 import { abc } from '../../lib/abcLanguage.ts';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { transposeAbc } from '../../lib/abcTransposer.ts';
-import { toAbcNoteName } from '../../lib/abcUtils.ts';
+import { toAbcNoteName, generateMidiForAbc } from '../../lib/abcUtils.ts';
 
 // Lazy load complex components
 const PdfRenderer = React.lazy(() => import('./PdfRenderer.tsx'));
 const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer.tsx'));
 
 export default function ScoreView() {
-  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio } = useScores();
+  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore } = useScores();
   const [isDragging, setIsDragging] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
@@ -95,43 +95,6 @@ export default function ScoreView() {
   const { isPlaying: isMetronomePlaying, start: startMetronome, stop: stopMetronome } = useMetronome();
   const { isDronePlaying, setIsDronePlaying } = useDrone();
   const { isPlaying: isAccompanimentPlaying, setIsPlaying: setIsAccompanimentPlaying } = useAccompaniment();
-
-  const generateMidiForAbc = useCallback((abc: string, tuneIndex: number = 0, transpose: number = 0) => {
-    try {
-      if (!abc || typeof abc !== 'string') return null;
-      
-      // Filter out any lines starting with %% (directives/comments) ONLY before the first tune
-      let filteredAbc = abc;
-      const firstXMatch = filteredAbc.match(/^X:/m);
-      if (firstXMatch && firstXMatch.index !== undefined) {
-        const header = filteredAbc.substring(0, firstXMatch.index);
-        const rest = filteredAbc.substring(firstXMatch.index);
-        filteredAbc = header.replace(/^%%[^\n]*\n?/gm, '') + rest;
-      } else {
-        filteredAbc = filteredAbc.replace(/^%%[^\n]*\n?/gm, '');
-      }
-      
-      // Split into individual tunes to be more robust for tunebooks
-      const tunes = filteredAbc.split(/(?=^X:)/m).filter(t => t.trim().includes('X:'));
-      const targetAbc = tunes.length > tuneIndex ? tunes[tuneIndex] : filteredAbc;
-      
-      const div = document.createElement('div');
-      const visualObjs = abcjs.renderAbc(div, targetAbc, {
-        visualTranspose: transpose
-      });
-      
-      if (visualObjs && visualObjs.length > 0) {
-        const midiBuffer = abcjs.synth.getMidiFile(visualObjs[0], {
-          midiOutputType: 'binary'
-        }) as Uint8Array;
-        const blob = new Blob([midiBuffer], { type: 'audio/midi' });
-        return URL.createObjectURL(blob);
-      }
-    } catch (err) {
-      console.error('Failed to generate MIDI:', err);
-    }
-    return null;
-  }, []);
 
   const getAbcTuneTitles = useCallback((abc: string) => {
     try {
@@ -196,128 +159,11 @@ export default function ScoreView() {
         } : s));
       }
     }
-  }, [activeScoreId, scores, generateMidiForAbc, setScores]);
+  }, [activeScoreId, scores, setScores]);
 
-  const handleFiles = useCallback(async (files: FileList | File[]) => {
-    const audioFiles: File[] = [];
-    const imageFiles: File[] = [];
-    const filesToProcess: File[] = [];
-    
-    // First, filter out files that are already loaded (by title)
-    for (const file of Array.from(files)) {
-      const name = file.name.split('.')[0];
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      
-      // Separate images and audio
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
-        imageFiles.push(file);
-        continue;
-      }
-      if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'mid', 'midi'].includes(ext || '')) {
-        audioFiles.push(file);
-        continue;
-      }
-
-      // Check for duplicate scores
-      const existingScore = scores.find(s => s.title === name);
-      if (existingScore) {
-        setActiveScoreId(existingScore.id);
-        continue;
-      }
-      
-      filesToProcess.push(file);
-    }
-
-    const newScores: ScoreData[] = [];
-    
-    for (const file of filesToProcess) {
-      const ext = file.name.split('.').pop()?.toLowerCase();
-      const id = Math.random().toString(36).substr(2, 9);
-      const name = file.name.split('.')[0];
-      
-      let format: ScoreFormat = ScoreFormat.Text;
-      let content: string | string[] = '';
-      let audioUrl: string | undefined = undefined;
-      let audioName: string | undefined = undefined;
-
-      if (ext === 'pdf') {
-        format = ScoreFormat.PDF;
-        content = URL.createObjectURL(file);
-      } else if (ext === 'abc') {
-        format = ScoreFormat.ABC;
-        content = await file.text();
-        const midiUrl = generateMidiForAbc(content, 0);
-        if (midiUrl) {
-          audioUrl = midiUrl;
-          audioName = `${name}.mid`;
-        }
-      } else if (ext === 'xml' || ext === 'musicxml') {
-        format = ScoreFormat.MusicXML;
-        content = await file.text();
-      } else if (ext === 'txt') {
-        format = ScoreFormat.Text;
-        content = await file.text();
-      } else {
-        continue; // Unsupported
-      }
-
-      newScores.push({
-        id,
-        title: name,
-        format,
-        content,
-        zoom: 1,
-        pan: { x: 0, y: 0 },
-        viewMode: 'scroll',
-        audioUrl,
-        audioName,
-        showEditor: false,
-        selectedTuneIndex: 0
-      });
-    }
-
-    if (imageFiles.length > 0) {
-      const id = Math.random().toString(36).substr(2, 9);
-      const content = imageFiles.map(f => URL.createObjectURL(f));
-      newScores.push({
-        id,
-        title: imageFiles.length === 1 ? imageFiles[0].name.split('.')[0] : `Image Collection (${imageFiles.length})`,
-        format: ScoreFormat.Image,
-        content,
-        zoom: 1,
-        pan: { x: 0, y: 0 },
-        viewMode: 'scroll'
-      });
-    }
-
-    // Process resulting scores
-    setScores(prev => {
-      let updatedScores = [...prev, ...newScores];
-      
-      // If we have audio files, try to link them
-      if (audioFiles.length > 0) {
-        const audioUrl = URL.createObjectURL(audioFiles[0]); // Take first audio for now
-        const audioName = audioFiles[0].name;
-        
-        setGlobalAudio({ url: audioUrl, name: audioName });
-
-        if (newScores.length > 0) {
-          // Link to the first new score added in this batch
-          newScores[0].audioUrl = audioUrl;
-          newScores[0].audioName = audioName;
-        } else if (activeScoreId) {
-          // Link to existing active score
-          updatedScores = updatedScores.map(s => 
-            s.id === activeScoreId ? { ...s, audioUrl, audioName } : s
-          );
-        }
-      }
-      
-      return updatedScores;
-    });
-
-    if (newScores.length > 0) setActiveScoreId(newScores[0].id);
-  }, [scores, activeScoreId, generateMidiForAbc, setActiveScoreId, setScores, setGlobalAudio]);
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    loadFiles(files);
+  }, [loadFiles]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -359,39 +205,7 @@ export default function ScoreView() {
   };
 
   const handleDownload = () => {
-    const score = scores.find(s => s.id === activeScoreId);
-    if (!score) return;
-    
-    let content = '';
-    let mimeType = 'text/plain';
-    let fileName = '';
-
-    if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text || score.format === ScoreFormat.MusicXML) {
-      content = score.content as string;
-      const ext = score.format === ScoreFormat.ABC ? 'abc' : (score.format === ScoreFormat.MusicXML ? 'xml' : 'txt');
-      fileName = `${score.title || 'score'}.${ext}`;
-    } else {
-      const fileUrl = Array.isArray(score.content) ? score.content[0] : (score.content as string);
-      if (!fileUrl) return;
-      
-      const link = document.createElement('a');
-      link.href = fileUrl;
-      link.download = score.title || 'score';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    }
-
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportActiveScore();
   };
 
   const updateActiveScore = (updates: Partial<ScoreData>) => {

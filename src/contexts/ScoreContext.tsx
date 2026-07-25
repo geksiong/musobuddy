@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
+import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
 
 interface GlobalAudio {
   url: string;
@@ -16,8 +17,11 @@ interface ScoreContextType {
   setScores: React.Dispatch<React.SetStateAction<ScoreData[]>>;
   activeScoreId: string | null;
   setActiveScoreId: React.Dispatch<React.SetStateAction<string | null>>;
+  activeScore: ScoreData | undefined;
   globalAudio: GlobalAudio | null;
   setGlobalAudio: React.Dispatch<React.SetStateAction<GlobalAudio | null>>;
+  loadFiles: (files: FileList | File[]) => Promise<string | null>;
+  exportActiveScore: () => void;
 }
 
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
@@ -74,6 +78,136 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
 
   const [globalAudio, setGlobalAudio] = useState<GlobalAudio | null>(null);
 
+  const activeScore = scores.find(s => s.id === activeScoreId) || scores[0];
+
+  const exportActiveScore = useCallback(() => {
+    exportScore(activeScore);
+  }, [activeScore]);
+
+  const loadFiles = useCallback(async (files: FileList | File[]): Promise<string | null> => {
+    const audioFiles: File[] = [];
+    const imageFiles: File[] = [];
+    const filesToProcess: File[] = [];
+    
+    let targetScoreId: string | null = null;
+
+    for (const file of Array.from(files)) {
+      const name = file.name.split('.')[0];
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
+        imageFiles.push(file);
+        continue;
+      }
+      if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'mid', 'midi'].includes(ext || '')) {
+        audioFiles.push(file);
+        continue;
+      }
+
+      const existingScore = scores.find(s => s.title === name);
+      if (existingScore) {
+        targetScoreId = existingScore.id;
+        setActiveScoreId(existingScore.id);
+        continue;
+      }
+      
+      filesToProcess.push(file);
+    }
+
+    const newScores: ScoreData[] = [];
+    
+    for (const file of filesToProcess) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      const id = Math.random().toString(36).substr(2, 9);
+      const name = file.name.split('.')[0];
+      
+      let format: ScoreFormat = ScoreFormat.Text;
+      let content: string | string[] = '';
+      let audioUrl: string | undefined = undefined;
+      let audioName: string | undefined = undefined;
+
+      if (ext === 'pdf') {
+        format = ScoreFormat.PDF;
+        content = URL.createObjectURL(file);
+      } else if (ext === 'abc') {
+        format = ScoreFormat.ABC;
+        content = await file.text();
+        const midiUrl = generateMidiForAbc(content, 0);
+        if (midiUrl) {
+          audioUrl = midiUrl;
+          audioName = `${name}.mid`;
+        }
+      } else if (ext === 'xml' || ext === 'musicxml') {
+        format = ScoreFormat.MusicXML;
+        content = await file.text();
+      } else if (ext === 'txt') {
+        format = ScoreFormat.Text;
+        content = await file.text();
+      } else {
+        continue;
+      }
+
+      newScores.push({
+        id,
+        title: name,
+        format,
+        content,
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+        viewMode: 'scroll',
+        audioUrl,
+        audioName,
+        showEditor: false,
+        selectedTuneIndex: 0
+      });
+    }
+
+    if (imageFiles.length > 0) {
+      const id = Math.random().toString(36).substr(2, 9);
+      const content = imageFiles.map(f => URL.createObjectURL(f));
+      newScores.push({
+        id,
+        title: imageFiles.length === 1 ? imageFiles[0].name.split('.')[0] : `Image Collection (${imageFiles.length})`,
+        format: ScoreFormat.Image,
+        content,
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+        viewMode: 'scroll'
+      });
+    }
+
+    if (newScores.length > 0) {
+      targetScoreId = newScores[0].id;
+    }
+
+    setScores(prev => {
+      let updatedScores = [...prev, ...newScores];
+      
+      if (audioFiles.length > 0) {
+        const audioUrl = URL.createObjectURL(audioFiles[0]);
+        const audioName = audioFiles[0].name;
+        
+        setGlobalAudio({ url: audioUrl, name: audioName });
+
+        if (newScores.length > 0) {
+          newScores[0].audioUrl = audioUrl;
+          newScores[0].audioName = audioName;
+        } else if (activeScoreId) {
+          updatedScores = updatedScores.map(s => 
+            s.id === activeScoreId ? { ...s, audioUrl, audioName } : s
+          );
+        }
+      }
+      
+      return updatedScores;
+    });
+
+    if (targetScoreId) {
+      setActiveScoreId(targetScoreId);
+    }
+    return targetScoreId;
+  }, [scores, activeScoreId, setActiveScoreId, setScores, setGlobalAudio]);
+
   useEffect(() => {
     // Persist scores and active ID to localStorage
     // Note: We avoid persisting blob URLs as they die on refresh, 
@@ -101,8 +235,11 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       setScores,
       activeScoreId,
       setActiveScoreId,
+      activeScore,
       globalAudio,
-      setGlobalAudio
+      setGlobalAudio,
+      loadFiles,
+      exportActiveScore
     }}>
       {children}
     </ScoreContext.Provider>
@@ -116,3 +253,4 @@ export function useScores() {
   }
   return context;
 }
+
