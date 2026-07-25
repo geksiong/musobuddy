@@ -28,10 +28,11 @@ import {
   Scroll,
   Play,
   Square as Stop,
-  Wind,
-  Radio,
-  Clock,
-  Download
+  Drum,
+  Waves,
+  Piano,
+  Download,
+  Sliders
 } from 'lucide-react';
 import { ScoreFormat, ScoreData } from './types.ts';
 import { TUNINGS } from './constants.ts';
@@ -271,7 +272,7 @@ export default function ScoreView() {
             )}>
               <div className="flex items-center gap-2 mb-1">
                  <div className="w-6 h-6 rounded bg-orange-500/10 flex items-center justify-center">
-                    <Clock className="w-3.5 h-3.5 text-orange-500" />
+                    <Sliders className="w-3.5 h-3.5 text-orange-500" />
                  </div>
                  <span className={cn("text-[10px] font-black uppercase tracking-widest leading-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>Performance Tools</span>
               </div>
@@ -288,7 +289,7 @@ export default function ScoreView() {
                   title="Metronome"
                 >
                   <div className="w-7 h-7 rounded-lg bg-current/10 flex items-center justify-center shrink-0">
-                    <Clock className="w-3.5 h-3.5" />
+                    <Drum className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex flex-col items-center text-center">
                     <span className="text-[8px] font-black uppercase leading-tight">Metronome</span>
@@ -306,7 +307,7 @@ export default function ScoreView() {
                   title="Drone"
                 >
                   <div className="w-7 h-7 rounded-lg bg-current/10 flex items-center justify-center shrink-0">
-                    <Wind className="w-3.5 h-3.5" />
+                    <Waves className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex flex-col items-center text-center">
                     <span className="text-[8px] font-black uppercase leading-tight">Drone</span>
@@ -324,7 +325,7 @@ export default function ScoreView() {
                   title="Accompaniment"
                 >
                   <div className="w-7 h-7 rounded-lg bg-current/10 flex items-center justify-center shrink-0">
-                    <Radio className="w-3.5 h-3.5" />
+                    <Piano className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex flex-col items-center text-center">
                     <span className="text-[8px] font-black uppercase leading-tight">AI Engine</span>
@@ -434,45 +435,6 @@ export default function ScoreView() {
                   </button>
                 </div>
               </div>
-            </div>
-
-            {/* Scores List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
-              {scores.map(s => (
-                <button 
-                  key={s.id}
-                  onClick={() => setActiveScoreId(s.id)}
-                  className={cn(
-                    "p-4 rounded-2xl border transition-all text-left flex items-start gap-4 group relative overflow-hidden",
-                    activeScoreId === s.id 
-                      ? (resolvedTheme === 'dark' ? "bg-white/10 border-orange-500/50 shadow-[0_0_20px_rgba(255,78,0,0.1)]" : "bg-white border-orange-500 shadow-xl shadow-orange-500/10") 
-                      : (resolvedTheme === 'dark' ? "bg-white/5 border-white/5 hover:border-white/10" : "bg-white border-black/5 hover:border-black/10")
-                  )}
-                >
-                  {activeScoreId === s.id && (
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 blur-3xl -mr-12 -mt-12" />
-                  )}
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all",
-                    activeScoreId === s.id ? "bg-orange-500 text-black shadow-lg" : (resolvedTheme === 'dark' ? "bg-white/10 text-white group-hover:bg-white/20" : "bg-slate-100 text-slate-400 group-hover:bg-slate-200")
-                  )}>
-                    <ScoreIcon format={s.format} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className={cn("text-sm font-bold truncate leading-tight transition-colors uppercase tracking-tight", activeScoreId === s.id ? (resolvedTheme === 'dark' ? "text-white" : "text-slate-900") : (resolvedTheme === 'dark' ? "text-slate-400 group-hover:text-orange-400" : "text-slate-500 group-hover:text-orange-600"))}>{s.title || 'Untitled'}</div>
-                    <div className={cn("text-[9px] uppercase font-bold tracking-[0.15em] mt-1 italic", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>{s.format}</div>
-                  </div>
-                </button>
-              ))}
-              {scores.length === 0 && (
-                <div className={cn(
-                  "p-8 text-center rounded-2xl border border-dashed transition-colors",
-                  resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/10" : "bg-slate-50 border-black/5"
-                )}>
-                  <Library className={cn("w-8 h-8 mx-auto mb-4", resolvedTheme === 'dark' ? "text-white/10" : "text-slate-200")} />
-                  <p className={cn("text-[10px] uppercase font-black tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-300")}>Empty Collection</p>
-                </div>
-              )}
             </div>
           </motion.div>
         )}
