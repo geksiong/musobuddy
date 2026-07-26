@@ -251,14 +251,14 @@ export default function ScoreView() {
   const activeScore = scores.find(s => s.id === activeScoreId) || scores[0];
 
   return (
-    <div className="min-h-full flex flex-col p-4 md:p-8 relative">
-      <div className="flex-1 flex flex-col min-w-0 relative">
+    <div className="h-full flex-1 flex flex-col px-2 sm:px-4 md:px-6 pt-2 sm:pt-4 md:pt-6 pb-0 relative overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
         <div 
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={onDrop}
           className={cn(
-            "flex-1 rounded-2xl border flex flex-col overflow-hidden backdrop-blur-sm relative transition-all",
+            "flex-1 rounded-t-2xl rounded-b-none border border-b-0 flex flex-col overflow-hidden backdrop-blur-sm relative transition-all min-h-0",
             resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl",
             isDragging && "ring-4 ring-orange-500 ring-inset bg-orange-500/5"
           )}
@@ -270,38 +270,35 @@ export default function ScoreView() {
               </div>
             </div>
           )}
-          {/* Label */}
-          <div className="absolute top-6 left-8 pointer-events-none">
-            <span className="text-[10px] font-bold text-orange-400 tracking-[0.3em] uppercase italic opacity-50">Active Session</span>
-          </div>
-
-          <ScoreDisplay 
-            score={activeScore} 
-            onUpdate={updateActiveScore}
-            onDelete={() => activeScore && deleteScore(activeScore.id)}
-            onDownload={handleDownload}
-            onTranspose={handleTransposeInternal}
-            getAbcTuneTitles={getAbcTuneTitles}
-            playbackTime={playbackTime}
-            onReloadMidi={() => {
-              if (activeScore && activeScore.format === ScoreFormat.ABC) {
-                const midiUrl = generateMidiForAbc(
-                  activeScore.content as string, 
-                  activeScore.selectedTuneIndex || 0,
-                  activeScore.transpose || 0
-                );
-                if (midiUrl) {
-                  if (activeScore.audioUrl?.startsWith('blob:')) {
-                    URL.revokeObjectURL(activeScore.audioUrl);
+          {ScoreDisplay && (
+            <ScoreDisplay 
+              score={activeScore} 
+              onUpdate={updateActiveScore}
+              onDelete={() => activeScore && deleteScore(activeScore.id)}
+              onDownload={handleDownload}
+              onTranspose={handleTransposeInternal}
+              getAbcTuneTitles={getAbcTuneTitles}
+              playbackTime={playbackTime}
+              onReloadMidi={() => {
+                if (activeScore && activeScore.format === ScoreFormat.ABC) {
+                  const midiUrl = generateMidiForAbc(
+                    activeScore.content as string, 
+                    activeScore.selectedTuneIndex || 0,
+                    activeScore.transpose || 0
+                  );
+                  if (midiUrl) {
+                    if (activeScore.audioUrl?.startsWith('blob:')) {
+                      URL.revokeObjectURL(activeScore.audioUrl);
+                    }
+                    updateActiveScore({
+                      audioUrl: midiUrl,
+                      audioName: `${activeScore.title || 'score'}.mid`
+                    });
                   }
-                  updateActiveScore({
-                    audioUrl: midiUrl,
-                    audioName: `${activeScore.title || 'score'}.mid`
-                  });
                 }
-              }
-            }}
-          />
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -350,13 +347,16 @@ function ScoreDisplay({
   const viewMode = score.viewMode || 'scroll';
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative min-h-0 h-full">
       {/* Toolbar */}
       <div className={cn(
-        "px-6 py-6 flex flex-col lg:flex-row lg:items-center justify-between border-b transition-all gap-6",
-        resolvedTheme === 'dark' ? "border-white/5 bg-slate-900/40" : "border-black/5 bg-white shadow-sm"
+        "sticky top-0 z-30 px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between border-b transition-all gap-4 sm:gap-6 backdrop-blur-xl shrink-0 shadow-sm",
+        resolvedTheme === 'dark' ? "border-white/10 bg-[#121215]/95 text-white" : "border-black/10 bg-white/95 text-slate-900"
       )}>
         <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold text-orange-400 tracking-[0.3em] uppercase italic opacity-60">Active Session</span>
+          </div>
           <div className="flex items-center gap-3">
             <input 
               value={score.title}
@@ -591,7 +591,7 @@ function ScoreDisplay({
         </div>
 
       {/* Rendering Area */}
-      <div className="flex-1 overflow-auto custom-scrollbar relative p-8">
+      <div className="flex-1 relative p-4 sm:p-8 pb-4 sm:pb-6">
         {((score.format === ScoreFormat.PDF || score.format === ScoreFormat.Image) && !score.content) ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-12">
             <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-6", resolvedTheme === 'dark' ? "bg-white/5 text-white/20" : "bg-slate-100 text-slate-300")}>

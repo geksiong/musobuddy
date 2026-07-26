@@ -113,8 +113,8 @@ export default function App() {
     )}>
       {/* Header Navigation */}
       <header className={cn(
-        "flex items-center justify-between px-3 sm:px-6 py-3 border-b shrink-0 transition-colors gap-2 sm:gap-4",
-        resolvedTheme === 'dark' ? "border-white/10" : "border-black/5 bg-white shadow-sm"
+        "flex items-center justify-between px-3 sm:px-6 py-3 border-b shrink-0 transition-colors gap-2 sm:gap-4 sticky top-0 z-50 backdrop-blur-xl",
+        resolvedTheme === 'dark' ? "border-white/10 bg-[#0A0A0A]/90 text-slate-200" : "border-black/5 bg-white/90 text-slate-900 shadow-sm"
       )}>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#FF4E00] rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,78,0,0.3)] shrink-0">
@@ -304,7 +304,7 @@ export default function App() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 relative overflow-y-auto custom-scrollbar">
+      <main className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
@@ -312,7 +312,10 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="min-h-full"
+            className={cn(
+              "flex-1 flex flex-col min-h-0",
+              currentView === 'score' ? "h-full overflow-hidden" : "overflow-y-auto custom-scrollbar"
+            )}
           >
             {currentView === 'metronome' && <MetronomeView />}
             {currentView === 'tuner' && <TunerView />}
