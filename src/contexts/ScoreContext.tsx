@@ -21,6 +21,7 @@ interface ScoreContextType {
   globalAudio: GlobalAudio | null;
   setGlobalAudio: React.Dispatch<React.SetStateAction<GlobalAudio | null>>;
   loadFiles: (files: FileList | File[]) => Promise<string | null>;
+  createScore: (format: ScoreFormat) => string;
   exportActiveScore: () => void;
   playbackTime: number;
   setPlaybackTime: React.Dispatch<React.SetStateAction<number>>;
@@ -116,6 +117,39 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
   const exportActiveScore = useCallback(() => {
     exportScore(activeScore);
   }, [activeScore]);
+
+  const createScore = useCallback((format: ScoreFormat): string => {
+    const id = Math.random().toString(36).substr(2, 9);
+    let title = 'Untitled Score';
+    let initialContent = '';
+
+    if (format === ScoreFormat.ABC) {
+      title = 'New ABC Score';
+      initialContent = 'X:1\nT:New ABC Score\nM:4/4\nK:C\nC D E F | G A B c |';
+    } else if (format === ScoreFormat.Text) {
+      title = 'New Text Sheet';
+      initialContent = '';
+    }
+
+    const midiUrl = format === ScoreFormat.ABC ? generateMidiForAbc(initialContent, 0) : null;
+    const newScore: ScoreData = {
+      id,
+      title,
+      format,
+      content: initialContent,
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+      viewMode: 'scroll',
+      showEditor: format === ScoreFormat.ABC,
+      selectedTuneIndex: 0,
+      audioUrl: midiUrl || undefined,
+      audioName: midiUrl ? 'rendering.mid' : undefined
+    };
+
+    setScores(prev => [...prev, newScore]);
+    setActiveScoreId(id);
+    return id;
+  }, [setActiveScoreId]);
 
   const loadFiles = useCallback(async (files: FileList | File[]): Promise<string | null> => {
     const audioFiles: File[] = [];
@@ -272,6 +306,7 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       globalAudio,
       setGlobalAudio,
       loadFiles,
+      createScore,
       exportActiveScore,
       playbackTime,
       setPlaybackTime

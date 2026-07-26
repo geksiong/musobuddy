@@ -20,7 +20,6 @@ import {
   Music,
   RefreshCw,
   Upload,
-  PanelLeft,
   ChevronLeft,
   ChevronRight,
   Columns,
@@ -58,7 +57,6 @@ const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer.tsx'));
 export default function ScoreView() {
   const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore, playbackTime } = useScores();
   const [isDragging, setIsDragging] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { resolvedTheme } = useTheme();
 
@@ -253,124 +251,7 @@ export default function ScoreView() {
   const activeScore = scores.find(s => s.id === activeScoreId) || scores[0];
 
   return (
-    <div className="min-h-full flex flex-col md:flex-row gap-0 md:gap-6 p-4 md:p-8 relative">
-      {/* Sidebar - Scores Library */}
-      <AnimatePresence initial={false}>
-        {!isSidebarCollapsed && (
-          <motion.div 
-            initial={{ width: 0, opacity: 0, marginRight: 0 }}
-            animate={{ width: 320, opacity: 1, marginRight: 24 }}
-            exit={{ width: 0, opacity: 0, marginRight: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="w-full md:w-80 flex flex-col gap-6 overflow-hidden shrink-0"
-          >
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/10 to-transparent rounded-2xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
-              <div className={cn(
-                "relative rounded-2xl border p-6 backdrop-blur-sm overflow-hidden h-fit transition-colors",
-                resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl"
-              )}>
-                <div className="absolute top-0 right-0 p-4">
-                  <Library className={cn("w-8 h-8 rotate-12", resolvedTheme === 'dark' ? "text-white/5" : "text-black/5")} />
-                </div>
-                
-                <span className={cn("text-[9px] uppercase font-black tracking-[0.3em] block mb-2", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>Collection</span>
-                <h1 className={cn("text-2xl font-black leading-tight uppercase tracking-tighter italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Score</h1>
-                
-                <div className="mt-8 flex flex-col gap-2">
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    multiple 
-                    onChange={(e) => {
-                      if (e.target.files) {
-                        handleFiles(e.target.files);
-                        e.target.value = '';
-                      }
-                    }}
-                    accept=".abc,.txt,.pdf,.xml,.musicxml,image/*,audio/*"
-                  />
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className={cn(
-                      "w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group bg-[#FF4E00] border-[#FF4E00] text-white shadow-lg shadow-orange-500/20"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white">
-                        <Upload className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-black uppercase">Load Score</div>
-                        <div className="text-[10px] uppercase tracking-widest font-bold opacity-60">Upload Files</div>
-                      </div>
-                    </div>
-                  </button>
-
-                  <button 
-                    onClick={() => {
-                      const id = Math.random().toString(36).substr(2, 9);
-                      const initialContent = 'X:1\nT:New ABC Score\nM:4/4\nK:C\nC D E F | G A B c |';
-                      const midiUrl = generateMidiForAbc(initialContent);
-                      const newScore: ScoreData = {
-                        id,
-                        title: 'New ABC Score',
-                        format: ScoreFormat.ABC,
-                        content: initialContent,
-                        zoom: 1,
-                        pan: { x: 0, y: 0 },
-                        viewMode: 'scroll',
-                        showEditor: false,
-                        audioUrl: midiUrl || undefined,
-                        audioName: midiUrl ? 'rendering.mid' : undefined
-                      };
-                      setScores([...scores, newScore]);
-                      setActiveScoreId(id);
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group",
-                      resolvedTheme === 'dark' ? "bg-white/[0.03] hover:bg-white/[0.08] border-white/5" : "bg-slate-50 hover:bg-slate-100 border-black/5"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-black transition-colors">
-                        <FileCode className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className={cn("text-xs font-black uppercase", resolvedTheme === 'dark' ? "text-white/80" : "text-slate-900")}>ABC Score</div>
-                        <div className={cn("text-[10px] uppercase tracking-widest font-bold", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>Notation</div>
-                      </div>
-                    </div>
-                    <Plus className={cn("w-4 h-4 transition-colors", resolvedTheme === 'dark' ? "text-white/20 group-hover:text-white" : "text-slate-300 group-hover:text-slate-900")} />
-                  </button>
-
-                  <button 
-                    onClick={() => addScore(ScoreFormat.Text)}
-                    className={cn(
-                      "w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group",
-                      resolvedTheme === 'dark' ? "bg-white/[0.03] hover:bg-white/[0.08] border-white/5" : "bg-slate-50 hover:bg-slate-100 border-black/5"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black transition-colors">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className={cn("text-xs font-black uppercase", resolvedTheme === 'dark' ? "text-white/80" : "text-slate-900")}>Text Sheet</div>
-                        <div className={cn("text-[10px] uppercase tracking-widest font-bold", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>Lyrics/Chords</div>
-                      </div>
-                    </div>
-                    <Plus className={cn("w-4 h-4 transition-colors", resolvedTheme === 'dark' ? "text-white/20 group-hover:text-white" : "text-slate-300 group-hover:text-slate-900")} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Display */}
+    <div className="min-h-full flex flex-col p-4 md:p-8 relative">
       <div className="flex-1 flex flex-col min-w-0 relative">
         <div 
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
@@ -420,11 +301,8 @@ export default function ScoreView() {
                 }
               }
             }}
-            isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
         </div>
-
       </div>
     </div>
   );
@@ -446,9 +324,7 @@ function ScoreDisplay({
   onTranspose,
   getAbcTuneTitles,
   onReloadMidi,
-  playbackTime,
-  isSidebarCollapsed,
-  onToggleSidebar
+  playbackTime
 }: { 
   score?: ScoreData, 
   onUpdate: (u: Partial<ScoreData>) => void, 
@@ -457,9 +333,7 @@ function ScoreDisplay({
   onTranspose: (semitones: number) => void,
   getAbcTuneTitles: (abc: string) => string[],
   onReloadMidi: () => void,
-  playbackTime: number,
-  isSidebarCollapsed: boolean,
-  onToggleSidebar: () => void
+  playbackTime: number
 }) {
   const { resolvedTheme } = useTheme();
   
@@ -468,7 +342,7 @@ function ScoreDisplay({
       <Library className="w-16 h-16 opacity-5 mb-4" />
       <div className="text-center">
         <p className="text-xs uppercase font-black tracking-[0.4em] opacity-40">No Score Selected</p>
-        <p className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-20 mt-2">Select or create from the library</p>
+        <p className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-20 mt-2">Create a new score or load a file from top nav</p>
       </div>
     </div>
   );
@@ -484,29 +358,17 @@ function ScoreDisplay({
       )}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <button 
-              onClick={onToggleSidebar}
-              className={cn(
-                "p-2 rounded-xl border transition-all hover:scale-105 active:scale-95 shadow-sm hidden md:flex items-center justify-center group",
-                !isSidebarCollapsed 
-                  ? "bg-orange-500 border-orange-500 text-white" 
-                  : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900")
-              )}
-              title={isSidebarCollapsed ? "Show Library" : "Hide Library"}
-            >
-              <PanelLeft className="w-4 h-4" />
-            </button>
             <input 
               value={score.title}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-            className={cn(
-              "w-full bg-transparent text-3xl font-black focus:outline-none uppercase tracking-tighter italic transition-colors",
-              resolvedTheme === 'dark' ? "text-white placeholder:text-white/10" : "text-slate-900 placeholder:text-slate-200"
-            )}
-            placeholder="UNTITLED SCORE"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-4 mt-2">
+              onChange={(e) => onUpdate({ title: e.target.value })}
+              className={cn(
+                "w-full bg-transparent text-3xl font-black focus:outline-none uppercase tracking-tighter italic transition-colors",
+                resolvedTheme === 'dark' ? "text-white placeholder:text-white/10" : "text-slate-900 placeholder:text-slate-200"
+              )}
+              placeholder="UNTITLED SCORE"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-4 mt-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
               <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>{score.format} MODE</span>

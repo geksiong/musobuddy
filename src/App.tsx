@@ -26,13 +26,17 @@ import {
   Download,
   X,
   FileMusic,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  FileCode,
+  FileText
 } from 'lucide-react';
 import { cn } from './lib/utils.ts';
 import { useAudio } from './contexts/AudioContext.tsx';
 import { useAccompaniment } from './contexts/AccompanimentContext.tsx';
 import { useTheme } from './contexts/ThemeContext.tsx';
 import { useScores } from './contexts/ScoreContext.tsx';
+import { ScoreFormat } from './components/Score/types.ts';
 
 // Components
 import MetronomeView from './components/Metronome/MetronomeView.tsx';
@@ -49,8 +53,20 @@ export default function App() {
   const { isMetronomePlaying, isDronePlaying, playingRefNote } = useAudio();
   const { isPlaying: isAccompanimentPlaying } = useAccompaniment();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { scores, setScores, activeScoreId, setActiveScoreId, activeScore, loadFiles, exportActiveScore } = useScores();
+  const { scores, setScores, activeScoreId, setActiveScoreId, activeScore, loadFiles, createScore, exportActiveScore } = useScores();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isNewScoreOpen, setIsNewScoreOpen] = useState(false);
+  const newScoreDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (newScoreDropdownRef.current && !newScoreDropdownRef.current.contains(e.target as Node)) {
+        setIsNewScoreOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleHeaderLoadScore = () => {
     fileInputRef.current?.click();
@@ -134,28 +150,6 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          {/* Active Score Badge in Header */}
-          {activeScore && (
-            <button
-              onClick={() => setCurrentView('score')}
-              title={`Active Score: ${activeScore.title} (${activeScore.format.toUpperCase()}). Click to open in score view.`}
-              className={cn(
-                "hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all max-w-[220px] truncate",
-                currentView === 'score'
-                  ? "border-[#FF4E00]/60 bg-[#FF4E00]/10 text-[#FF4E00]"
-                  : resolvedTheme === 'dark' 
-                    ? "border-white/15 bg-white/5 hover:bg-white/10 text-slate-300" 
-                    : "border-black/10 bg-black/5 hover:bg-black/10 text-slate-700"
-              )}
-            >
-              <FileMusic className="w-3.5 h-3.5 text-[#FF4E00] shrink-0" />
-              <span className="truncate">{activeScore.title}</span>
-              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono font-bold bg-black/20 dark:bg-white/20 shrink-0">
-                {activeScore.format}
-              </span>
-            </button>
-          )}
-
           {/* Theme Toggle */}
           <div className={cn(
             "hidden sm:flex items-center gap-0.5 p-1 rounded-full border transition-all shadow-inner shrink-0",
@@ -191,6 +185,100 @@ export default function App() {
               accept=".abc,.txt,.pdf,.xml,.musicxml,image/*,audio/*"
               onChange={handleHeaderFileChange}
             />
+
+            {/* New Score Dropdown Button */}
+            <div className="relative shrink-0" ref={newScoreDropdownRef}>
+              <button
+                onClick={() => setIsNewScoreOpen(!isNewScoreOpen)}
+                title="Create a new blank score"
+                className={cn(
+                  "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border text-[10px] font-extrabold tracking-wider transition-all uppercase flex items-center gap-1 sm:gap-1.5 shrink-0 min-h-[36px]",
+                  isNewScoreOpen
+                    ? "bg-[#FF4E00] border-[#FF4E00] text-white shadow-lg shadow-[#FF4E00]/20"
+                    : resolvedTheme === 'dark'
+                      ? "border-white/20 bg-white/5 hover:bg-white/10 text-slate-200"
+                      : "border-black/10 bg-slate-100 hover:bg-slate-200 text-slate-800"
+                )}
+              >
+                <Plus className="w-3.5 h-3.5 text-[#FF4E00] shrink-0" />
+                <span>New <span className="hidden sm:inline">Score</span></span>
+                <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", isNewScoreOpen && "rotate-180")} />
+              </button>
+
+              <AnimatePresence>
+                {isNewScoreOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className={cn(
+                      "absolute right-0 top-full mt-2 w-56 rounded-2xl border p-2 shadow-2xl z-50 overflow-hidden backdrop-blur-xl",
+                      resolvedTheme === 'dark' 
+                        ? "bg-[#141416]/95 border-white/10 text-white" 
+                        : "bg-white/95 border-black/10 text-slate-900"
+                    )}
+                  >
+                    <div className="text-[9px] uppercase font-black tracking-widest px-3 py-1.5 text-slate-400 border-b border-black/5 dark:border-white/5 mb-1">
+                      Create Editable Sheet
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        createScore(ScoreFormat.ABC);
+                        setCurrentView('score');
+                        setIsNewScoreOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left group",
+                        resolvedTheme === 'dark' ? "hover:bg-white/10" : "hover:bg-slate-100"
+                      )}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 text-[#FF4E00] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <FileCode className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black uppercase tracking-tight">ABC Score</div>
+                        <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">Notation</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        createScore(ScoreFormat.Text);
+                        setCurrentView('score');
+                        setIsNewScoreOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left group",
+                        resolvedTheme === 'dark' ? "hover:bg-white/10" : "hover:bg-slate-100"
+                      )}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black uppercase tracking-tight">Text Sheet</div>
+                        <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">Lyrics / Chords</div>
+                      </div>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <button 
+              onClick={handleHeaderLoadScore}
+              title="Load Score from file"
+              className={cn(
+                "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] font-black tracking-wider transition-colors uppercase shadow-lg shadow-[#FF4E00]/10 flex items-center gap-1 sm:gap-1.5 shrink-0 min-h-[36px]",
+                resolvedTheme === 'dark' ? "bg-white text-black hover:bg-slate-200" : "bg-black text-white hover:bg-slate-800"
+              )}
+            >
+              <Upload className="w-3.5 h-3.5 text-[#FF4E00] shrink-0" />
+              <span>Load<span className="hidden sm:inline"> Score</span></span>
+            </button>
+
             <button 
               onClick={handleHeaderSave}
               disabled={!activeScore}
@@ -204,17 +292,6 @@ export default function App() {
             >
               <Download className="w-3.5 h-3.5 text-[#FF4E00] shrink-0" />
               <span>Save</span>
-            </button>
-            <button 
-              onClick={handleHeaderLoadScore}
-              title="Load Score from file"
-              className={cn(
-                "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] font-black tracking-wider transition-colors uppercase shadow-lg shadow-[#FF4E00]/10 flex items-center gap-1 sm:gap-1.5 shrink-0 min-h-[36px]",
-                resolvedTheme === 'dark' ? "bg-white text-black hover:bg-slate-200" : "bg-black text-white hover:bg-slate-800"
-              )}
-            >
-              <Upload className="w-3.5 h-3.5 text-[#FF4E00] shrink-0" />
-              <span>Load<span className="hidden sm:inline"> Score</span></span>
             </button>
           </div>
         </div>
