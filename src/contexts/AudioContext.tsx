@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
 import { MetronomeSound, BeatPattern } from '../components/Metronome/types.ts';
+import { DEFAULT_PRESETS } from '../components/Metronome/constants.ts';
 import { DroneTone } from '../components/Drone/types.ts';
 import { InstrumentType } from '../types.ts';
 import { NOTES, getIntervalsForChord } from '../constants.ts';
@@ -54,8 +55,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Metronome State
   const [isMetronomePlaying, setIsMetronomePlaying] = useState(false);
   const [metronomeBpm, setMetronomeBpm] = useState(120);
-  const [metronomePattern, _setMetronomePattern] = useState<BeatPattern | null>(null);
-  const metronomePatternRef = useRef<BeatPattern | null>(null);
+  const [metronomePattern, _setMetronomePattern] = useState<BeatPattern | null>(DEFAULT_PRESETS[0] || null);
+  const metronomePatternRef = useRef<BeatPattern | null>(DEFAULT_PRESETS[0] || null);
   const [metronomeVolume, setMetronomeVolume] = useState(0.8);
   const metronomeVolumeRef = useRef(0.8);
   const [currentBeat, setCurrentBeat] = useState(0);
@@ -260,6 +261,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const startMetronome = () => {
     const ctx = initAudio();
     setIsMetronomePlaying(true);
+    if (!metronomePatternRef.current && DEFAULT_PRESETS.length > 0) {
+      metronomePatternRef.current = DEFAULT_PRESETS[0];
+      _setMetronomePattern(DEFAULT_PRESETS[0]);
+    }
     const startTime = ctx.currentTime + 0.05;
     if (metronomePatternRef.current) {
       voiceStatesRef.current = metronomePatternRef.current.voices.map(() => ({
