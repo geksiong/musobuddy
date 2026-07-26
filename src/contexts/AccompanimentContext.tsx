@@ -33,8 +33,8 @@ const SyncEngine: React.FC = () => {
     isPlaying, progression, arpeggioPreset, selectedInstrument, isBassEnabled,
     setCurrentIndex, setIsPendingStart, accompanimentVolume
   } = useAccompaniment();
-  const { currentBeat, isPlaying: isMetronomeRunning, activePattern } = useMetronome();
-  const { playChord, playNote } = useAudio();
+  const { currentBeat, activePattern } = useMetronome();
+  const { playChord, playNote, setIsAccompanimentPlaying, isMetronomePlaying } = useAudio();
   const lastBeatRef = useRef<number>(-1);
   const playbackStartBeatRef = useRef<number>(0);
   const pendingStartRef = useRef<boolean>(false);
@@ -43,23 +43,30 @@ const SyncEngine: React.FC = () => {
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
 
   useEffect(() => {
+    setIsAccompanimentPlaying(isPlaying);
+  }, [isPlaying, setIsAccompanimentPlaying]);
+
+  useEffect(() => {
     if (isPlaying) {
-      if (isMetronomeRunning && currentBeat % masterLength !== 0) {
-        pendingStartRef.current = true;
-        setIsPendingStart(true);
-      } else {
-        playbackStartBeatRef.current = currentBeat;
-        pendingStartRef.current = false;
-        setIsPendingStart(false);
+      if (lastBeatRef.current === -1) {
+        if (isMetronomePlaying && currentBeat % masterLength !== 0) {
+          pendingStartRef.current = true;
+          setIsPendingStart(true);
+        } else {
+          playbackStartBeatRef.current = currentBeat;
+          pendingStartRef.current = false;
+          setIsPendingStart(false);
+        }
       }
     } else {
       pendingStartRef.current = false;
       setIsPendingStart(false);
+      lastBeatRef.current = -1;
     }
-  }, [isPlaying, isMetronomeRunning, masterLength, setIsPendingStart]); 
+  }, [isPlaying, isMetronomePlaying, masterLength, setIsPendingStart]); 
 
   useEffect(() => {
-    if (isPlaying && isMetronomeRunning) {
+    if (isPlaying) {
       if (pendingStartRef.current) {
         if (currentBeat % masterLength === 0) {
           playbackStartBeatRef.current = currentBeat;
@@ -122,7 +129,7 @@ const SyncEngine: React.FC = () => {
     } else {
       lastBeatRef.current = -1;
     }
-  }, [currentBeat, isPlaying, isMetronomeRunning, progression, arpeggioPreset, masterLength, selectedInstrument, isBassEnabled, setCurrentIndex, playChord, playNote]);
+  }, [currentBeat, isPlaying, progression, arpeggioPreset, masterLength, selectedInstrument, isBassEnabled, setCurrentIndex, playChord, playNote]);
 
   return null;
 };

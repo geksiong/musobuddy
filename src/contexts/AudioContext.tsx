@@ -18,6 +18,10 @@ interface AudioContextType {
   metronomeVolume: number;
   setMetronomeVolume: (volume: number) => void;
 
+  // Accompaniment
+  isAccompanimentPlaying: boolean;
+  setIsAccompanimentPlaying: (playing: boolean) => void;
+
   // Drone
   activeDrones: Record<string, { tone: DroneTone; volume: number; pulseBpm: number }>;
   isDronePlaying: boolean;
@@ -52,8 +56,13 @@ const SCHEDULE_AHEAD_TIME = 0.1;
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  // Metronome State
-  const [isMetronomePlaying, setIsMetronomePlaying] = useState(false);
+  // Metronome & Accompaniment State
+  const [isMetronomePlaying, _setIsMetronomePlaying] = useState(false);
+  const isMetronomePlayingRef = useRef(false);
+
+  const [isAccompanimentPlaying, _setIsAccompanimentPlaying] = useState(false);
+  const isAccompanimentPlayingRef = useRef(false);
+
   const [metronomeBpm, setMetronomeBpm] = useState(120);
   const [metronomePattern, _setMetronomePattern] = useState<BeatPattern | null>(DEFAULT_PRESETS[0] || null);
   const metronomePatternRef = useRef<BeatPattern | null>(DEFAULT_PRESETS[0] || null);
@@ -197,11 +206,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const isMetronomePlayingRef = useRef(false);
-
   useEffect(() => {
     isMetronomePlayingRef.current = isMetronomePlaying;
   }, [isMetronomePlaying]);
+
+  useEffect(() => {
+    isAccompanimentPlayingRef.current = isAccompanimentPlaying;
+  }, [isAccompanimentPlaying]);
 
   useEffect(() => {
     metronomeVolumeRef.current = metronomeVolume;
@@ -235,18 +246,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           playValue = (vState.stepIndex % length === 0) ? 2 : 1;
         }
 
-        if (playValue > 0 && !voice.muted) {
+        // Only emit audible metronome click if metronome sound is enabled
+        if (isMetronomePlayingRef.current && playValue > 0 && !voice.muted) {
           playClick(vState.nextNoteTime, voice.sound, voice.volume * metronomeVolumeRef.current, playValue === 2);
         }
 
-        // Handle visual update timing: use the exact scheduled time for visual transition
+        // Handle visual & beat state update timing
         if (i === 0) {
           const beatToUpdate = vState.stepIndex;
           const timeToUpdate = vState.nextNoteTime;
           
           const delay = (timeToUpdate - ctx.currentTime) * 1000;
           setTimeout(() => {
-            if (isMetronomePlayingRef.current) {
+            if (isMetronomePlayingRef.current || isAccompanimentPlayingRef.current) {
               setCurrentBeat(beatToUpdate);
             }
           }, Math.max(0, delay));
@@ -256,48 +268,83 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         vState.stepIndex++;
       }
     });
-  }, [metronomeBpm]); // isMetronomePlaying contextually is used via the ref now
+  }, [metronomeBpm]);
 
-  const startMetronome = () => {
+  const ensureRhythmEngine = useCallback(() => {
     const ctx = initAudio();
-    setIsMetronomePlaying(true);
     if (!metronomePatternRef.current && DEFAULT_PRESETS.length > 0) {
       metronomePatternRef.current = DEFAULT_PRESETS[0];
       _setMetronomePattern(DEFAULT_PRESETS[0]);
     }
-    const startTime = ctx.currentTime + 0.05;
-    if (metronomePatternRef.current) {
+
+    if (voiceStatesRef.current.length === 0 && metronomePatternRef.current) {
+      const startTime = ctx.currentTime + 0.05;
       voiceStatesRef.current = metronomePatternRef.current.voices.map(() => ({
         nextNoteTime: startTime,
         stepIndex: 0
       }));
+      setCurrentBeat(0);
     }
-    setCurrentBeat(0);
-    if (metronomeTimerRef.current) window.clearInterval(metronomeTimerRef.current);
-    metronomeTimerRef.current = window.setInterval(metronomeScheduler, LOOKAHEAD);
-  };
 
-  const stopMetronome = () => {
-    setIsMetronomePlaying(false);
-    if (metronomeTimerRef.current) {
-      window.clearInterval(metronomeTimerRef.current);
-      metronomeTimerRef.current = null;
+    if (!metronomeTimerRef.current) {
+      metronomeTimerRef.current = window.setInterval(metronomeScheduler, LOOKAHEAD);
     }
-    voiceStatesRef.current = [];
-    setCurrentBeat(0);
-  };
+  }, [metronomeScheduler]);
+
+  const stopRhythmEngineIfUnused = useCallback(() => {
+    if (!isMetronomePlayingRef.current && !isAccompanimentPlayingRef.current) {
+      if (metronomeTimerRef.current) {
+        window.clearInterval(metronomeTimerRef.current);
+        metronomeTimerRef.current = null;
+      }
+      voiceStatesRef.current = [];
+      setCurrentBeat(0);
+    }
+  }, []);
+
+  const startMetronome = useCallback(() => {
+    isMetronomePlayingRef.current = true;
+    _setIsMetronomePlaying(true);
+    ensureRhythmEngine();
+  }, [ensureRhythmEngine]);
+
+  const stopMetronome = useCallback(() => {
+    isMetronomePlayingRef.current = false;
+    _setIsMetronomePlaying(false);
+    stopRhythmEngineIfUnused();
+  }, [stopRhythmEngineIfUnused]);
+
+  const setIsAccompanimentPlaying = useCallback((playing: boolean) => {
+    isAccompanimentPlayingRef.current = playing;
+    _setIsAccompanimentPlaying(playing);
+    if (playing) {
+      ensureRhythmEngine();
+    } else {
+      stopRhythmEngineIfUnused();
+    }
+  }, [ensureRhythmEngine, stopRhythmEngineIfUnused]);
 
   const setMetronomePattern = (pattern: BeatPattern) => {
     metronomePatternRef.current = pattern;
     _setMetronomePattern(pattern);
+    if (isMetronomePlayingRef.current || isAccompanimentPlayingRef.current) {
+      const ctx = audioCtxRef.current;
+      const now = ctx ? ctx.currentTime : 0;
+      const anchorTime = voiceStatesRef.current[0]?.nextNoteTime || (now + 0.05);
+      const anchorStep = voiceStatesRef.current[0]?.stepIndex || 0;
+      voiceStatesRef.current = pattern.voices.map((_, idx) => ({
+        nextNoteTime: voiceStatesRef.current[idx]?.nextNoteTime || anchorTime,
+        stepIndex: voiceStatesRef.current[idx]?.stepIndex || anchorStep
+      }));
+    }
   };
 
   useEffect(() => {
-    if (isMetronomePlaying) {
+    if (isMetronomePlaying || isAccompanimentPlaying) {
       if (metronomeTimerRef.current) window.clearInterval(metronomeTimerRef.current);
       metronomeTimerRef.current = window.setInterval(metronomeScheduler, LOOKAHEAD);
     }
-  }, [metronomeScheduler, isMetronomePlaying]);
+  }, [metronomeScheduler, isMetronomePlaying, isAccompanimentPlaying]);
 
   const toggleDroneNote = (note: string) => {
     setSelectedDroneNote(note);
@@ -785,6 +832,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const value = {
     isMetronomePlaying, metronomeBpm, setMetronomeBpm, startMetronome, stopMetronome, metronomePattern, setMetronomePattern, currentBeat, metronomeVolume, setMetronomeVolume,
+    isAccompanimentPlaying, setIsAccompanimentPlaying,
     activeDrones, isDronePlaying, setIsDronePlaying,
     userDroneNotes, toggleDroneNote,
     selectedDroneNote, setSelectedDroneNote, 

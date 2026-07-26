@@ -9,6 +9,7 @@ import {
   X, SlidersHorizontal, Music, ChevronUp, ChevronDown, Save, Edit2
 } from 'lucide-react';
 import { useMetronome } from '../../hooks/useMetronome.ts';
+import { useAudio } from '../../contexts/AudioContext.tsx';
 import { DEFAULT_PRESETS, TEMPO_NAMES } from './constants.ts';
 import { BeatPattern, MetronomeSound, TimeSignatureType } from './types.ts';
 import { motion, AnimatePresence } from 'motion/react';
@@ -17,6 +18,9 @@ import { useTheme } from '../../contexts/ThemeContext.tsx';
 
 export default function MetronomeView() {
   const { isPlaying, bpm, setBpm, start, stop, setActivePattern, activePattern, currentBeat, metronomeVolume, setMetronomeVolume } = useMetronome();
+  const { isAccompanimentPlaying } = useAudio();
+  const isRhythmActive = isPlaying || isAccompanimentPlaying;
+
   const { resolvedTheme } = useTheme();
   const [displayMode, setDisplayMode] = useState<'circular' | 'rings' | 'linear'>('circular');
   const [showEditor, setShowEditor] = useState(false);
@@ -35,23 +39,38 @@ export default function MetronomeView() {
   const masterVoice = activePattern?.voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
 
+  const lastBeatTimeRef = useRef<number>(performance.now());
+  const prevBeatRef = useRef<number>(currentBeat);
+
   useEffect(() => {
-    if (!isPlaying) {
+    if (currentBeat !== prevBeatRef.current) {
+      prevBeatRef.current = currentBeat;
+      lastBeatTimeRef.current = performance.now();
+    }
+  }, [currentBeat]);
+
+  useEffect(() => {
+    if (!isRhythmActive) {
       setRotation(0);
       return;
     }
     let frame: number;
-    const startT = performance.now();
     const update = () => {
-      const elapsed = (performance.now() - startT) / 1000;
-      const measureDuration = (60 / bpm) * masterLength;
-      const revs = elapsed / measureDuration;
-      setRotation(revs * 360);
+      const now = performance.now();
+      const elapsed = (now - lastBeatTimeRef.current) / 1000;
+      const secondsPerBeat = 60 / bpm;
+      const fractionOfBeat = Math.min(1, Math.max(0, elapsed / secondsPerBeat));
+      
+      const offset = activePattern?.displayOffset || 0;
+      const measurePosition = ((currentBeat + offset) % masterLength) + fractionOfBeat;
+      const currentRotation = (measurePosition / masterLength) * 360;
+      setRotation(currentRotation);
+      
       frame = requestAnimationFrame(update);
     };
     update();
     return () => cancelAnimationFrame(frame);
-  }, [isPlaying, bpm, masterLength]);
+  }, [isRhythmActive, bpm, masterLength, currentBeat, activePattern?.displayOffset]);
 
   useEffect(() => {
     if (!activePattern && DEFAULT_PRESETS.length > 0) {
@@ -390,11 +409,11 @@ export default function MetronomeView() {
 
           <div className="relative z-10 w-full flex flex-col items-center">
             {displayMode === 'circular' ? (
-              <CircularVisualizer isPlaying={isPlaying} pattern={activePattern} rotation={rotation} displayBeat={displayBeat} resolvedTheme={resolvedTheme} />
+              <CircularVisualizer isPlaying={isRhythmActive} pattern={activePattern} rotation={rotation} displayBeat={displayBeat} resolvedTheme={resolvedTheme} />
             ) : displayMode === 'rings' ? (
-              <RingsVisualizer isPlaying={isPlaying} pattern={activePattern} rotation={rotation} displayBeat={displayBeat} resolvedTheme={resolvedTheme} />
+              <RingsVisualizer isPlaying={isRhythmActive} pattern={activePattern} rotation={rotation} displayBeat={displayBeat} resolvedTheme={resolvedTheme} />
             ) : (
-              <LinearVisualizer isPlaying={isPlaying} pattern={activePattern} rotation={rotation} resolvedTheme={resolvedTheme} />
+              <LinearVisualizer isPlaying={isRhythmActive} pattern={activePattern} rotation={rotation} resolvedTheme={resolvedTheme} />
             )}
           </div>
         </div>
