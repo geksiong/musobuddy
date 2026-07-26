@@ -32,6 +32,26 @@ import {
 import { cn } from '../../lib/utils.ts';
 import { motion, AnimatePresence } from 'motion/react';
 
+export interface AudioPlayerControls {
+  isPlaying: boolean;
+  togglePlay: () => void;
+  stopPlayback: () => void;
+  rewind: (seconds?: number) => void;
+  volume: number;
+  volumeUp: (step?: number) => void;
+  volumeDown: (step?: number) => void;
+  isMuted: boolean;
+  toggleMute: () => void;
+  currentTime: number;
+  duration: number;
+  formatTime: (time: number) => string;
+  isLoaded: boolean;
+  url?: string;
+  filename?: string;
+  seek: (time: number) => void;
+  fullPlayerJSX?: React.ReactNode;
+}
+
 interface ScoreAudioPlayerProps {
   url?: string;
   filename?: string;
@@ -39,6 +59,7 @@ interface ScoreAudioPlayerProps {
   onUploadRequested?: () => void;
   onFilesDropped?: (files: FileList) => void;
   onTimeUpdate?: (time: number) => void;
+  renderTopBarControls?: (controls: AudioPlayerControls) => React.ReactNode;
 }
 
 export default function ScoreAudioPlayer({ 
@@ -47,7 +68,8 @@ export default function ScoreAudioPlayer({
   resolvedTheme, 
   onUploadRequested,
   onFilesDropped,
-  onTimeUpdate
+  onTimeUpdate,
+  renderTopBarControls
 }: ScoreAudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -122,8 +144,6 @@ export default function ScoreAudioPlayer({
       return;
     }
 
-    const isMidiFile = filename?.toLowerCase().endsWith('.mid') || filename?.toLowerCase().endsWith('.midi');
-    setIsMidi(!!isMidiFile);
     setIsLoaded(false);
     setCurrentTime(0);
     setIsPlaying(false);
@@ -136,6 +156,23 @@ export default function ScoreAudioPlayer({
         setMidiChannels({});
         midiChannelsRef.current = {};
         
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch audio file');
+        const arrayBuffer = await response.arrayBuffer();
+
+        // Check magic bytes for MIDI: "MThd" -> [0x4D, 0x54, 0x68, 0x64]
+        const uint8 = new Uint8Array(arrayBuffer);
+        const isMidiBuffer = uint8.length >= 4 &&
+          uint8[0] === 0x4d && uint8[1] === 0x54 && uint8[2] === 0x68 && uint8[3] === 0x64;
+        
+        const isMidiFile = isMidiBuffer || 
+          filename?.toLowerCase().endsWith('.mid') || 
+          filename?.toLowerCase().endsWith('.midi') || 
+          url?.toLowerCase().includes('.mid') ||
+          url?.toLowerCase().includes('midi');
+
+        setIsMidi(!!isMidiFile);
+
         const pitchShift = new Tone.PitchShift({ pitch: pitchRef.current });
         const analyser = new Tone.Analyser('fft', 256);
         const vol = new Tone.Volume(isMutedRef.current ? -Infinity : volumeStateRef.current);
@@ -165,10 +202,6 @@ export default function ScoreAudioPlayer({
             oscillator: { type: 'triangle' },
             envelope: { attack: 0.05, release: 0.1 }
           });
-
-          const response = await fetch(url);
-          if (!response.ok) throw new Error('Failed to fetch MIDI');
-          const arrayBuffer = await response.arrayBuffer();
           
           if (!MidiPlayer || !MidiPlayer.Player) {
             throw new Error('MidiPlayer not correctly loaded');
@@ -590,8 +623,48 @@ export default function ScoreAudioPlayer({
     }
   };
 
-  if (!isLoaded || !url) {
-    return (
+  const rewind = (seconds = 5) => {
+    seek(Math.max(0, currentTime - seconds));
+  };
+
+  const volumeUp = (step = 3) => {
+    setVolume(prev => Math.min(0, prev + step));
+  };
+
+  const volumeDown = (step = 3) => {
+    setVolume(prev => Math.max(-64, prev - step));
+  };
+
+  const toggleMute = () => {
+    setIsMuted(prev => !prev);
+  };
+
+  const audioControls: AudioPlayerControls = {
+    isPlaying,
+    togglePlay: () => {
+      if (!url || !isLoaded) {
+        onUploadRequested?.();
+      } else {
+        togglePlay();
+      }
+    },
+    stopPlayback,
+    rewind,
+    volume,
+    volumeUp,
+    volumeDown,
+    isMuted,
+    toggleMute,
+    currentTime,
+    duration,
+    formatTime,
+    isLoaded,
+    url,
+    filename,
+    seek
+  };
+
+  const fullCard = (!isLoaded || !url) ? (
       <div 
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
         onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
@@ -626,403 +699,413 @@ export default function ScoreAudioPlayer({
           Load Audio
         </button>
       </div>
-    );
-  }
-
-  return (
-    <motion.div 
-      initial={false}
-      animate={{ height: isCollapsed ? '80px' : 'auto' }}
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
-      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
-      onDrop={handleDrop}
-      className={cn(
-        "rounded-2xl border transition-all flex flex-col overflow-hidden relative",
-        resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl",
-        isDragging && "ring-4 ring-orange-500 ring-inset bg-orange-500/5"
-      )}
-    >
-      {isDragging && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-orange-500/10 backdrop-blur-sm">
-          <div className="bg-orange-500 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl animate-bounce">
-            Drop Audio Files
-          </div>
-        </div>
-      )}
-      {/* Mini View Header */}
-      <div className="flex items-center justify-between gap-4 h-20 px-6 shrink-0 relative select-none">
-
-        {/* Title area - Explicit Expansion Trigger */}
-        <div 
-          className="flex items-center gap-4 z-10 cursor-pointer group/title"
-          onClick={() => isCollapsed && setIsCollapsed(false)}
-        >
-          <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover/title:scale-110 transition-transform">
-            <Music className="w-5 h-5" />
-          </div>
-          <div className="hidden sm:block">
-            <h3 className={cn("text-xs font-black uppercase tracking-widest leading-none group-hover/title:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-              {filename || 'Audio Engine'}
-            </h3>
-            <div className="flex items-center gap-2 mt-1">
-               <span className="text-[10px] font-black tabular-nums text-orange-500 tracking-tighter">
-                {formatTime(currentTime)} / {formatTime(duration)}
-               </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dedicated Progress Slider for Mini View */}
-        {isCollapsed && (
-          <div className="flex-1 flex flex-col justify-center gap-1.5 z-10 max-w-sm px-4">
-            {/* Spectrum behind progress in mini view */}
-            <div className="h-4 bg-black/5 rounded-md overflow-hidden opacity-40">
-              <canvas 
-                ref={miniCanvasRef} 
-                width={400} 
-                height={40} 
-                className="w-full h-full object-cover"
-              />
-            </div>
-            
-            {/* Progress Slider */}
-            <div 
-              className="relative h-4 select-none cursor-pointer group/mini-seek"
-              onClick={(e) => {
-                e.stopPropagation();
-                const rect = e.currentTarget.getBoundingClientRect();
-                const percent = (e.clientX - rect.left) / rect.width;
-                seek(percent * duration);
-              }}
-            >
-              <div className="w-full h-1.5 bg-black/10 rounded-full overflow-hidden relative">
-                <div 
-                  className="absolute h-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]"
-                  style={{ width: `${(currentTime / duration) * 100}%` }}
-                />
-              </div>
-              {/* Knob */}
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-orange-500 rounded-full shadow-md scale-0 group-hover/mini-seek:scale-100 transition-transform pointer-events-none"
-                style={{ left: `calc(${(currentTime / duration) * 100}% - 6px)` }}
-              />
+    ) : (
+      <motion.div 
+        initial={false}
+        animate={{ height: isCollapsed ? '80px' : 'auto' }}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+        onDrop={handleDrop}
+        className={cn(
+          "rounded-2xl border transition-all flex flex-col overflow-hidden relative",
+          resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl",
+          isDragging && "ring-4 ring-orange-500 ring-inset bg-orange-500/5"
+        )}
+      >
+        {isDragging && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-orange-500/10 backdrop-blur-sm">
+            <div className="bg-orange-500 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl animate-bounce">
+              Drop Audio Files
             </div>
           </div>
         )}
+        {/* Mini View Header */}
+        <div className="flex items-center justify-between gap-4 h-20 px-6 shrink-0 relative select-none">
 
-        <div className="flex items-center gap-2 z-10">
-          <button 
-            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-            className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-orange-500/20"
+          {/* Title area - Explicit Expansion Trigger */}
+          <div 
+            className="flex items-center gap-4 z-10 cursor-pointer group/title"
+            onClick={() => isCollapsed && setIsCollapsed(false)}
           >
-            {isPlaying ? <Pause className="w-4 h-4" fill="currentColor" /> : <Play className="w-4 h-4 pl-0.5" fill="currentColor" />}
-          </button>
-          
-          <button 
-            onClick={(e) => { e.stopPropagation(); stopPlayback(); }}
-            className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-              resolvedTheme === 'dark' ? "bg-white/5 text-white hover:bg-white/10" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            )}
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); onUploadRequested(); }}
-            className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-              resolvedTheme === 'dark' ? "bg-white/5 text-white hover:bg-white/10" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            )}
-            title="Load New Audio"
-          >
-            <Upload className="w-4 h-4" />
-          </button>
-
-          <div className="w-[1px] h-6 bg-black/10 mx-2" />
-
-          <div className="hidden lg:flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setIsMuted(!isMuted)}>
-              {isMuted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4 text-slate-400" />}
-            </button>
-            <input 
-              type="range" min="-64" max="0" step="1" 
-              value={volume} onChange={(e) => setVolume(parseInt(e.target.value))}
-              className="w-20 accent-orange-500 h-1 rounded-lg"
-            />
-          </div>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); setIsCollapsed(!isCollapsed); }}
-            className={cn(
-              "p-2 rounded-xl transition-all ml-2",
-              resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-400 hover:text-slate-900"
-            )}
-          >
-            {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {!isCollapsed && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="px-6 pb-6 flex flex-col gap-6"
-          >
-            {/* Visualizer & Header Info */}
-            <div className="flex items-center justify-between gap-8 pt-4 border-t border-black/5">
-              <div className="hidden md:block">
-                <p className={cn("text-[10px] font-bold opacity-50 uppercase tracking-tighter", resolvedTheme === 'dark' ? "text-white" : "text-slate-500")}>Professional Playback Control</p>
-                <p className={cn("text-[8px] font-bold opacity-30 mt-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-400")}>{isMidi ? 'MIDI SYMBOLIC ENGINE' : 'PCM AUDIO ENGINE'}</p>
+            <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover/title:scale-110 transition-transform">
+              <Music className="w-5 h-5" />
+            </div>
+            <div className="hidden sm:block">
+              <h3 className={cn("text-xs font-black uppercase tracking-widest leading-none group-hover/title:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
+                {filename || 'Audio Engine'}
+              </h3>
+              <div className="flex items-center gap-2 mt-1">
+                 <span className="text-[10px] font-black tabular-nums text-orange-500 tracking-tighter">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                 </span>
               </div>
             </div>
+          </div>
 
-            {/* Progress Bar with Loop Markers */}
-            <div className="flex flex-col gap-3">
-              {/* MIDI Channels (Conditional) */}
-              {isMidi && Object.keys(midiChannels).length > 0 && (
-                <div className="flex flex-col gap-2 mb-2 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">MIDI Instrument Channels</span>
-                    <button 
-                      onClick={() => {
-                        const newChannels = { ...midiChannelsRef.current };
-                        Object.keys(newChannels).forEach(ch => newChannels[parseInt(ch)].muted = false);
-                        midiChannelsRef.current = newChannels;
-                        setMidiChannels({ ...newChannels });
-                      }}
-                      className="text-[8px] font-black uppercase tracking-widest text-orange-500/60 hover:text-orange-500"
-                    >
-                      Reset All
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.keys(midiChannels).map((chStr) => {
-                      const ch = parseInt(chStr);
-                      const channelInfo = midiChannels[ch];
-                      return (
-                        <button
-                          key={ch}
-                          onClick={() => {
-                            const newChannels = { ...midiChannelsRef.current };
-                            newChannels[ch].muted = !newChannels[ch].muted;
-                            midiChannelsRef.current = newChannels;
-                            setMidiChannels({ ...newChannels });
-                            if (newChannels[ch].muted) {
-                              synthRef.current?.releaseAll();
-                            }
-                          }}
-                          className={cn(
-                            "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border",
-                            channelInfo.muted 
-                              ? "bg-black/5 border-transparent text-slate-300" 
-                              : "bg-orange-500/10 border-orange-500/20 text-orange-600 shadow-sm"
-                          )}
-                        >
-                          CH {ch} {channelInfo.program !== undefined ? `- ${getInstrumentName(channelInfo.program)}` : ''}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Spectrum Display - Just above progress */}
-              <div className="h-16 rounded-xl overflow-hidden opacity-80 pointer-events-none bg-black/5 mb-[-8px]">
+          {/* Dedicated Progress Slider for Mini View */}
+          {isCollapsed && (
+            <div className="flex-1 flex flex-col justify-center gap-1.5 z-10 max-w-sm px-4">
+              {/* Spectrum behind progress in mini view */}
+              <div className="h-4 bg-black/5 rounded-md overflow-hidden opacity-40">
                 <canvas 
-                  ref={canvasRef} 
-                  width={1200} 
-                  height={160} 
+                  ref={miniCanvasRef} 
+                  width={400} 
+                  height={40} 
                   className="w-full h-full object-cover"
                 />
               </div>
-
+              
+              {/* Progress Slider */}
               <div 
-                ref={progressBarRef}
-                className="relative h-12 group cursor-pointer"
+                className="relative h-4 select-none cursor-pointer group/mini-seek"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const percent = (e.clientX - rect.left) / rect.width;
+                  seek(percent * duration);
+                }}
               >
-                
-                {/* Background Track */}
-                <div 
-                  className="absolute inset-y-4 inset-x-0 rounded-full bg-black/5 overflow-hidden"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const percent = (e.clientX - rect.left) / rect.width;
-                    seek(percent * duration);
-                  }}
-                >
-                   <div 
-                    className="absolute h-full bg-orange-500 opacity-40 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+                <div className="w-full h-1.5 bg-black/10 rounded-full overflow-hidden relative">
+                  <div 
+                    className="absolute h-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]"
                     style={{ width: `${(currentTime / duration) * 100}%` }}
                   />
-                  {loopMode && (
-                    <div 
-                      className="absolute h-full bg-orange-500/10 border-x border-orange-500/30"
-                      style={{ left: `${(loopStart / duration) * 100}%`, width: `${((loopEnd - loopStart) / duration) * 100}%` }}
+                </div>
+                {/* Knob */}
+                <div 
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-orange-500 rounded-full shadow-md scale-0 group-hover/mini-seek:scale-100 transition-transform pointer-events-none"
+                  style={{ left: `calc(${(currentTime / duration) * 100}% - 6px)` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 z-10">
+            <button 
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-orange-500/20"
+            >
+              {isPlaying ? <Pause className="w-4 h-4" fill="currentColor" /> : <Play className="w-4 h-4 pl-0.5" fill="currentColor" />}
+            </button>
+            
+            <button 
+              onClick={(e) => { e.stopPropagation(); stopPlayback(); }}
+              className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                resolvedTheme === 'dark' ? "bg-white/5 text-white hover:bg-white/10" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              )}
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+
+            <button 
+              onClick={(e) => { e.stopPropagation(); onUploadRequested(); }}
+              className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                resolvedTheme === 'dark' ? "bg-white/5 text-white hover:bg-white/10" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              )}
+              title="Load New Audio"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+
+            <div className="w-[1px] h-6 bg-black/10 mx-2" />
+
+            <div className="hidden lg:flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => setIsMuted(!isMuted)}>
+                {isMuted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4 text-slate-400" />}
+              </button>
+              <input 
+                type="range" min="-64" max="0" step="1" 
+                value={volume} onChange={(e) => setVolume(parseInt(e.target.value))}
+                className="w-20 accent-orange-500 h-1 rounded-lg"
+              />
+            </div>
+
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsCollapsed(!isCollapsed); }}
+              className={cn(
+                "p-2 rounded-xl transition-all ml-2",
+                resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-400 hover:text-slate-900"
+              )}
+            >
+              {isCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {!isCollapsed && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="px-6 pb-6 flex flex-col gap-6"
+            >
+              {/* Visualizer & Header Info */}
+              <div className="flex items-center justify-between gap-8 pt-4 border-t border-black/5">
+                <div className="hidden md:block">
+                  <p className={cn("text-[10px] font-bold opacity-50 uppercase tracking-tighter", resolvedTheme === 'dark' ? "text-white" : "text-slate-500")}>Professional Playback Control</p>
+                  <p className={cn("text-[8px] font-bold opacity-30 mt-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-400")}>{isMidi ? 'MIDI SYMBOLIC ENGINE' : 'PCM AUDIO ENGINE'}</p>
+                </div>
+              </div>
+
+              {/* Progress Bar with Loop Markers */}
+              <div className="flex flex-col gap-3">
+                {/* MIDI Channels (Conditional) */}
+                {isMidi && Object.keys(midiChannels).length > 0 && (
+                  <div className="flex flex-col gap-2 mb-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">MIDI Instrument Channels</span>
+                      <button 
+                        onClick={() => {
+                          const newChannels = { ...midiChannelsRef.current };
+                          Object.keys(newChannels).forEach(ch => newChannels[parseInt(ch)].muted = false);
+                          midiChannelsRef.current = newChannels;
+                          setMidiChannels({ ...newChannels });
+                        }}
+                        className="text-[8px] font-black uppercase tracking-widest text-orange-500/60 hover:text-orange-500"
+                      >
+                        Reset All
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.keys(midiChannels).map((chStr) => {
+                        const ch = parseInt(chStr);
+                        const channelInfo = midiChannels[ch];
+                        return (
+                          <button
+                            key={ch}
+                            onClick={() => {
+                              const newChannels = { ...midiChannelsRef.current };
+                              newChannels[ch].muted = !newChannels[ch].muted;
+                              midiChannelsRef.current = newChannels;
+                              setMidiChannels({ ...newChannels });
+                              if (newChannels[ch].muted) {
+                                synthRef.current?.releaseAll();
+                              }
+                            }}
+                            className={cn(
+                              "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border",
+                              channelInfo.muted 
+                                ? "bg-black/5 border-transparent text-slate-300" 
+                                : "bg-orange-500/10 border-orange-500/20 text-orange-600 shadow-sm"
+                            )}
+                          >
+                            CH {ch} {channelInfo.program !== undefined ? `- ${getInstrumentName(channelInfo.program)}` : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Spectrum Display - Just above progress */}
+                <div className="h-16 rounded-xl overflow-hidden opacity-80 pointer-events-none bg-black/5 mb-[-8px]">
+                  <canvas 
+                    ref={canvasRef} 
+                    width={1200} 
+                    height={160} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div 
+                  ref={progressBarRef}
+                  className="relative h-12 group cursor-pointer"
+                >
+                  
+                  {/* Background Track */}
+                  <div 
+                    className="absolute inset-y-4 inset-x-0 rounded-full bg-black/5 overflow-hidden"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const percent = (e.clientX - rect.left) / rect.width;
+                      seek(percent * duration);
+                    }}
+                  >
+                     <div 
+                      className="absolute h-full bg-orange-500 opacity-40 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+                      style={{ width: `${(currentTime / duration) * 100}%` }}
                     />
+                    {loopMode && (
+                      <div 
+                        className="absolute h-full bg-orange-500/10 border-x border-orange-500/30"
+                        style={{ left: `${(loopStart / duration) * 100}%`, width: `${((loopEnd - loopStart) / duration) * 100}%` }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Current Time Marker */}
+                  <div 
+                    className="absolute inset-y-2 w-0.5 bg-orange-500 z-10 pointer-events-none shadow-[0_0_8px_rgba(249,115,22,0.6)]"
+                    style={{ left: `${(currentTime / duration) * 100}%` }}
+                  />
+
+                  {/* Loop Draggables */}
+                  {loopMode && (
+                    <>
+                      <div 
+                        onMouseDown={(e) => handleLoopMarkerDrag(e, 'start')}
+                        className="absolute inset-y-0 w-4 -ml-2 cursor-col-resize z-20 flex items-center justify-center group/marker"
+                        style={{ left: `${(loopStart / duration) * 100}%` }}
+                      >
+                        <div className="w-1 h-8 bg-orange-500 rounded-full group-hover/marker:w-2 transition-all shadow-lg" />
+                      </div>
+                      <div 
+                        onMouseDown={(e) => handleLoopMarkerDrag(e, 'end')}
+                        className="absolute inset-y-0 w-4 -ml-2 cursor-col-resize z-20 flex items-center justify-center group/marker"
+                        style={{ left: `${(loopEnd / duration) * 100}%` }}
+                      >
+                        <div className="w-1 h-8 bg-orange-500 rounded-full group-hover/marker:w-2 transition-all shadow-lg" />
+                      </div>
+                    </>
                   )}
                 </div>
+              </div>
 
-                {/* Current Time Marker */}
-                <div 
-                  className="absolute inset-y-2 w-0.5 bg-orange-500 z-10 pointer-events-none shadow-[0_0_8px_rgba(249,115,22,0.6)]"
-                  style={{ left: `${(currentTime / duration) * 100}%` }}
-                />
-
-                {/* Loop Draggables */}
-                {loopMode && (
-                  <>
-                    <div 
-                      onMouseDown={(e) => handleLoopMarkerDrag(e, 'start')}
-                      className="absolute inset-y-0 w-4 -ml-2 cursor-col-resize z-20 flex items-center justify-center group/marker"
-                      style={{ left: `${(loopStart / duration) * 100}%` }}
-                    >
-                      <div className="w-1 h-8 bg-orange-500 rounded-full group-hover/marker:w-2 transition-all shadow-lg" />
+              {/* Expanded Controls Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {/* Pitch Control */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <Gauge className="w-3 h-3" />
+                      <span>Pitch Shifter</span>
                     </div>
-                    <div 
-                      onMouseDown={(e) => handleLoopMarkerDrag(e, 'end')}
-                      className="absolute inset-y-0 w-4 -ml-2 cursor-col-resize z-20 flex items-center justify-center group/marker"
-                      style={{ left: `${(loopEnd / duration) * 100}%` }}
+                    <span className="text-orange-500">{pitch > 0 ? `+${pitch}` : pitch} ST</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setPitch(Math.max(-12, pitch - 1))}
+                      className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
                     >
-                      <div className="w-1 h-8 bg-orange-500 rounded-full group-hover/marker:w-2 transition-all shadow-lg" />
+                      <MinusCircle className="w-4 h-4" />
+                    </button>
+                    <div className="flex-1 relative h-1 bg-black/10 rounded-full">
+                      <div 
+                        className="absolute h-full bg-orange-500 rounded-full"
+                        style={{ 
+                          left: pitch < 0 ? `${50 + (pitch / 12) * 50}%` : '50%',
+                          right: pitch > 0 ? `${50 - (pitch / 12) * 50}%` : '50%'
+                        }}
+                      />
                     </div>
-                  </>
-                )}
-              </div>
-            </div>
+                    <button 
+                      onClick={() => setPitch(Math.min(12, pitch + 1))}
+                      className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => setPitch(0)}
+                    className="text-[8px] font-black uppercase tracking-widest text-orange-500/50 hover:text-orange-500 self-center"
+                  >Reset Pitch</button>
+                </div>
 
-            {/* Expanded Controls Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {/* Pitch Control */}
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {/* Tempo Control */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-3 h-3" />
+                      <span>Tempo Engine</span>
+                    </div>
+                    <span className="text-orange-500">{Math.round(playbackRate * 100)}%</span>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <Gauge className="w-3 h-3" />
-                    <span>Pitch Shifter</span>
+                    <button 
+                      onClick={() => setPlaybackRate(Math.max(0.5, Math.round((playbackRate - 0.1) * 10) / 10))}
+                      className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
+                      title="-10%"
+                    >
+                      <MinusCircle className="w-4 h-4" />
+                    </button>
+                    <div className="flex-1 relative h-1 bg-black/10 rounded-full overflow-hidden">
+                      <div 
+                        className="absolute h-full bg-orange-500 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${((playbackRate - 0.5) / 1.5) * 100}%`
+                        }}
+                      />
+                    </div>
+                    <button 
+                      onClick={() => setPlaybackRate(Math.min(2, Math.round((playbackRate + 0.1) * 10) / 10))}
+                      className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
+                      title="+10%"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                    </button>
                   </div>
-                  <span className="text-orange-500">{pitch > 0 ? `+${pitch}` : pitch} ST</span>
-                </div>
-                <div className="flex items-center gap-2">
                   <button 
-                    onClick={() => setPitch(Math.max(-12, pitch - 1))}
-                    className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
-                  >
-                    <MinusCircle className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 relative h-1 bg-black/10 rounded-full">
-                    <div 
-                      className="absolute h-full bg-orange-500 rounded-full"
-                      style={{ 
-                        left: pitch < 0 ? `${50 + (pitch / 12) * 50}%` : '50%',
-                        right: pitch > 0 ? `${50 - (pitch / 12) * 50}%` : '50%'
-                      }}
-                    />
-                  </div>
-                  <button 
-                    onClick={() => setPitch(Math.min(12, pitch + 1))}
-                    className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                  </button>
+                    onClick={() => setPlaybackRate(1)}
+                    className="text-[8px] font-black uppercase tracking-widest text-orange-500/50 hover:text-orange-500 self-center"
+                  >Standard Speed</button>
                 </div>
-                <button 
-                  onClick={() => setPitch(0)}
-                  className="text-[8px] font-black uppercase tracking-widest text-orange-500/50 hover:text-orange-500 self-center"
-                >Reset Pitch</button>
-              </div>
 
-              {/* Tempo Control */}
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-3 h-3" />
-                    <span>Tempo Engine</span>
+                {/* Advanced Signal Options */}
+                <div className="flex flex-col gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Signal Processing</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button 
+                      onClick={() => setLoopMode(!loopMode)}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                        loopMode ? "bg-orange-500 text-white shadow-lg shadow-orange-500/10" : "bg-black/5 text-slate-400"
+                      )}
+                    >
+                      <RefreshCw className={cn("w-3 h-3", loopMode && "animate-spin-slow")} />
+                      Repeat
+                    </button>
+                    <button 
+                      onClick={() => !isMidi && setVocalRemoved(!vocalRemoved)}
+                      disabled={isMidi}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                        isMidi ? "bg-black/5 text-slate-300 cursor-not-allowed opacity-50" : 
+                        vocalRemoved ? "bg-purple-500 text-white" : "bg-black/5 text-slate-400"
+                      )}
+                      title={isMidi ? "Isolation not available for MIDI" : "Vocal Removal"}
+                    >
+                      <MicOff className="w-3 h-3" />
+                      Isolation
+                    </button>
                   </div>
-                  <span className="text-orange-500">{Math.round(playbackRate * 100)}%</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setPlaybackRate(Math.max(0.5, Math.round((playbackRate - 0.1) * 10) / 10))}
-                    className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
-                    title="-10%"
-                  >
-                    <MinusCircle className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 relative h-1 bg-black/10 rounded-full overflow-hidden">
-                    <div 
-                      className="absolute h-full bg-orange-500 rounded-full transition-all duration-300"
-                      style={{ 
-                        width: `${((playbackRate - 0.5) / 1.5) * 100}%`
-                      }}
-                    />
+                  <div className="flex items-center gap-1 bg-black/5 p-1 rounded-xl">
+                    <button 
+                      onClick={() => setChannels({ ...channels, l: !channels.l })}
+                      className={cn(
+                        "flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest",
+                        channels.l ? "bg-white text-orange-500 shadow-sm" : "opacity-30"
+                      )}
+                    >Left</button>
+                    <button 
+                      onClick={() => setChannels({ ...channels, r: !channels.r })}
+                      className={cn(
+                        "flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest",
+                        channels.r ? "bg-white text-orange-500 shadow-sm" : "opacity-30"
+                      )}
+                    >Right</button>
                   </div>
-                  <button 
-                    onClick={() => setPlaybackRate(Math.min(2, Math.round((playbackRate + 0.1) * 10) / 10))}
-                    className="p-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
-                    title="+10%"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                  </button>
                 </div>
-                <button 
-                  onClick={() => setPlaybackRate(1)}
-                  className="text-[8px] font-black uppercase tracking-widest text-orange-500/50 hover:text-orange-500 self-center"
-                >Standard Speed</button>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
 
-              {/* Advanced Signal Options */}
-              <div className="flex flex-col gap-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Signal Processing</span>
-                <div className="flex flex-wrap gap-2">
-                  <button 
-                    onClick={() => setLoopMode(!loopMode)}
-                    className={cn(
-                      "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                      loopMode ? "bg-orange-500 text-white shadow-lg shadow-orange-500/10" : "bg-black/5 text-slate-400"
-                    )}
-                  >
-                    <RefreshCw className={cn("w-3 h-3", loopMode && "animate-spin-slow")} />
-                    Repeat
-                  </button>
-                  <button 
-                    onClick={() => !isMidi && setVocalRemoved(!vocalRemoved)}
-                    disabled={isMidi}
-                    className={cn(
-                      "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                      isMidi ? "bg-black/5 text-slate-300 cursor-not-allowed opacity-50" : 
-                      vocalRemoved ? "bg-purple-500 text-white" : "bg-black/5 text-slate-400"
-                    )}
-                    title={isMidi ? "Isolation not available for MIDI" : "Vocal Removal"}
-                  >
-                    <MicOff className="w-3 h-3" />
-                    Isolation
-                  </button>
-                </div>
-                <div className="flex items-center gap-1 bg-black/5 p-1 rounded-xl">
-                  <button 
-                    onClick={() => setChannels({ ...channels, l: !channels.l })}
-                    className={cn(
-                      "flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest",
-                      channels.l ? "bg-white text-orange-500 shadow-sm" : "opacity-30"
-                    )}
-                  >Left</button>
-                  <button 
-                    onClick={() => setChannels({ ...channels, r: !channels.r })}
-                    className={cn(
-                      "flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest",
-                      channels.r ? "bg-white text-orange-500 shadow-sm" : "opacity-30"
-                    )}
-                  >Right</button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
+  if (renderTopBarControls) {
+    return (
+      <div className="w-full">
+        {renderTopBarControls({
+          ...audioControls,
+          fullPlayerJSX: fullCard
+        })}
+      </div>
+    );
+  }
+
+  return fullCard;
 }

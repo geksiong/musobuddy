@@ -22,6 +22,8 @@ interface ScoreContextType {
   setGlobalAudio: React.Dispatch<React.SetStateAction<GlobalAudio | null>>;
   loadFiles: (files: FileList | File[]) => Promise<string | null>;
   exportActiveScore: () => void;
+  playbackTime: number;
+  setPlaybackTime: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
@@ -63,7 +65,7 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
     return DEFAULT_SCORES;
   });
   
-  const [activeScoreId, setActiveScoreId] = useState<string | null>(() => {
+  const [activeScoreIdState, setActiveScoreIdState] = useState<string | null>(() => {
     const savedId = localStorage.getItem('studio_buddy_active_score_id');
     if (savedId) return savedId;
     const savedScores = localStorage.getItem('studio_buddy_scores');
@@ -77,8 +79,39 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [globalAudio, setGlobalAudio] = useState<GlobalAudio | null>(null);
+  const [playbackTime, setPlaybackTime] = useState<number>(0);
+
+  const setActiveScoreId = useCallback((id: string | null) => {
+    setActiveScoreIdState(id);
+    setGlobalAudio(null);
+  }, []);
+
+  const activeScoreId = activeScoreIdState;
 
   const activeScore = scores.find(s => s.id === activeScoreId) || scores[0];
+
+  // Auto-generate MIDI audioUrl for active score if missing or empty
+  useEffect(() => {
+    if (!activeScore) return;
+
+    const isAbc = activeScore.format === ScoreFormat.ABC || 
+      (typeof activeScore.content === 'string' && activeScore.content.includes('X:'));
+
+    if (isAbc && (!activeScore.audioUrl || activeScore.audioUrl === '')) {
+      const midiUrl = generateMidiForAbc(
+        activeScore.content as string,
+        activeScore.selectedTuneIndex || 0,
+        activeScore.transpose || 0
+      );
+      if (midiUrl) {
+        setScores(prev => prev.map(s => s.id === activeScore.id ? {
+          ...s,
+          audioUrl: midiUrl,
+          audioName: `${s.title || 'score'}.mid`
+        } : s));
+      }
+    }
+  }, [activeScore?.id, activeScore?.content, activeScore?.selectedTuneIndex, activeScore?.transpose, activeScore?.audioUrl]);
 
   const exportActiveScore = useCallback(() => {
     exportScore(activeScore);
@@ -239,7 +272,9 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       globalAudio,
       setGlobalAudio,
       loadFiles,
-      exportActiveScore
+      exportActiveScore,
+      playbackTime,
+      setPlaybackTime
     }}>
       {children}
     </ScoreContext.Provider>

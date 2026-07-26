@@ -56,10 +56,9 @@ const PdfRenderer = React.lazy(() => import('./PdfRenderer.tsx'));
 const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer.tsx'));
 
 export default function ScoreView() {
-  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore } = useScores();
+  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore, playbackTime } = useScores();
   const [isDragging, setIsDragging] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [playbackTime, setPlaybackTime] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { resolvedTheme } = useTheme();
 
@@ -265,75 +264,6 @@ export default function ScoreView() {
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="w-full md:w-80 flex flex-col gap-6 overflow-hidden shrink-0"
           >
-            {/* Global Controls Panel - Moved from main to sidebar */}
-            <div className={cn(
-                 "flex flex-col gap-3 p-4 rounded-xl border transition-colors shadow-md",
-                 resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-md"
-            )}>
-              <div className="flex items-center gap-2 mb-1">
-                 <div className="w-6 h-6 rounded bg-orange-500/10 flex items-center justify-center">
-                    <Sliders className="w-3.5 h-3.5 text-orange-500" />
-                 </div>
-                 <span className={cn("text-[10px] font-black uppercase tracking-widest leading-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>Performance Tools</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <button 
-                  onClick={() => isMetronomePlaying ? stopMetronome() : startMetronome()}
-                  className={cn(
-                    "w-full p-2.5 rounded-xl transition-all border flex flex-col items-center justify-center gap-2",
-                    isMetronomePlaying 
-                      ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/20" 
-                      : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-50 border-black/10 text-slate-500 hover:text-slate-900")
-                  )}
-                  title="Metronome"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-current/10 flex items-center justify-center shrink-0">
-                    <Drum className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="flex flex-col items-center text-center">
-                    <span className="text-[8px] font-black uppercase leading-tight">Metronome</span>
-                  </div>
-                </button>
-
-                <button 
-                  onClick={() => setIsDronePlaying(!isDronePlaying)}
-                  className={cn(
-                    "w-full p-2.5 rounded-xl transition-all border flex flex-col items-center justify-center gap-2",
-                    isDronePlaying 
-                      ? "bg-purple-500 border-purple-500 text-white shadow-lg shadow-purple-500/20" 
-                      : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-50 border-black/10 text-slate-500 hover:text-slate-900")
-                  )}
-                  title="Drone"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-current/10 flex items-center justify-center shrink-0">
-                    <Waves className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="flex flex-col items-center text-center">
-                    <span className="text-[8px] font-black uppercase leading-tight">Drone</span>
-                  </div>
-                </button>
-
-                <button 
-                  onClick={() => setIsAccompanimentPlaying(!isAccompanimentPlaying)}
-                  className={cn(
-                    "w-full p-2.5 rounded-xl transition-all border flex flex-col items-center justify-center gap-2",
-                    isAccompanimentPlaying 
-                      ? "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20" 
-                      : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-50 border-black/10 text-slate-500 hover:text-slate-900")
-                  )}
-                  title="Accompaniment"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-current/10 flex items-center justify-center shrink-0">
-                    <Piano className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="flex flex-col items-center text-center">
-                    <span className="text-[8px] font-black uppercase leading-tight">AI Engine</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/10 to-transparent rounded-2xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
               <div className={cn(
@@ -442,21 +372,6 @@ export default function ScoreView() {
 
       {/* Main Display */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Top Controls Row */}
-        <div className="mb-4">
-          {/* Global Audio Engine Panel */}
-          <div className="w-full">
-            <ScoreAudioPlayer 
-              url={globalAudio?.url || activeScore?.audioUrl} 
-              filename={globalAudio?.name || activeScore?.audioName || 'audio.mp3'}
-              resolvedTheme={resolvedTheme} 
-              onUploadRequested={() => fileInputRef.current?.click()}
-              onFilesDropped={handleFiles}
-              onTimeUpdate={setPlaybackTime}
-            />
-          </div>
-        </div>
-
         <div 
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}

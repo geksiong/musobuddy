@@ -40,6 +40,7 @@ import TunerView from './components/Tuner/TunerView.tsx';
 import DroneView from './components/Drone/DroneView.tsx';
 import ScoreView from './components/Score/ScoreView.tsx';
 import AccompanimentView from './components/Accompaniment/AccompanimentView.tsx';
+import PracticeToolsPanel from './components/Navigation/PracticeToolsPanel.tsx';
 
 type ViewType = 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment' | 'settings';
 
@@ -218,6 +219,12 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Practice Tools Collapsible Panel */}
+      <PracticeToolsPanel 
+        onNavigate={(view) => setCurrentView(view)} 
+        fileInputRef={fileInputRef} 
+      />
 
       {/* Main Content */}
       <main className="flex-1 relative overflow-y-auto custom-scrollbar">
