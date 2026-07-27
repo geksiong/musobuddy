@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
-import { MetronomeSound, BeatPattern } from '../components/Metronome/types.ts';
+import { MetronomeSound, BeatPattern, TimeSignatureType } from '../components/Metronome/types.ts';
 import { DEFAULT_PRESETS } from '../components/Metronome/constants.ts';
 import { DroneTone } from '../components/Drone/types.ts';
 import { InstrumentType } from '../types.ts';
@@ -238,12 +238,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const length = voice.pattern?.length || voice.beats || 4;
       const interval = measureDuration / length;
 
+      const is12Beat = pattern.type === TimeSignatureType.Flamenco || pattern.timeSignature === '12-Beat' || masterLength === 12;
+      const startBeat = pattern.startBeat || 1;
+      const startIndex = (is12Beat && length === 12)
+        ? ((startBeat - 1 + 12) % 12)
+        : ((startBeat - 1 + length) % length);
+
       while (vState.nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD_TIME) {
         let playValue = 0;
+        const patternIdx = (vState.stepIndex + startIndex) % length;
         if (voice.pattern && voice.pattern.length > 0) {
-          playValue = voice.pattern[vState.stepIndex % voice.pattern.length];
+          playValue = voice.pattern[patternIdx % voice.pattern.length];
         } else {
-          playValue = (vState.stepIndex % length === 0) ? 2 : 1;
+          playValue = (patternIdx === 0) ? 2 : 1;
         }
 
         // Only emit audible metronome click if metronome sound is enabled

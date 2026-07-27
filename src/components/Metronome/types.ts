@@ -41,5 +41,6 @@ export interface BeatPattern {
   countIn: boolean;
   type: TimeSignatureType;
   isUserPreset?: boolean;
-  displayOffset?: number; // Starting count offset (e.g., 11 for a 12-beat cycle starting at 12)
+  startBeat?: number; // Starting beat position (e.g. 1 for beat 1, 12 for beat 12)
+  displayOffset?: number; // Starting count offset
 }

@@ -38,22 +38,33 @@ export default function MetronomeView() {
 
   const masterVoice = activePattern?.voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+  const is12Beat = masterLength === 12 || activePattern?.type === TimeSignatureType.Flamenco || activePattern?.timeSignature === '12-Beat';
 
   const lastBeatTimeRef = useRef<number>(performance.now());
   const prevBeatRef = useRef<number>(currentBeat);
+  const wasRhythmActiveRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (currentBeat !== prevBeatRef.current) {
+    if (currentBeat !== prevBeatRef.current || (isRhythmActive && !wasRhythmActiveRef.current)) {
       prevBeatRef.current = currentBeat;
       lastBeatTimeRef.current = performance.now();
     }
-  }, [currentBeat]);
+    wasRhythmActiveRef.current = isRhythmActive;
+  }, [currentBeat, isRhythmActive]);
 
   useEffect(() => {
+    const startBeat = activePattern?.startBeat || 1;
+    const is12Beat = masterLength === 12 || activePattern?.type === TimeSignatureType.Flamenco || activePattern?.timeSignature === '12-Beat';
+
+    const baseStartAngle = (is12Beat && masterLength === 12)
+      ? (startBeat / 12) * 360
+      : ((startBeat - 1) / masterLength) * 360;
+
     if (!isRhythmActive) {
-      setRotation(0);
+      setRotation(baseStartAngle);
       return;
     }
+
     let frame: number;
     const update = () => {
       const now = performance.now();
@@ -61,16 +72,16 @@ export default function MetronomeView() {
       const secondsPerBeat = 60 / bpm;
       const fractionOfBeat = Math.min(1, Math.max(0, elapsed / secondsPerBeat));
       
-      const offset = activePattern?.displayOffset || 0;
-      const measurePosition = ((currentBeat + offset) % masterLength) + fractionOfBeat;
-      const currentRotation = (measurePosition / masterLength) * 360;
+      const measurePosition = currentBeat + fractionOfBeat;
+      const currentRotation = baseStartAngle + (measurePosition / masterLength) * 360;
+
       setRotation(currentRotation);
       
       frame = requestAnimationFrame(update);
     };
     update();
     return () => cancelAnimationFrame(frame);
-  }, [isRhythmActive, bpm, masterLength, currentBeat, activePattern?.displayOffset]);
+  }, [isRhythmActive, bpm, masterLength, currentBeat, activePattern?.startBeat, activePattern?.type, activePattern?.timeSignature]);
 
   useEffect(() => {
     if (!activePattern && DEFAULT_PRESETS.length > 0) {
@@ -141,7 +152,7 @@ export default function MetronomeView() {
   };
 
   const offset = activePattern?.displayOffset || 0;
-  const displayBeat = (Math.floor(((rotation % 360) / 360) * masterLength) + offset) % masterLength;
+  const displayBeat = (Math.floor((((rotation % 360) + 360) % 360) / (360 / masterLength) + 0.0001) + offset) % masterLength;
 
   return (
     <div className={cn(
@@ -485,7 +496,7 @@ export default function MetronomeView() {
                   resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-slate-100/50 border-black/5"
                 )}>
                   <div className="flex flex-col gap-2">
-                    <span className="text-[9px] font-black text-[#FF4E00] uppercase tracking-[0.3em]">Start Sequence At</span>
+                    <span className="text-[9px] font-black text-[#FF4E00] uppercase tracking-[0.3em]">Start Beat</span>
                     <div className={cn(
                       "flex items-center gap-3 p-1.5 rounded-xl border transition-colors",
                       resolvedTheme === 'dark' ? "bg-black/40 border-white/5" : "bg-white border-black/5"
@@ -493,8 +504,8 @@ export default function MetronomeView() {
                       <button 
                         onClick={() => {
                           const next = { ...activePattern };
-                          const currentOffset = next.displayOffset || 0;
-                          next.displayOffset = (currentOffset - 1 + masterLength) % masterLength;
+                          const currentStart = next.startBeat || 1;
+                          next.startBeat = currentStart === 1 ? masterLength : currentStart - 1;
                           setActivePattern(next);
                         }}
                         className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}
@@ -502,13 +513,15 @@ export default function MetronomeView() {
                         <Minus className="w-4 h-4" />
                       </button>
                       <div className="min-w-[3rem] text-center">
-                        <span className={cn("text-xl font-black italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900 text-slate-900")}>{(activePattern.displayOffset || 0) + 1}</span>
+                        <span className={cn("text-xl font-black italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
+                          {activePattern.startBeat || 1}
+                        </span>
                       </div>
                       <button 
                         onClick={() => {
                           const next = { ...activePattern };
-                          const currentOffset = next.displayOffset || 0;
-                          next.displayOffset = (currentOffset + 1) % masterLength;
+                          const currentStart = next.startBeat || 1;
+                          next.startBeat = currentStart === masterLength ? 1 : currentStart + 1;
                           setActivePattern(next);
                         }}
                         className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "hover:bg-white/5 text-white/40 hover:text-white" : "hover:bg-black/5 text-slate-400 hover:text-slate-900")}
@@ -680,7 +693,8 @@ export default function MetronomeView() {
                       {voice.pattern?.map((val, i) => {
                         // Highlight based on current master rotation
                         const length = voice.pattern?.length || 4;
-                        const isCurrent = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
+                        const voiceBeatIdx = Math.floor((((rotation % 360) + 360) % 360) / (360 / length) + 0.0001) % length;
+                        const isCurrent = voiceBeatIdx === i && isPlaying;
                         return (
                           <button
                             key={i}
@@ -702,7 +716,7 @@ export default function MetronomeView() {
                           >
                             {isCurrent && !voice.muted && <div className="absolute inset-0 bg-white/40 animate-pulse" />}
                             <span className="relative z-10">{val === 2 ? 'ACC' : val === 1 ? 'BEAT' : ''}</span>
-                            <span className={cn("absolute bottom-1 right-1 text-[7px]", resolvedTheme === 'dark' ? "text-white/10" : "text-black/10")}>{((i + (activePattern?.displayOffset || 0)) % (voice.pattern?.length || 4)) + 1}</span>
+                            <span className={cn("absolute bottom-1 right-1 text-[7px]", resolvedTheme === 'dark' ? "text-white/10" : "text-black/10")}>{is12Beat && length === 12 ? (i === 0 ? 12 : i) : (((i + (activePattern?.displayOffset || 0)) % (voice.pattern?.length || 4)) + 1)}</span>
                           </button>
                         );
                       })}
@@ -752,8 +766,10 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
   const radius = 140;
 
-  // Vibrant high-contrast colors for different layers
+  const is12Beat = masterLength === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
   const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+
+  const normRot = ((rotation % 360) + 360) % 360;
 
   return (
     <div className="relative w-80 h-80 flex items-center justify-center">
@@ -775,13 +791,37 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
       />
 
       <div className="relative w-full h-full flex items-center justify-center">
-        {/* Single guide ring */}
-        <svg className="absolute w-full h-full rotate-[-90deg]">
+        {/* Guide ring & clock face numbers */}
+        <svg className="absolute w-full h-full">
           <circle 
             cx="160" cy="160" r={radius} 
             className={cn("fill-none", resolvedTheme === 'dark' ? "stroke-white/[0.05]" : "stroke-black/[0.05]")}
             strokeWidth="1"
           />
+          {is12Beat && Array.from({ length: 12 }).map((_, bIdx) => {
+            const num = bIdx === 0 ? 12 : bIdx; // 12 at 0deg (top), 1 at 30deg, ..., 11 at 330deg
+            const ang = (bIdx / 12) * 360; // 0, 30, 60, ..., 330
+            const rad = (ang * Math.PI) / 180;
+            const rLabel = radius + 18;
+            const x = 160 + rLabel * Math.sin(rad);
+            const y = 160 - rLabel * Math.cos(rad);
+            const isAccentBeat = [3, 6, 8, 10, 12].includes(num);
+            return (
+              <text
+                key={num}
+                x={x}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                className={cn(
+                  "text-[10px] font-mono font-bold transition-colors select-none",
+                  isAccentBeat ? "fill-[#FF4E00] font-black" : (resolvedTheme === 'dark' ? "fill-white/30" : "fill-slate-400")
+                )}
+              >
+                {num}
+              </text>
+            );
+          })}
         </svg>
 
         {/* Draw voices in reverse order so higher numbered (larger radii) voices are drawn first (behind) */}
@@ -789,16 +829,26 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
           const vIndex = voices.length - 1 - reversedVIndex;
           const length = voice.pattern?.length || voice.beats || 4;
           const color = voiceColors[vIndex % voiceColors.length];
-          
-          // \"higher number voices have larger radii\" (dot sizes)
           const dotRadius = 4 + (vIndex * 4); 
           
           return (
             <div key={voice.id} className="absolute inset-0 pointer-events-none">
               {Array.from({ length }).map((_, i) => {
-                const angle = (i * 360) / length;
+                const angle = (is12Beat && length === 12)
+                  ? ((i + 1) / 12) * 360
+                  : (i * 360) / length;
+
+                let voiceBeatIdx = 0;
+                if (is12Beat && length === 12) {
+                  let b = Math.floor((normRot + 0.0001) / 30);
+                  if (b === 0) b = 12;
+                  voiceBeatIdx = b - 1;
+                } else {
+                  voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
+                }
+
+                const isOver = voiceBeatIdx === i && isPlaying;
                 const val = voice.pattern ? voice.pattern[i] : (i === 0 ? 2 : 1);
-                const isOver = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
                 
                 if (val === 0 && !isOver) return null;
 
@@ -844,16 +894,25 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
          <motion.div 
            animate={{
-             scale: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? 1.05 : 1,
-             borderColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.5)" : (resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)"),
-             backgroundColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.05)" : (resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)"),
-             boxShadow: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "0 0 40px rgba(255, 78, 0, 0.2)" : (resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)")
+             scale: isPlaying ? 1.02 : 1,
+             borderColor: resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)",
+             backgroundColor: resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)",
+             boxShadow: resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)"
            }}
            transition={{ duration: 0.1 }}
            className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center"
          >
            <div className={cn("text-4xl font-black font-mono tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-             {((displayBeat % masterLength) + 1).toString().padStart(2, '0')}
+             {(() => {
+               if (is12Beat && masterLength === 12) {
+                 let b = Math.floor((normRot + 0.0001) / 30);
+                 if (b === 0) b = 12;
+                 return b.toString().padStart(2, '0');
+               } else {
+                 let b = (Math.floor(normRot / (360 / masterLength) + 0.0001) % masterLength) + 1;
+                 return b.toString().padStart(2, '0');
+               }
+             })()}
            </div>
          </motion.div>
       </div>
@@ -866,7 +925,10 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
   const masterVoice = voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
 
+  const is12Beat = masterLength === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
   const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+
+  const normRot = ((rotation % 360) + 360) % 360;
 
   return (
     <div className="relative w-80 h-80 flex items-center justify-center">
@@ -909,9 +971,21 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
               </svg>
 
               {Array.from({ length }).map((_, i) => {
-                const angle = (i * 360) / length;
+                const angle = (is12Beat && length === 12)
+                  ? ((i + 1) / 12) * 360
+                  : (i * 360) / length;
+
+                let voiceBeatIdx = 0;
+                if (is12Beat && length === 12) {
+                  let b = Math.floor((normRot + 0.0001) / 30);
+                  if (b === 0) b = 12;
+                  voiceBeatIdx = b - 1;
+                } else {
+                  voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
+                }
+
+                const isOver = voiceBeatIdx === i && isPlaying;
                 const val = voice.pattern ? voice.pattern[i] : (i === 0 ? 2 : 1);
-                const isOver = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
                 
                 return (
                   <div 
@@ -952,16 +1026,25 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
          <motion.div 
            animate={{
-             scale: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? 1.05 : 1,
-             borderColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.5)" : (resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)"),
-             backgroundColor: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "rgba(255, 78, 0, 0.05)" : (resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)"),
-             boxShadow: isPlaying && Math.floor(((rotation % 360) / 360) * masterLength) === 0 ? "0 0 40px rgba(255, 78, 0, 0.2)" : (resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)")
+             scale: isPlaying ? 1.02 : 1,
+             borderColor: resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)",
+             backgroundColor: resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)",
+             boxShadow: resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)"
            }}
            transition={{ duration: 0.1 }}
            className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center"
          >
            <div className={cn("text-4xl font-black font-mono tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-             {((displayBeat % masterLength) + 1).toString().padStart(2, '0')}
+             {(() => {
+               if (is12Beat && masterLength === 12) {
+                 let b = Math.floor((normRot + 0.0001) / 30);
+                 if (b === 0) b = 12;
+                 return b.toString().padStart(2, '0');
+               } else {
+                 let b = (Math.floor(normRot / (360 / masterLength) + 0.0001) % masterLength) + 1;
+                 return b.toString().padStart(2, '0');
+               }
+             })()}
            </div>
          </motion.div>
       </div>
@@ -972,7 +1055,12 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
 function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isPlaying: boolean, pattern: BeatPattern | null, rotation: number, resolvedTheme: 'dark' | 'light' }) {
   const voices = pattern?.voices || [];
   const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
-  
+  const masterVoice = voices[0];
+  const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+  const is12Beat = masterLength === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
+
+  const normRot = ((rotation % 360) + 360) % 360;
+
   return (
     <div className="w-full flex flex-col gap-6 items-center py-8">
       {voices.map((voice, vIndex) => {
@@ -987,7 +1075,15 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
             </div>
             <div className="flex gap-2 w-full justify-center overflow-x-auto py-2">
               {displayPattern.map((val, i) => {
-                const isCurrent = Math.floor(((rotation % 360) / 360) * length) === i && isPlaying;
+                let voiceBeatIdx = 0;
+                if (is12Beat && length === 12) {
+                  let b = Math.floor((normRot + 0.0001) / 30);
+                  if (b === 0) b = 12;
+                  voiceBeatIdx = b - 1;
+                } else {
+                  voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
+                }
+                const isCurrent = voiceBeatIdx === i && isPlaying;
                 
                 return (
                   <motion.div

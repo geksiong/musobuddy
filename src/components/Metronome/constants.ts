@@ -27,6 +27,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: false,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '2-4',
@@ -38,6 +39,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '3-4',
@@ -49,6 +51,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '4-4',
@@ -60,6 +63,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '6-8-33',
@@ -71,6 +75,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '6-8-222',
@@ -82,6 +87,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '5-4-32',
@@ -93,6 +99,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '5-4-23',
@@ -104,6 +111,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '7-4-43',
@@ -115,6 +123,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '7-4-34',
@@ -126,6 +135,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '7-4-223',
@@ -137,6 +147,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '9-8-333',
@@ -148,6 +159,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: '9-8-2223',
@@ -159,6 +171,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
+    startBeat: 1,
   },
   {
     id: 'soleas',
@@ -170,7 +183,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
-    displayOffset: 11,
+    startBeat: 1,
   },
   {
     id: 'poly-2-3',
@@ -183,6 +196,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: false,
     type: TimeSignatureType.Polyrhythm,
+    startBeat: 1,
   },
   {
     id: 'poly-3-4',
@@ -195,6 +209,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: false,
     type: TimeSignatureType.Polyrhythm,
+    startBeat: 1,
   },
   {
     id: 'poly-4-5',
@@ -207,6 +222,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: false,
     type: TimeSignatureType.Polyrhythm,
+    startBeat: 1,
   },
   {
     id: 'poly-2-3-5',
@@ -220,5 +236,6 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     ],
     countIn: false,
     type: TimeSignatureType.Polyrhythm,
+    startBeat: 1,
   }
 ];
