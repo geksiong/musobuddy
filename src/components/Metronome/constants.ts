@@ -18,12 +18,144 @@ export const TEMPO_NAMES = [
 
 export const DEFAULT_PRESETS: BeatPattern[] = [
   {
+    id: 'pulse',
+    name: 'Pulse',
+    bpm: 60,
+    timeSignature: '1/1',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 1, active: true, muted: false, pattern: [1] },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '2-4',
+    name: '2/4 Basic',
+    bpm: 100,
+    timeSignature: '2/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 2, active: true, muted: false, pattern: [2, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '3-4',
+    name: '3/4 Basic',
+    bpm: 60,
+    timeSignature: '3/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 3, active: true, muted: false, pattern: [2, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
     id: '4-4',
     name: '4/4 Basic',
-    bpm: 120,
+    bpm: 100,
     timeSignature: '4/4',
     voices: [
       { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 4, active: true, muted: false, pattern: [2, 1, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '6-8-33',
+    name: '6/8 (3+3)',
+    bpm: 120,
+    timeSignature: '6/8',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 6, active: true, muted: false, pattern: [2, 1, 1, 2, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '6-8-222',
+    name: '6/8 (2+2+2)',
+    bpm: 120,
+    timeSignature: '6/8',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 6, active: true, muted: false, pattern: [2, 1, 2, 1, 2, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '5-4-32',
+    name: '5/4 (3+2)',
+    bpm: 120,
+    timeSignature: '5/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 5, active: true, muted: false, pattern: [2, 1, 1, 2, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '5-4-23',
+    name: '5/4 (2+3)',
+    bpm: 120,
+    timeSignature: '5/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 5, active: true, muted: false, pattern: [2, 1, 2, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '7-4-43',
+    name: '7/4 (4+3)',
+    bpm: 120,
+    timeSignature: '7/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 7, active: true, muted: false, pattern: [2, 1, 1, 1, 2, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '7-4-34',
+    name: '7/4 (3+4)',
+    bpm: 120,
+    timeSignature: '7/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 7, active: true, muted: false, pattern: [2, 1, 1, 2, 1, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '7-4-223',
+    name: '7/4 (2+2+3)',
+    bpm: 120,
+    timeSignature: '7/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 7, active: true, muted: false, pattern: [2, 1, 2, 1, 2, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '9-8-333',
+    name: '9/8 (3+3+3)',
+    bpm: 120,
+    timeSignature: '9/8',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 9, active: true, muted: false, pattern: [2, 1, 1, 2, 1, 1, 2, 1, 1] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+  },
+  {
+    id: '9-8-2223',
+    name: '9/8 (2+2+2+3)',
+    bpm: 120,
+    timeSignature: '9/8',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 9, active: true, muted: false, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 1] },
     ],
     countIn: true,
     type: TimeSignatureType.Standard,
