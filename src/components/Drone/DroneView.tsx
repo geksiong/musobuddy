@@ -103,16 +103,16 @@ export default function DroneView() {
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex flex-wrap justify-center gap-2">
           {DRONE_TONES.map(tone => (
             <button
               key={tone}
               onClick={() => setDroneTone(tone as DroneTone)}
               className={cn(
-                "px-6 py-3 rounded-full font-bold transition-all text-[10px] uppercase tracking-widest border",
+                "px-3.5 py-1.5 rounded-full font-extrabold transition-all text-[9px] uppercase tracking-wider border",
                 droneTone === tone 
-                  ? "bg-purple-500/10 text-purple-500 border-purple-500/50" 
-                  : (resolvedTheme === 'dark' ? "bg-white/[0.03] text-white/30 border-transparent hover:border-white/10 hover:text-white" : "bg-slate-100 text-slate-400 border-transparent hover:bg-slate-200 hover:text-slate-900")
+                  ? "bg-purple-500/10 text-purple-500 border-purple-500/50 shadow-sm" 
+                  : (resolvedTheme === 'dark' ? "bg-white/[0.03] text-white/40 border-transparent hover:border-white/10 hover:text-white" : "bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200 hover:text-slate-900")
               )}
             >
               {tone.replace('_', ' ')}
@@ -120,64 +120,70 @@ export default function DroneView() {
           ))}
         </div>
 
-        {/* Volume & Pulse & Play */}
-        <div className="flex flex-col items-center gap-10 w-full max-w-lg">
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-             <div className="flex flex-col gap-4">
-               <div className="flex items-center justify-between">
-                 <span className={cn("text-[10px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>Volume</span>
-                 <span className="text-[10px] font-mono font-bold text-emerald-500">{Math.round(droneVolume * 100)}%</span>
-               </div>
-               <div className="flex items-center gap-4">
-                 <Volume2 className={cn("w-4 h-4 shrink-0", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-300")} />
-                 <input 
-                   type="range" 
-                   min="0" max="1" step="0.01" 
-                   value={droneVolume} 
-                   onChange={(e) => setDroneVolume(parseFloat(e.target.value))}
-                   className={cn(
-                     "flex-1 accent-purple-500 h-1 rounded-full appearance-none cursor-pointer duration-500",
-                     resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
-                   )}
-                 />
-               </div>
-             </div>
+        {/* Bottom Controls: Play Button on Bottom Left, Sliders Stacked Vertically on Bottom Right */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 w-full pt-6 border-t border-black/5 dark:border-white/5">
+          {/* Bottom Left: Play Button */}
+          <div className="flex items-center justify-start shrink-0">
+            <button 
+              onClick={mainToggleButton}
+              className={cn(
+                "w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-2xl relative group shrink-0",
+                isDronePlaying 
+                  ? "bg-red-500 text-white shadow-red-500/20" 
+                  : "bg-purple-600 text-white shadow-purple-600/20"
+              )}
+            >
+              {isDronePlaying ? <Pause className="w-8 h-8 sm:w-10 sm:h-10 fill-current" /> : <Play className="w-8 h-8 sm:w-10 sm:h-10 ml-1 fill-current" />}
+              {isDronePlaying && (
+                <div className="absolute inset-[-6px] border-2 border-red-500/30 rounded-full animate-ping pointer-events-none" />
+              )}
+            </button>
+          </div>
 
-             <div className="flex flex-col gap-4">
-               <div className="flex items-center justify-between">
-                 <span className={cn("text-[10px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>Pulse Rate</span>
-                 <span className="text-[10px] font-mono font-bold text-emerald-500">{dronePulseBpm === 0 ? 'Steady' : `${dronePulseBpm} BPM`}</span>
-               </div>
-               <div className="flex items-center gap-4">
-                 <Wind className={cn("w-4 h-4 shrink-0", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-300")} />
-                 <input 
-                   type="range" 
-                   min="0" max="200" step="1" 
-                   value={dronePulseBpm} 
-                   onChange={(e) => setDronePulseBpm(parseInt(e.target.value))}
-                   className={cn(
-                     "flex-1 accent-purple-500 h-1 rounded-full appearance-none cursor-pointer",
-                     resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
-                   )}
-                 />
-               </div>
-             </div>
-           </div>
+          {/* Bottom Right: Volume & Pulse Rate Sliders (stacked vertically) */}
+          <div className="flex flex-col gap-4 w-full sm:w-72 md:w-80 shrink-0">
+            {/* Volume Slider */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className={cn("text-[10px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>Volume</span>
+                <span className="text-[10px] font-mono font-bold text-emerald-500">{Math.round(droneVolume * 100)}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Volume2 className={cn("w-4 h-4 shrink-0", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-300")} />
+                <input 
+                  type="range" 
+                  min="0" max="1" step="0.01" 
+                  value={droneVolume} 
+                  onChange={(e) => setDroneVolume(parseFloat(e.target.value))}
+                  className={cn(
+                    "flex-1 accent-purple-500 h-1.5 rounded-full appearance-none cursor-pointer duration-500",
+                    resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
+                  )}
+                />
+              </div>
+            </div>
 
-           <button 
-             onClick={mainToggleButton}
-             className={cn(
-               "w-32 h-32 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-2xl relative group",
-               isDronePlaying 
-                 ? "bg-red-500 text-white shadow-red-500/20" 
-                 : "bg-purple-600 text-white shadow-purple-600/20"
-             )}
-           >
-             {isDronePlaying ? <Pause className="w-10 h-10 fill-current" /> : <Play className="w-10 h-10 ml-1 fill-current" />}
-             {isDronePlaying && (
-               <div className="absolute inset-[-8px] border-2 border-red-500/30 rounded-full animate-ping pointer-events-none" />
-             )}
-           </button>
+            {/* Pulse Rate Slider */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className={cn("text-[10px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-slate-500" : "text-slate-400")}>Pulse Rate</span>
+                <span className="text-[10px] font-mono font-bold text-emerald-500">{dronePulseBpm === 0 ? 'Steady' : `${dronePulseBpm} BPM`}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Wind className={cn("w-4 h-4 shrink-0", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-300")} />
+                <input 
+                  type="range" 
+                  min="0" max="200" step="1" 
+                  value={dronePulseBpm} 
+                  onChange={(e) => setDronePulseBpm(parseInt(e.target.value))}
+                  className={cn(
+                    "flex-1 accent-purple-500 h-1.5 rounded-full appearance-none cursor-pointer",
+                    resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
+                  )}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
