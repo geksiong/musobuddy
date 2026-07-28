@@ -1632,11 +1632,15 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
                         top: 0,
                         transform: `translate(-50%, -50%) ${isOver && !voice.muted ? 'scale(1.25)' : 'scale(1)'}`,
                         backgroundColor: !voice.muted ? (
-                          isOver ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : `${color}22`)
+                          isOver ? (resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.25)') : (val === 2 ? color : `${color}22`)
                         ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
-                        border: !voice.muted && val === 2 ? `1px solid ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}` : 'none',
+                        border: !voice.muted ? (
+                          isOver 
+                            ? `1.5px solid ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.4)'}` 
+                            : (val === 2 ? `1px solid ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}` : 'none')
+                        ) : 'none',
                         boxShadow: !voice.muted ? (
-                          isOver ? `0 0 20px ${resolvedTheme === 'dark' ? '#FFFFFF' : '#000000'}, 0 0 40px ${color}` : (val === 2 ? `0 0 15px ${color}66` : 'none')
+                          isOver ? `0 0 12px ${color}88, 0 0 6px ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.15)'}` : (val === 2 ? `0 0 15px ${color}66` : 'none')
                         ) : 'none'
                       }}
                     />
@@ -1793,10 +1797,15 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
                         top: 0,
                         transform: `translate(-50%, -50%) ${isOver && !voice.muted ? 'scale(1.5)' : 'scale(1)'}`,
                         backgroundColor: !voice.muted ? (
-                          isOver ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : `${color}22`)
+                          isOver ? (resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.25)') : (val === 2 ? color : `${color}22`)
                         ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                        border: !voice.muted ? (
+                          isOver 
+                            ? `1.5px solid ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.4)'}` 
+                            : (val === 2 ? `1px solid ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}` : 'none')
+                        ) : 'none',
                         boxShadow: !voice.muted ? (
-                          isOver ? `0 0 20px ${resolvedTheme === 'dark' ? '#FFFFFF' : '#000000'}, 0 0 40px ${color}` : (val === 2 ? `0 0 15px ${color}66` : 'none')
+                          isOver ? `0 0 12px ${color}88, 0 0 6px ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.15)'}` : (val === 2 ? `0 0 15px ${color}66` : 'none')
                         ) : 'none'
                       }} 
                     />
@@ -1925,9 +1934,9 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
                               scale: isCurrent && !voice.muted ? 1.05 : 1,
                               opacity: voice.muted ? 0.25 : (val === 0 && !isCurrent ? 0.15 : 1),
                               backgroundColor: !voice.muted ? (
-                                isCurrent ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : (val === 1 ? `${color}25` : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)')))
+                                isCurrent ? (resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.25)') : (val === 2 ? color : (val === 1 ? `${color}25` : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)')))
                               ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'),
-                              boxShadow: !voice.muted && isCurrent ? `0 0 16px ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.3)'}, 0 0 30px ${color}` : (val === 2 && !voice.muted ? `0 0 10px ${color}44` : 'none')
+                              boxShadow: !voice.muted && isCurrent ? `0 0 12px ${color}88, 0 0 6px ${resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.15)'}` : (val === 2 && !voice.muted ? `0 0 10px ${color}44` : 'none')
                             }}
                             transition={{ duration: 0.08 }}
                             className={cn(
