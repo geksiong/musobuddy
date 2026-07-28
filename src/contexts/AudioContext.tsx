@@ -225,7 +225,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const masterVoice = pattern.voices[0];
     const masterLength = masterVoice.pattern?.length || masterVoice.beats || 4;
-    const measureDuration = (60.0 / metronomeBpm) * masterLength;
+    const masterBaseBeats = (masterVoice.isDoubleTime ? masterLength / 2 : masterLength) || 4;
+    const measureDuration = (60.0 / metronomeBpm) * masterBaseBeats;
 
     pattern.voices.forEach((voice, i) => {
       if (!voice.active) return;
@@ -238,11 +239,25 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const length = voice.pattern?.length || voice.beats || 4;
       const interval = measureDuration / length;
 
-      const is12Beat = pattern.type === TimeSignatureType.Flamenco || pattern.timeSignature === '12-Beat' || masterLength === 12;
+      const is12Beat = pattern.type === TimeSignatureType.Flamenco || pattern.timeSignature === '12-Beat' || masterBaseBeats === 12;
       const startBeat = pattern.startBeat || 1;
-      const startIndex = (is12Beat && length === 12)
-        ? ((startBeat - 1 + 12) % 12)
-        : ((startBeat - 1 + length) % length);
+      
+      let startIndex = 0;
+      if (is12Beat) {
+        if (voice.isDoubleTime && length === 24) {
+          startIndex = ((startBeat - 1) * 2 + 24) % 24;
+        } else if (length === 12) {
+          startIndex = ((startBeat - 1) + 12) % 12;
+        } else {
+          startIndex = ((startBeat - 1) + length) % length;
+        }
+      } else {
+        if (voice.isDoubleTime) {
+          startIndex = ((startBeat - 1) * 2 + length) % length;
+        } else {
+          startIndex = ((startBeat - 1) + length) % length;
+        }
+      }
 
       while (vState.nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD_TIME) {
         let playValue = 0;

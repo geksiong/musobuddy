@@ -186,6 +186,36 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     startBeat: 1,
   },
   {
+    id: 'soleas-palmas-double',
+    name: 'Soleás + Palmas 2x',
+    bpm: 80,
+    timeSignature: '12-Beat (2x Palmas)',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [0, 0, 2, 0, 0, 2, 0, 2, 0, 2, 0, 2] },
+      { 
+        id: 1, sound: MetronomeSound.Clap, volume: 0.85, beats: 24, active: true, muted: false, isDoubleTime: true,
+        pattern: [0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2] 
+      },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 1,
+  },
+  {
+    id: 'funk-double-hihat',
+    name: '4/4 (2x Double Time)',
+    bpm: 100,
+    timeSignature: '4/4 (2x Layer)',
+    voices: [
+      { id: 0, sound: MetronomeSound.Kick, volume: 1, beats: 4, active: true, muted: false, pattern: [2, 0, 1, 0] },
+      { id: 1, sound: MetronomeSound.HiHat, volume: 0.7, beats: 8, active: true, muted: false, isDoubleTime: true, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 2, sound: MetronomeSound.Clap, volume: 0.8, beats: 4, active: true, muted: false, pattern: [0, 2, 0, 2] },
+    ],
+    countIn: true,
+    type: TimeSignatureType.Standard,
+    startBeat: 1,
+  },
+  {
     id: 'poly-2-3',
     name: '2:3 Poly',
     bpm: 90,

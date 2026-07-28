@@ -30,6 +30,7 @@ export interface MetronomeVoice {
   beats: number; // For polyrhythm: x in x:y
   active: boolean;
   pattern?: number[]; // custom beat pattern: 0: silent, 1: normal, 2: accent
+  isDoubleTime?: boolean; // Double time layer (2x beats per measure, half-beat each)
 }
 
 export interface BeatPattern {
