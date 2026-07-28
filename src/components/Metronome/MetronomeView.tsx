@@ -1463,6 +1463,21 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
   const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
 
   const normRot = ((rotation % 360) + 360) % 360;
+  const startBeat = pattern?.startBeat || 1;
+
+  let currentBeatNum = 1;
+  if (is12Beat) {
+    let b = Math.floor((normRot + 0.0001) / 30);
+    if (b === 0) b = 12;
+    currentBeatNum = b;
+  } else {
+    currentBeatNum = (Math.floor(normRot / (360 / masterBaseBeats) + 0.0001) % masterBaseBeats) + 1;
+  }
+
+  const sectorAngle = is12Beat ? 30 : (360 / masterBaseBeats);
+  const angleInSector = (normRot + 0.0001) % sectorAngle;
+  const beatProgress = angleInSector / sectorAngle;
+  const isStartBeat = isPlaying && (currentBeatNum === startBeat) && (beatProgress < 0.20);
 
   return (
     <div className="relative w-[340px] h-[340px] sm:w-[360px] sm:h-[360px] flex items-center justify-center shrink-0">
@@ -1596,29 +1611,27 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
          <motion.div 
            animate={{
-             scale: isPlaying ? 1.02 : 1,
-             borderColor: resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)",
-             backgroundColor: resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)",
-             boxShadow: resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)"
+             scale: isStartBeat ? 1.15 : (isPlaying ? 1.02 : 1),
+             borderColor: isStartBeat 
+               ? "#FF4E00" 
+               : (resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)"),
+             backgroundColor: isStartBeat 
+               ? (resolvedTheme === 'dark' ? "rgba(255, 78, 0, 0.3)" : "rgba(255, 78, 0, 0.2)") 
+               : (resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)"),
+             boxShadow: isStartBeat 
+               ? "0 0 35px rgba(255, 78, 0, 0.8), inset 0 0 20px rgba(255, 78, 0, 0.5)" 
+               : (resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)")
            }}
-           transition={{ duration: 0.1 }}
-           className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center"
+           transition={{ duration: 0.08 }}
+           className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center transition-colors"
          >
-           <div className={cn("text-4xl font-black font-mono tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-             {(() => {
-               if (is12Beat && masterLength === 12) {
-                 let b = Math.floor((normRot + 0.0001) / 30);
-                 if (b === 0) b = 12;
-                 return b.toString().padStart(2, '0');
-               } else if (is12Beat && masterLength === 24) {
-                 let b = Math.floor((normRot + 0.0001) / 30);
-                 if (b === 0) b = 12;
-                 return b.toString().padStart(2, '0');
-               } else {
-                 let b = (Math.floor(normRot / (360 / masterBaseBeats) + 0.0001) % masterBaseBeats) + 1;
-                 return b.toString().padStart(2, '0');
-               }
-             })()}
+           <div className={cn(
+             "text-4xl font-black font-mono tracking-widest italic leading-none transition-all duration-75",
+             isStartBeat 
+               ? "text-[#FF4E00] scale-110 drop-shadow-[0_0_16px_rgba(255,78,0,0.9)]" 
+               : (resolvedTheme === 'dark' ? "text-white" : "text-slate-900")
+           )}>
+             {currentBeatNum.toString().padStart(2, '0')}
            </div>
          </motion.div>
       </div>
@@ -1636,6 +1649,21 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
   const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
 
   const normRot = ((rotation % 360) + 360) % 360;
+  const startBeat = pattern?.startBeat || 1;
+
+  let currentBeatNum = 1;
+  if (is12Beat) {
+    let b = Math.floor((normRot + 0.0001) / 30);
+    if (b === 0) b = 12;
+    currentBeatNum = b;
+  } else {
+    currentBeatNum = (Math.floor(normRot / (360 / masterBaseBeats) + 0.0001) % masterBaseBeats) + 1;
+  }
+
+  const sectorAngle = is12Beat ? 30 : (360 / masterBaseBeats);
+  const angleInSector = (normRot + 0.0001) % sectorAngle;
+  const beatProgress = angleInSector / sectorAngle;
+  const isStartBeat = isPlaying && (currentBeatNum === startBeat) && (beatProgress < 0.20);
 
   return (
     <div className="relative w-[340px] h-[340px] sm:w-[360px] sm:h-[360px] flex items-center justify-center shrink-0">
@@ -1743,29 +1771,27 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
          <motion.div 
            animate={{
-             scale: isPlaying ? 1.02 : 1,
-             borderColor: resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)",
-             backgroundColor: resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)",
-             boxShadow: resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)"
+             scale: isStartBeat ? 1.15 : (isPlaying ? 1.02 : 1),
+             borderColor: isStartBeat 
+               ? "#FF4E00" 
+               : (resolvedTheme === 'dark' ? "rgba(255, 255, 255, 0.1)" : "rgba(0,0,0,0.05)"),
+             backgroundColor: isStartBeat 
+               ? (resolvedTheme === 'dark' ? "rgba(255, 78, 0, 0.3)" : "rgba(255, 78, 0, 0.2)") 
+               : (resolvedTheme === 'dark' ? "rgba(0, 0, 0, 0.4)" : "rgba(255, 255, 255, 0.9)"),
+             boxShadow: isStartBeat 
+               ? "0 0 35px rgba(255, 78, 0, 0.8), inset 0 0 20px rgba(255, 78, 0, 0.5)" 
+               : (resolvedTheme === 'dark' ? "0 20px 50px rgba(0, 0, 0, 0.5)" : "0 10px 30px rgba(0, 0, 0, 0.05)")
            }}
-           transition={{ duration: 0.1 }}
-           className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center"
+           transition={{ duration: 0.08 }}
+           className="flex flex-col items-center backdrop-blur-xl w-32 h-32 rounded-full border shadow-2xl justify-center transition-colors"
          >
-           <div className={cn("text-4xl font-black font-mono tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-             {(() => {
-               if (is12Beat && masterLength === 12) {
-                 let b = Math.floor((normRot + 0.0001) / 30);
-                 if (b === 0) b = 12;
-                 return b.toString().padStart(2, '0');
-               } else if (is12Beat && masterLength === 24) {
-                 let b = Math.floor((normRot + 0.0001) / 30);
-                 if (b === 0) b = 12;
-                 return b.toString().padStart(2, '0');
-               } else {
-                 let b = (Math.floor(normRot / (360 / masterBaseBeats) + 0.0001) % masterBaseBeats) + 1;
-                 return b.toString().padStart(2, '0');
-               }
-             })()}
+           <div className={cn(
+             "text-4xl font-black font-mono tracking-widest italic leading-none transition-all duration-75",
+             isStartBeat 
+               ? "text-[#FF4E00] scale-110 drop-shadow-[0_0_16px_rgba(255,78,0,0.9)]" 
+               : (resolvedTheme === 'dark' ? "text-white" : "text-slate-900")
+           )}>
+             {currentBeatNum.toString().padStart(2, '0')}
            </div>
          </motion.div>
       </div>
