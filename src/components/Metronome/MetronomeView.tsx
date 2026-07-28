@@ -760,6 +760,7 @@ export default function MetronomeView() {
 
                   const length = voice.pattern?.length || voice.beats || 4;
                   const vSub = voice.isTripleTime ? 3 : (voice.isDoubleTime || voice.isSwing ? 2 : 1);
+                  const voiceBaseBeats = Math.max(1, Math.round(length / vSub));
                   const currentSubMode: 'straight' | 'double' | 'triple' | 'swing' = voice.isSwing ? 'swing' : (voice.isTripleTime ? 'triple' : (voice.isDoubleTime ? 'double' : 'straight'));
 
                   const handleSubdivisionChange = (targetMode: 'straight' | 'double' | 'triple' | 'swing') => {
@@ -979,14 +980,14 @@ export default function MetronomeView() {
                       </div>
 
                       {/* Packed Beat Button Grid aligned by base beats across all layers */}
-                      <div className="w-full overflow-x-auto min-w-0 pt-4 border-t transition-colors pb-1" style={{ borderColor: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
+                      <div className="w-full min-w-0 pt-4 border-t transition-colors pb-1" style={{ borderColor: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
                         <div 
-                          className="grid gap-1 sm:gap-2 w-full min-w-[580px] items-stretch"
+                          className="grid gap-1 sm:gap-2 w-full min-w-0 items-stretch"
                           style={{
-                            gridTemplateColumns: `repeat(${masterBaseBeats}, minmax(0, 1fr))`
+                            gridTemplateColumns: `repeat(${voiceBaseBeats}, minmax(0, 1fr))`
                           }}
                         >
-                          {Array.from({ length: masterBaseBeats }).map((_, beatIdx) => {
+                          {Array.from({ length: voiceBaseBeats }).map((_, beatIdx) => {
                             const subBeats = voice.pattern?.slice(beatIdx * vSub, (beatIdx + 1) * vSub) || Array(vSub).fill(1);
                             const swingR = activePattern.swingRatio ?? (2 / 3);
 
@@ -999,7 +1000,7 @@ export default function MetronomeView() {
 
                                   // Compute beat label for step i
                                   let labelText = '';
-                                  const bNum = is12Beat ? (beatIdx === 0 ? 12 : beatIdx) : (((beatIdx + (activePattern?.displayOffset || 0)) % masterBaseBeats) + 1);
+                                  const bNum = is12Beat ? (beatIdx === 0 ? 12 : beatIdx) : (((beatIdx + (activePattern?.displayOffset || 0)) % voiceBaseBeats) + 1);
                                   if (vSub === 1) {
                                     labelText = `${bNum}`;
                                   } else if (vSub === 2) {
@@ -1424,6 +1425,7 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
       {voices.map((voice, vIndex) => {
         const length = voice.pattern?.length || voice.beats || 4;
         const vSub = voice.isTripleTime ? 3 : (voice.isDoubleTime || voice.isSwing ? 2 : 1);
+        const voiceBaseBeats = Math.max(1, Math.round(length / vSub));
         const color = voiceColors[vIndex % voiceColors.length];
 
         const tagText = voice.isSwing
@@ -1450,18 +1452,18 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
               </span>
             </div>
 
-            <div className="w-full overflow-x-auto min-w-0">
+            <div className="w-full min-w-0 py-2 px-1">
               <div 
-                className="grid gap-1 sm:gap-2 w-full min-w-[500px] items-stretch"
+                className="grid gap-1 sm:gap-2 w-full min-w-0 items-stretch"
                 style={{
-                  gridTemplateColumns: `repeat(${masterBaseBeats}, minmax(0, 1fr))`
+                  gridTemplateColumns: `repeat(${voiceBaseBeats}, minmax(0, 1fr))`
                 }}
               >
-                {Array.from({ length: masterBaseBeats }).map((_, beatIdx) => {
+                {Array.from({ length: voiceBaseBeats }).map((_, beatIdx) => {
                   const subBeats = voice.pattern?.slice(beatIdx * vSub, (beatIdx + 1) * vSub) || Array(vSub).fill(1);
 
                   return (
-                    <div key={beatIdx} className="flex items-center gap-1 w-full h-full">
+                    <div key={beatIdx} className="flex items-center gap-1 w-full h-full min-w-0">
                       {subBeats.map((val, subIdx) => {
                         const i = beatIdx * vSub + subIdx;
 
