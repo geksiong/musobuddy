@@ -181,23 +181,59 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     bpm: 80,
     timeSignature: '12-Beat',
     voices: [
-      { id: 0, sound: MetronomeSound.Clap, volume: 1, beats: 12, active: true, muted: false, pattern: [1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2] },
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2] },
+      { 
+        id: 1, sound: MetronomeSound.Clap, volume: 0.85, beats: 24, active: true, muted: false, isDoubleTime: true,
+        pattern: [0, 1, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0, 1, 1, 2, 0, 1, 1, 2, 0, 1, 0, 2, 0] 
+      },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
     startBeat: 1,
   },
   {
-    id: 'soleas-palmas-double',
-    name: 'Soleás + Palmas 2x',
-    bpm: 80,
-    timeSignature: '12-Beat (2x Palmas)',
+    id: 'alegrias',
+    name: 'Alegriás',
+    bpm: 140,
+    timeSignature: '12-Beat',
     voices: [
       { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2] },
-      { 
-        id: 1, sound: MetronomeSound.Clap, volume: 0.85, beats: 24, active: true, muted: false, isDoubleTime: true,
-        pattern: [1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1] 
-      },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 1,
+  },
+  {
+    id: 'bulerias-1',
+    name: 'Buleriás 1',
+    bpm: 200,
+    timeSignature: '12-Beat',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [2, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1] },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 12,
+  },
+  {
+    id: 'bulerias-2',
+    name: 'Buleriás 2',
+    bpm: 200,
+    timeSignature: '12-Beat',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [2, 1, 1, 2, 1, 1, 1, 2, 2, 1, 2, 1] },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 12,
+  },
+  {
+    id: 'siguiriyas',
+    name: 'Siguiriyas',
+    bpm: 60,
+    timeSignature: '12-Beat',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 1] },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
