@@ -23,7 +23,6 @@ import {
   Moon,
   Monitor,
   Upload,
-  Download,
   X,
   FileMusic,
   ChevronDown,
@@ -53,7 +52,7 @@ export default function App() {
   const { isMetronomePlaying, isDronePlaying, playingRefNote } = useAudio();
   const { isPlaying: isAccompanimentPlaying } = useAccompaniment();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { scores, setScores, activeScoreId, setActiveScoreId, activeScore, loadFiles, createScore, exportActiveScore } = useScores();
+  const { scores, setScores, activeScoreId, setActiveScoreId, loadFiles, createScore } = useScores();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isNewScoreOpen, setIsNewScoreOpen] = useState(false);
   const newScoreDropdownRef = useRef<HTMLDivElement>(null);
@@ -78,10 +77,6 @@ export default function App() {
       setCurrentView('score');
       e.target.value = '';
     }
-  };
-
-  const handleHeaderSave = () => {
-    exportActiveScore();
   };
 
   const handleDeleteScore = (id: string) => {
@@ -279,20 +274,7 @@ export default function App() {
               <span>Load<span className="hidden sm:inline"> Score</span></span>
             </button>
 
-            <button 
-              onClick={handleHeaderSave}
-              disabled={!activeScore}
-              title={activeScore ? `Save / Export (${activeScore.title})` : "Save / Export Score"}
-              className={cn(
-                "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border text-[10px] font-bold tracking-wider transition-colors uppercase flex items-center gap-1 sm:gap-1.5 shrink-0 min-h-[36px]",
-                resolvedTheme === 'dark' 
-                  ? "border-white/20 hover:bg-white/5 active:bg-white/10 disabled:opacity-40" 
-                  : "border-black/10 hover:bg-black/5 active:bg-black/10 disabled:opacity-40"
-              )}
-            >
-              <Download className="w-3.5 h-3.5 text-[#FF4E00] shrink-0" />
-              <span>Save</span>
-            </button>
+
           </div>
         </div>
       </header>

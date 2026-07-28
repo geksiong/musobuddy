@@ -573,10 +573,10 @@ function ScoreDisplay({
                   "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95",
                   resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900"
                 )}
-                title="Download Score"
+                title="Save Score"
               >
                 <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Export</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save</span>
               </button>
 
               <button 
