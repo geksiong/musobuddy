@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useMetronome } from '../../hooks/useMetronome.ts';
 import { useAudio } from '../../contexts/AudioContext.tsx';
-import { DEFAULT_PRESETS, TEMPO_NAMES } from './constants.ts';
+import { DEFAULT_PRESETS, TEMPO_NAMES, VOICE_COLORS } from './constants.ts';
 import { BeatPattern, MetronomeSound, TimeSignatureType } from './types.ts';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils.ts';
@@ -834,8 +834,7 @@ export default function MetronomeView() {
                 resolvedTheme === 'dark' ? "bg-black/40 border-white/10 shadow-lg shadow-black/50" : "bg-white/90 border-black/5 shadow-md"
               )}>
                 {activePattern.voices.map((voice, idx) => {
-                  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
-                  const color = voiceColors[idx % voiceColors.length];
+                  const color = VOICE_COLORS[idx % VOICE_COLORS.length];
                   const isMuted = voice.muted || !voice.active;
 
                   const subTag = voice.isSwing
@@ -1110,6 +1109,7 @@ export default function MetronomeView() {
                 </div>
 
                 {activePattern.voices.map((voice, vIndex) => {
+                  const voiceColor = VOICE_COLORS[vIndex % VOICE_COLORS.length];
                   const masterVoice = activePattern.voices[0];
                   const masterLen = masterVoice?.pattern?.length || masterVoice?.beats || 4;
                   const masterSub = masterVoice?.isTripleTime ? 3 : (masterVoice?.isDoubleTime || masterVoice?.isSwing ? 2 : 1);
@@ -1160,27 +1160,45 @@ export default function MetronomeView() {
                   };
 
                   return (
-                    <div key={voice.id} className={cn(
-                      "flex flex-col gap-6 p-8 rounded-[2rem] border transition-colors",
-                      resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/5 hover:border-white/10" : "bg-white border-black/5 hover:border-black/10 shadow-sm"
-                    )}>
+                    <div 
+                      key={voice.id} 
+                      style={{
+                        borderColor: resolvedTheme === 'dark' ? `${voiceColor}33` : `${voiceColor}44`
+                      }}
+                      className={cn(
+                        "flex flex-col gap-6 p-8 rounded-[2rem] border transition-colors",
+                        resolvedTheme === 'dark' ? "bg-white/[0.02] hover:border-white/20" : "bg-white hover:border-black/20 shadow-sm"
+                      )}
+                    >
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="flex flex-wrap items-center gap-6">
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-[9px] font-black text-[#FF4E00] uppercase tracking-[0.3em]">Layer {vIndex + 1}</span>
+                              <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: voiceColor }} />
+                              <span className="text-[9px] font-black uppercase tracking-[0.3em]" style={{ color: voiceColor }}>
+                                Layer {vIndex + 1}
+                              </span>
                               {voice.isSwing && (
-                                <span className="px-1.5 py-0.5 rounded bg-[#FF4E00]/20 text-[#FF4E00] font-mono text-[9px] font-black italic">
+                                <span 
+                                  className="px-1.5 py-0.5 rounded font-mono text-[9px] font-black italic"
+                                  style={{ backgroundColor: `${voiceColor}20`, color: voiceColor }}
+                                >
                                   Swing ({Math.round((activePattern.swingRatio ?? 0.667) * 100)}%)
                                 </span>
                               )}
                               {voice.isTripleTime && (
-                                <span className="px-1.5 py-0.5 rounded bg-[#A855F7]/20 text-[#A855F7] font-mono text-[9px] font-black italic">
+                                <span 
+                                  className="px-1.5 py-0.5 rounded font-mono text-[9px] font-black italic"
+                                  style={{ backgroundColor: `${voiceColor}20`, color: voiceColor }}
+                                >
                                   3x Triple
                                 </span>
                               )}
                               {voice.isDoubleTime && (
-                                <span className="px-1.5 py-0.5 rounded bg-[#00D4FF]/20 text-[#00D4FF] font-mono text-[9px] font-black italic">
+                                <span 
+                                  className="px-1.5 py-0.5 rounded font-mono text-[9px] font-black italic"
+                                  style={{ backgroundColor: `${voiceColor}20`, color: voiceColor }}
+                                >
                                   2x Double
                                 </span>
                               )}
@@ -1195,7 +1213,7 @@ export default function MetronomeView() {
                                 setTimeout(() => e.target.blur(), 0);
                               }}
                               className={cn(
-                                "bg-transparent font-black uppercase text-sm focus:outline-none cursor-pointer hover:text-[#FF4E00] transition-colors",
+                                "bg-transparent font-black uppercase text-sm focus:outline-none cursor-pointer transition-colors",
                                 resolvedTheme === 'dark' ? "text-white" : "text-slate-900"
                               )}
                             >
@@ -1232,7 +1250,8 @@ export default function MetronomeView() {
                                   next.voices[vIndex].volume = parseFloat(e.target.value);
                                   setActivePattern({ ...next });
                                 }}
-                                className={cn("w-full h-0.5 rounded-full appearance-none cursor-pointer accent-[#FF4E00]", resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200")}
+                                style={{ accentColor: voiceColor }}
+                                className={cn("w-full h-0.5 rounded-full appearance-none cursor-pointer", resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200")}
                               />
                             </div>
                           </div>
@@ -1258,10 +1277,14 @@ export default function MetronomeView() {
                                     key={opt.id}
                                     type="button"
                                     onClick={() => handleSubdivisionChange(opt.id as 'straight' | 'double' | 'triple' | 'swing')}
+                                    style={{
+                                      backgroundColor: isSel ? voiceColor : undefined,
+                                      boxShadow: isSel ? `0 2px 10px ${voiceColor}50` : undefined,
+                                    }}
                                     className={cn(
                                       "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all italic",
                                       isSel 
-                                        ? "bg-[#FF4E00] text-white shadow-md shadow-[#FF4E00]/20" 
+                                        ? "text-white shadow-md" 
                                         : resolvedTheme === 'dark' 
                                           ? "text-white/40 hover:text-white hover:bg-white/5" 
                                           : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
@@ -1373,7 +1396,24 @@ export default function MetronomeView() {
                                   return (
                                     <button
                                       key={i}
-                                      style={{ flex: flexVal }}
+                                      style={{
+                                        flex: flexVal,
+                                        backgroundColor: !voice.muted ? (
+                                          val === 2 
+                                            ? voiceColor 
+                                            : val === 1 
+                                              ? (resolvedTheme === 'dark' ? `${voiceColor}33` : `${voiceColor}22`)
+                                              : undefined
+                                        ) : undefined,
+                                        borderColor: !voice.muted ? (
+                                          val === 2 
+                                            ? voiceColor 
+                                            : val === 1 
+                                              ? `${voiceColor}66`
+                                              : undefined
+                                        ) : undefined,
+                                        boxShadow: !voice.muted && val === 2 ? `0 4px 14px ${voiceColor}45` : undefined,
+                                      }}
                                       onClick={() => {
                                         const newPattern = [...(voice.pattern || [])];
                                         newPattern[i] = (newPattern[i] + 1) % 3;
@@ -1385,8 +1425,8 @@ export default function MetronomeView() {
                                         "h-11 sm:h-12 rounded-xl transition-all flex flex-col items-center justify-center font-black border relative overflow-hidden min-w-0 px-0.5",
                                         vSub > 1 ? "text-[8px]" : "text-[9px]",
                                         voice.muted ? "opacity-30 pointer-events-none grayscale" : (
-                                          val === 2 ? "bg-[#FF4E00] border-[#FF4E00] text-white shadow-lg shadow-[#FF4E00]/20" :
-                                          val === 1 ? (resolvedTheme === 'dark' ? "bg-white/10 border-white/5 text-white" : "bg-slate-300 border-black/5 text-slate-900") :
+                                          val === 2 ? "text-white shadow-lg" :
+                                          val === 1 ? (resolvedTheme === 'dark' ? "text-white" : "text-slate-900") :
                                           (resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/5 text-white/20 hover:border-white/20 hover:text-white/60" : "bg-slate-50 border-black/5 text-slate-300 hover:border-black/20 hover:text-slate-600")
                                         )
                                       )}
@@ -1399,7 +1439,7 @@ export default function MetronomeView() {
                                         "absolute bottom-1 right-1 font-mono leading-none", 
                                         vSub > 1 ? "text-[8px] font-bold" : "text-[7px]",
                                         val > 0 
-                                          ? (val === 2 ? "text-white/80" : (resolvedTheme === 'dark' ? "text-white/60" : "text-black/60"))
+                                          ? (val === 2 ? "text-white/90" : (resolvedTheme === 'dark' ? "text-white/80" : "text-black/80"))
                                           : (resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")
                                       )}>
                                         {labelText}
@@ -1460,7 +1500,7 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
   const radius = 135;
 
   const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
-  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+  const voiceColors = VOICE_COLORS;
 
   const normRot = ((rotation % 360) + 360) % 360;
   const startBeat = pattern?.startBeat || 1;
@@ -1646,7 +1686,7 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
   const masterBaseBeats = (masterVoice?.isDoubleTime ? masterLength / 2 : masterLength) || 4;
 
   const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
-  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+  const voiceColors = VOICE_COLORS;
 
   const normRot = ((rotation % 360) + 360) % 360;
   const startBeat = pattern?.startBeat || 1;
@@ -1801,7 +1841,7 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
 
 function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isPlaying: boolean, pattern: BeatPattern | null, rotation: number, resolvedTheme: 'dark' | 'light' }) {
   const voices = pattern?.voices || [];
-  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+  const voiceColors = VOICE_COLORS;
   const masterVoice = voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
   const masterSubdivision = masterVoice?.isTripleTime ? 3 : (masterVoice?.isDoubleTime || masterVoice?.isSwing ? 2 : 1);

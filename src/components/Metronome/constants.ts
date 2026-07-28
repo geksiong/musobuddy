@@ -5,6 +5,8 @@
 
 import { MetronomeSound, TimeSignatureType, BeatPattern } from './types.ts';
 
+export const VOICE_COLORS = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+
 export const TEMPO_NAMES = [
   { name: 'Grave', min: 20, max: 40 },
   { name: 'Largo', min: 40, max: 60 },
