@@ -85,7 +85,7 @@ export default function MetronomeView() {
 
   useEffect(() => {
     if (!activePattern && DEFAULT_PRESETS.length > 0) {
-      setActivePattern(DEFAULT_PRESETS[0]);
+      setActivePattern(JSON.parse(JSON.stringify(DEFAULT_PRESETS[0])));
     }
   }, [activePattern, setActivePattern]);
 
@@ -156,7 +156,7 @@ export default function MetronomeView() {
 
   return (
     <div className={cn(
-      "min-h-full flex flex-col md:flex-row gap-6 p-4 md:p-8 selection:bg-orange-500/30 transition-colors",
+      "flex-1 min-h-full flex flex-col md:flex-row gap-6 p-4 md:p-8 selection:bg-orange-500/30 transition-colors",
       resolvedTheme === 'dark' ? "bg-black" : "bg-[#f8f9fa]"
     )}>
       {/* Sidebar - Controls & Presets */}
@@ -195,7 +195,17 @@ export default function MetronomeView() {
                  <div className="w-1.5 h-1.5 rounded-full bg-[#FF4E00] group-active:scale-150 transition-transform" />
                  <span className={cn("text-[8px] font-black uppercase tracking-widest italic leading-none", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tap</span>
               </button>
-              <button onClick={() => setBpm(120)} className={cn(
+              <button 
+                onClick={() => {
+                  if (activePattern) {
+                    const orig = [...DEFAULT_PRESETS, ...userPresets].find(p => p.id === activePattern.id) || DEFAULT_PRESETS[0];
+                    setActivePattern(JSON.parse(JSON.stringify(orig)));
+                    setBpm(orig.bpm);
+                  } else {
+                    setBpm(120);
+                  }
+                }} 
+                className={cn(
                 "w-14 h-14 border rounded-xl flex flex-col items-center justify-center gap-1 transition-all group shrink-0",
                 resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-black/5 shadow-sm hover:bg-slate-200 text-slate-400 hover:text-slate-900"
               )}>
@@ -255,7 +265,7 @@ export default function MetronomeView() {
             <div 
               key={preset.id}
               onClick={() => {
-                setActivePattern(preset);
+                setActivePattern(JSON.parse(JSON.stringify(preset)));
                 setBpm(preset.bpm);
               }}
               className={cn(
@@ -339,18 +349,18 @@ export default function MetronomeView() {
       </div>
 
       {/* Main Display */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div className="flex-1 flex flex-col min-w-0 relative h-full">
         <div className={cn(
-          "min-h-[500px] rounded-2xl border flex flex-col items-center justify-center p-12 relative overflow-hidden backdrop-blur-md transition-colors",
+          "flex-1 min-h-[550px] rounded-2xl border flex flex-col items-center justify-between p-6 sm:p-10 pt-20 md:pt-24 relative overflow-hidden backdrop-blur-md transition-colors",
           resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl shadow-black/5"
         )}>
           {/* Top Indicators */}
-          <div className="absolute top-10 left-12 flex items-center gap-2">
+          <div className="absolute top-6 left-8 sm:top-10 sm:left-12 flex items-center gap-2 z-20">
             <div className="w-2 h-2 rounded-full bg-[#FF4E00] animate-pulse" />
             <span className="text-[10px] font-bold text-[#FF4E00] uppercase tracking-[0.2em] italic">Live Pulse</span>
           </div>
 
-          <div className="flex items-center gap-6 absolute top-10 right-12 z-20">
+          <div className="flex items-center gap-6 absolute top-6 right-8 sm:top-10 sm:right-12 z-20">
              <div className="flex items-center gap-3 mr-4 group">
                <button 
                  onClick={() => setMetronomeVolume(metronomeVolume === 0 ? 0.8 : 0)}
@@ -418,7 +428,7 @@ export default function MetronomeView() {
              </div>
           </div>
 
-          <div className="relative z-10 w-full flex flex-col items-center">
+          <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center my-auto py-2 min-h-0">
             {displayMode === 'circular' ? (
               <CircularVisualizer isPlaying={isRhythmActive} pattern={activePattern} rotation={rotation} displayBeat={displayBeat} resolvedTheme={resolvedTheme} />
             ) : displayMode === 'rings' ? (
@@ -427,6 +437,122 @@ export default function MetronomeView() {
               <LinearVisualizer isPlaying={isRhythmActive} pattern={activePattern} rotation={rotation} resolvedTheme={resolvedTheme} />
             )}
           </div>
+
+          {/* Live Layer Quick Toggles Bar */}
+          {activePattern && activePattern.voices && activePattern.voices.length > 0 && (
+            <div className="relative z-20 mt-auto shrink-0 w-full max-w-xl px-2 pt-2">
+              <div className="flex items-center justify-between w-full px-1 mb-1.5">
+                <span className={cn(
+                  "text-[8px] font-black uppercase tracking-[0.2em] italic",
+                  resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400"
+                )}>
+                  Live Layers ({activePattern.voices.filter(v => v.active && !v.muted).length}/{activePattern.voices.length} Active)
+                </span>
+                {activePattern.voices.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allMuted = activePattern.voices.every(v => v.muted || !v.active);
+                      const nextVoices = activePattern.voices.map(v => ({
+                        ...v,
+                        active: true,
+                        muted: allMuted ? false : true
+                      }));
+                      setActivePattern({ ...activePattern, voices: nextVoices });
+                    }}
+                    className={cn(
+                      "text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border transition-all italic cursor-pointer",
+                      resolvedTheme === 'dark'
+                        ? "bg-white/5 border-white/10 hover:bg-white/10 text-white/50 hover:text-white"
+                        : "bg-slate-100 border-black/5 hover:bg-slate-200 text-slate-500 hover:text-slate-900 shadow-sm"
+                    )}
+                  >
+                    {activePattern.voices.every(v => v.muted || !v.active) ? 'Unmute All' : 'Mute All'}
+                  </button>
+                )}
+              </div>
+
+              <div className={cn(
+                "flex flex-wrap items-center justify-center gap-1.5 w-full p-2 rounded-xl border backdrop-blur-md transition-colors max-h-28 overflow-y-auto",
+                resolvedTheme === 'dark' ? "bg-black/40 border-white/10 shadow-lg shadow-black/50" : "bg-white/90 border-black/5 shadow-md"
+              )}>
+                {activePattern.voices.map((voice, idx) => {
+                  const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
+                  const color = voiceColors[idx % voiceColors.length];
+                  const isMuted = voice.muted || !voice.active;
+
+                  const subTag = voice.isSwing
+                    ? 'Swing'
+                    : voice.isTripleTime
+                    ? '3x'
+                    : voice.isDoubleTime
+                    ? '2x'
+                    : null;
+
+                  return (
+                    <button
+                      key={voice.id}
+                      type="button"
+                      onClick={() => {
+                        const nextVoices = activePattern.voices.map((v, i) => {
+                          if (i === idx) {
+                            return { ...v, active: true, muted: !isMuted };
+                          }
+                          return v;
+                        });
+                        setActivePattern({ ...activePattern, voices: nextVoices });
+                      }}
+                      style={{
+                        borderColor: !isMuted ? color : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                      }}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-black transition-all shadow-sm group relative overflow-hidden select-none cursor-pointer shrink-0",
+                        !isMuted 
+                          ? (resolvedTheme === 'dark' ? "bg-white/10 text-white shadow-md" : "bg-slate-900 text-white shadow-md")
+                          : (resolvedTheme === 'dark' ? "bg-white/5 text-white/30 border-white/10 hover:border-white/20 hover:text-white/60" : "bg-slate-100 text-slate-400 border-black/10 hover:border-black/20 hover:text-slate-700")
+                      )}
+                      title={`Click to ${isMuted ? 'enable/unmute' : 'disable/mute'} Layer ${idx + 1}`}
+                    >
+                      {!isMuted && (
+                        <div 
+                          className="absolute inset-0 opacity-15 transition-opacity group-hover:opacity-25" 
+                          style={{ backgroundColor: color }} 
+                        />
+                      )}
+                      
+                      <div 
+                        className="w-2 h-2 rounded-full shrink-0 transition-transform group-hover:scale-125"
+                        style={{ 
+                          backgroundColor: !isMuted ? color : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)')
+                        }}
+                      />
+
+                      <span className="relative z-10 font-black italic uppercase tracking-wider text-[10px]">
+                        Layer {idx + 1} &bull; {voice.sound}
+                      </span>
+
+                      {subTag && (
+                        <span className={cn(
+                          "relative z-10 text-[7px] font-mono px-1 rounded font-bold italic",
+                          !isMuted ? "bg-white/20 text-white" : "bg-black/10 text-slate-400"
+                        )}>
+                          {subTag}
+                        </span>
+                      )}
+
+                      <div className="relative z-10 flex items-center ml-0.5">
+                        {!isMuted ? (
+                          <Volume2 className="w-3 h-3 text-white animate-pulse" />
+                        ) : (
+                          <VolumeX className="w-3 h-3 text-red-400/80" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -973,7 +1099,7 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
   const masterVoice = voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
   const masterBaseBeats = (masterVoice?.isDoubleTime ? masterLength / 2 : masterLength) || 4;
-  const radius = 140;
+  const radius = 135;
 
   const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
   const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
@@ -981,39 +1107,40 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
   const normRot = ((rotation % 360) + 360) % 360;
 
   return (
-    <div className="relative w-80 h-80 flex items-center justify-center">
+    <div className="relative w-[340px] h-[340px] sm:w-[360px] sm:h-[360px] flex items-center justify-center shrink-0">
       <div className={cn("absolute inset-0 rounded-full blur-3xl opacity-10", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
       
       {/* Tracker line - stays on top */}
       <div 
         className={cn(
-          "absolute w-[2px] h-[160px] z-50 origin-bottom rounded-full pointer-events-none",
+          "absolute w-[2px] z-50 origin-bottom rounded-full pointer-events-none",
           resolvedTheme === 'dark' ? "bg-white shadow-[0_0_15px_white]" : "bg-slate-900 shadow-[0_0_15px_rgba(0,0,0,0.2)]"
         )}
         style={{ 
           transform: `rotate(${rotation % 360}deg)`,
-          top: '0',
+          top: `${180 - radius}px`,
+          height: `${radius}px`,
           left: '50%',
           marginLeft: '-1px',
-          transformOrigin: '50% 160px'
+          transformOrigin: '50% 100%'
         }}
       />
 
       <div className="relative w-full h-full flex items-center justify-center">
         {/* Guide ring & clock face numbers */}
-        <svg className="absolute w-full h-full">
+        <svg viewBox="0 0 360 360" className="absolute w-full h-full overflow-visible">
           <circle 
-            cx="160" cy="160" r={radius} 
-            className={cn("fill-none", resolvedTheme === 'dark' ? "stroke-white/[0.05]" : "stroke-black/[0.05]")}
-            strokeWidth="1"
+            cx="180" cy="180" r={radius} 
+            className={cn("fill-none", resolvedTheme === 'dark' ? "stroke-white/[0.08]" : "stroke-black/[0.08]")}
+            strokeWidth="1.5"
           />
           {is12Beat && Array.from({ length: 12 }).map((_, bIdx) => {
             const num = bIdx === 0 ? 12 : bIdx; // 12 at 0deg (top), 1 at 30deg, ..., 11 at 330deg
             const ang = (bIdx / 12) * 360; // 0, 30, 60, ..., 330
             const rad = (ang * Math.PI) / 180;
-            const rLabel = radius + 18;
-            const x = 160 + rLabel * Math.sin(rad);
-            const y = 160 - rLabel * Math.cos(rad);
+            const rLabel = radius + 22; // 135 + 22 = 157px (y=23px at top for 12, y=337px at bottom for 6)
+            const x = 180 + rLabel * Math.sin(rad);
+            const y = 180 - rLabel * Math.cos(rad);
             const isAccentBeat = [3, 6, 8, 10, 12].includes(num);
             return (
               <text
@@ -1023,8 +1150,8 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
                 textAnchor="middle"
                 dominantBaseline="central"
                 className={cn(
-                  "text-[10px] font-mono font-bold transition-colors select-none",
-                  isAccentBeat ? "fill-[#FF4E00] font-black" : (resolvedTheme === 'dark' ? "fill-white/30" : "fill-slate-400")
+                  "font-mono transition-colors select-none",
+                  isAccentBeat ? "fill-[#FF4E00] font-black text-[13px] sm:text-[14px]" : (resolvedTheme === 'dark' ? "fill-white/60 font-bold text-[11px] sm:text-[12px]" : "fill-slate-600 font-bold text-[11px] sm:text-[12px]")
                 )}
               >
                 {num}
@@ -1070,7 +1197,7 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
                     key={i}
                     className="absolute left-1/2 -ml-[1px] w-[2px] pointer-events-none"
                     style={{ 
-                      top: `${160 - radius}px`,
+                      top: `${180 - radius}px`,
                       height: `${radius}px`,
                       transform: `rotate(${angle}deg)`,
                       transformOrigin: '50% 100%'
@@ -1149,35 +1276,36 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
   const normRot = ((rotation % 360) + 360) % 360;
 
   return (
-    <div className="relative w-80 h-80 flex items-center justify-center">
+    <div className="relative w-[340px] h-[340px] sm:w-[360px] sm:h-[360px] flex items-center justify-center shrink-0">
       <div className={cn("absolute inset-0 rounded-full blur-3xl opacity-10", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
       
       <div 
         className={cn(
-          "absolute w-[2px] h-[160px] z-30 origin-bottom rounded-full",
+          "absolute w-[2px] z-30 origin-bottom rounded-full",
           resolvedTheme === 'dark' ? "bg-white shadow-[0_0_15px_white]" : "bg-slate-900 shadow-[0_0_15px_rgba(0,0,0,0.2)]"
         )}
         style={{ 
           transform: `rotate(${rotation % 360}deg)`,
-          top: '0',
+          top: '30px',
+          height: '150px',
           left: '50%',
           marginLeft: '-1px',
-          transformOrigin: '50% 160px'
+          transformOrigin: '50% 150px'
         }}
       />
 
       <div className="relative w-full h-full flex items-center justify-center">
         {voices.map((voice, vIndex) => {
-          const radius = 148 - (vIndex * 32); 
+          const radius = 150 - (vIndex * 32); 
           if (radius < 40) return null; 
           const length = voice.pattern?.length || voice.beats || 4;
           const color = voiceColors[vIndex % voiceColors.length];
           
           return (
             <div key={voice.id} className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <svg className="absolute w-full h-full rotate-[-90deg]">
+              <svg viewBox="0 0 360 360" className="absolute w-full h-full rotate-[-90deg]">
                 <circle 
-                  cx="160" cy="160" r={radius} 
+                  cx="180" cy="180" r={radius} 
                   className={cn(
                     "fill-none transition-colors",
                     voice.muted 
@@ -1214,7 +1342,7 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
                     key={i}
                     className="absolute left-1/2 -ml-[1px] w-[2px] pointer-events-none"
                     style={{ 
-                      top: `${160 - radius}px`,
+                      top: `${180 - radius}px`,
                       height: `${radius}px`,
                       transform: `rotate(${angle}deg)`,
                       transformOrigin: '50% 100%'
