@@ -110,50 +110,62 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const ctx = audioCtxRef.current;
     if (!ctx) return;
 
-    const startVol = Math.max(0.0001, volume * (isAccent ? 1.0 : 0.6));
+    // Accents are full volume (1.0), non-accented beats are softer (0.30 amplitude)
+    const amplitude = isAccent ? 1.0 : 0.30;
+    const startVol = Math.max(0.0001, volume * amplitude);
     const masterGain = ctx.createGain();
+
     masterGain.connect(ctx.destination);
+
+    // Keep duration uniform for a sound type so decay is clean
+    let clickDuration = 0.08;
+    if (sound === MetronomeSound.Kick || sound === MetronomeSound.Bass || sound === MetronomeSound.Bodhran) {
+      clickDuration = 0.15;
+    } else if (sound === MetronomeSound.Cowbell || sound === MetronomeSound.Snare || sound === MetronomeSound.Clap) {
+      clickDuration = 0.12;
+    } else if (sound === MetronomeSound.ClockTick) {
+      clickDuration = 0.03;
+    }
+
     masterGain.gain.setValueAtTime(startVol, time);
-    masterGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, time + clickDuration);
 
     switch (sound) {
       case MetronomeSound.Woodblock: {
-        // Woodblock: Sine with frequency sweep + high-frequency "crack"
         const osc = ctx.createOscillator();
         const crack = ctx.createOscillator();
         const crackGain = ctx.createGain();
         
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
-        osc.frequency.exponentialRampToValueAtTime(isAccent ? 600 : 400, time + 0.05);
+        osc.frequency.setValueAtTime(isAccent ? 1200 : 750, time);
+        osc.frequency.exponentialRampToValueAtTime(isAccent ? 800 : 500, time + 0.015);
         
         crack.type = 'square';
-        crack.frequency.setValueAtTime(isAccent ? 3000 : 2500, time);
-        crackGain.gain.setValueAtTime(0.1, time);
-        crackGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+        crack.frequency.setValueAtTime(isAccent ? 2600 : 1700, time);
+        crackGain.gain.setValueAtTime(isAccent ? 0.06 : 0.02, time);
+        crackGain.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
         
         osc.connect(masterGain);
         crack.connect(crackGain);
         crackGain.connect(masterGain);
         
         osc.start(time);
-        osc.stop(time + 0.3);
+        osc.stop(time + clickDuration);
         crack.start(time);
-        crack.stop(time + 0.02);
+        crack.stop(time + 0.012);
         break;
       }
       case MetronomeSound.Cowbell: {
-        // Cowbell: Metallic FM-like sound with two frequencies
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
         osc1.type = 'square';
         osc2.type = 'square';
-        osc1.frequency.setValueAtTime(isAccent ? 800 : 540, time);
-        osc2.frequency.setValueAtTime(isAccent ? 540 : 400, time);
+        osc1.frequency.setValueAtTime(isAccent ? 880 : 580, time);
+        osc2.frequency.setValueAtTime(isAccent ? 580 : 380, time);
         
         const filter = ctx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(isAccent ? 800 : 540, time);
+        filter.frequency.setValueAtTime(isAccent ? 880 : 580, time);
         filter.Q.setValueAtTime(2, time);
         
         osc1.connect(filter);
@@ -161,25 +173,23 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         filter.connect(masterGain);
         
         osc1.start(time);
-        osc1.stop(time + 0.3);
+        osc1.stop(time + clickDuration);
         osc2.start(time);
-        osc2.stop(time + 0.3);
+        osc2.stop(time + clickDuration);
         break;
       }
       case MetronomeSound.Kick: {
-        // Electronic kick: Sine with fast pitch drop
         const osc = ctx.createOscillator();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(150, time);
-        osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
+        osc.frequency.setValueAtTime(isAccent ? 160 : 100, time);
+        osc.frequency.exponentialRampToValueAtTime(40, time + 0.08);
         osc.connect(masterGain);
         osc.start(time);
-        osc.stop(time + 0.3);
+        osc.stop(time + clickDuration);
         break;
       }
       case MetronomeSound.HiHat: {
-        // Sharp noise burst
-        const bufferSize = ctx.sampleRate * 0.05;
+        const bufferSize = Math.floor(ctx.sampleRate * clickDuration);
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
@@ -188,20 +198,85 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         noise.buffer = buffer;
         const filter = ctx.createBiquadFilter();
         filter.type = 'highpass';
-        filter.frequency.setValueAtTime(8000, time);
+        filter.frequency.setValueAtTime(isAccent ? 8500 : 5500, time);
         
         noise.connect(filter);
         filter.connect(masterGain);
         noise.start(time);
         break;
       }
+      case MetronomeSound.Clap: {
+        const bufferSize = Math.floor(ctx.sampleRate * clickDuration);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
+        filter.Q.setValueAtTime(1.2, time);
+
+        noise.connect(filter);
+        filter.connect(masterGain);
+        noise.start(time);
+        break;
+      }
+      case MetronomeSound.Snare: {
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(isAccent ? 220 : 150, time);
+        osc.frequency.exponentialRampToValueAtTime(70, time + 0.06);
+
+        const bufferSize = Math.floor(ctx.sampleRate * clickDuration);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.setValueAtTime(isAccent ? 1800 : 1100, time);
+
+        osc.connect(masterGain);
+        noise.connect(noiseFilter);
+        noiseFilter.connect(masterGain);
+
+        osc.start(time);
+        osc.stop(time + clickDuration);
+        noise.start(time);
+        break;
+      }
+      case MetronomeSound.ClockTick: {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(isAccent ? 1800 : 1100, time);
+        osc.frequency.exponentialRampToValueAtTime(isAccent ? 1200 : 750, time + 0.015);
+        osc.connect(masterGain);
+        osc.start(time);
+        osc.stop(time + clickDuration);
+        break;
+      }
+      case MetronomeSound.Bodhran:
+      case MetronomeSound.Bass: {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(isAccent ? 140 : 90, time);
+        osc.frequency.exponentialRampToValueAtTime(45, time + 0.1);
+        osc.connect(masterGain);
+        osc.start(time);
+        osc.stop(time + clickDuration);
+        break;
+      }
       default: {
         const osc = ctx.createOscillator();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(isAccent ? 1000 : 800, time);
+        osc.frequency.setValueAtTime(isAccent ? 1200 : 750, time);
         osc.connect(masterGain);
         osc.start(time);
-        osc.stop(time + 0.3);
+        osc.stop(time + clickDuration);
       }
     }
   };

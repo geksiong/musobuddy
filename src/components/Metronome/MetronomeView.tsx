@@ -789,11 +789,11 @@ export default function MetronomeView() {
                         newPattern.push(origValue);
                       } else if (targetSub === 2) {
                         newPattern.push(origValue);
-                        newPattern.push(0);
+                        newPattern.push(1);
                       } else if (targetSub === 3) {
                         newPattern.push(origValue);
-                        newPattern.push(0);
-                        newPattern.push(0);
+                        newPattern.push(1);
+                        newPattern.push(1);
                       }
                     }
 
@@ -1172,10 +1172,12 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
             <div key={voice.id} className="absolute inset-0 pointer-events-none">
               {Array.from({ length }).map((_, i) => {
                 const angle = (is12Beat && length === 24)
-                  ? (i * 360) / 24
-                  : (is12Beat && length === 12)
-                    ? ((i + 1) / 12) * 360
-                    : (i * 360) / length;
+                  ? ((i + 2) / 24) * 360
+                  : (is12Beat && length === 36)
+                    ? ((i + 3) / 36) * 360
+                    : (is12Beat && length === 12)
+                      ? ((i + 1) / 12) * 360
+                      : (i * 360) / length;
 
                 let voiceBeatIdx = 0;
                 if (is12Beat && length === 12) {
@@ -1183,7 +1185,9 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
                   if (b === 0) b = 12;
                   voiceBeatIdx = b - 1;
                 } else if (is12Beat && length === 24) {
-                  voiceBeatIdx = Math.floor((normRot + 0.0001) / 15) % 24;
+                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 15) - 2 + 24) % 24;
+                } else if (is12Beat && length === 36) {
+                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 10) - 3 + 36) % 36;
                 } else {
                   voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
                 }
@@ -1319,10 +1323,12 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
 
               {Array.from({ length }).map((_, i) => {
                 const angle = (is12Beat && length === 24)
-                  ? (i * 360) / 24
-                  : (is12Beat && length === 12)
-                    ? ((i + 1) / 12) * 360
-                    : (i * 360) / length;
+                  ? ((i + 2) / 24) * 360
+                  : (is12Beat && length === 36)
+                    ? ((i + 3) / 36) * 360
+                    : (is12Beat && length === 12)
+                      ? ((i + 1) / 12) * 360
+                      : (i * 360) / length;
 
                 let voiceBeatIdx = 0;
                 if (is12Beat && length === 12) {
@@ -1330,7 +1336,9 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
                   if (b === 0) b = 12;
                   voiceBeatIdx = b - 1;
                 } else if (is12Beat && length === 24) {
-                  voiceBeatIdx = Math.floor((normRot + 0.0001) / 15) % 24;
+                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 15) - 2 + 24) % 24;
+                } else if (is12Beat && length === 36) {
+                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 10) - 3 + 36) % 36;
                 } else {
                   voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
                 }
@@ -1473,9 +1481,9 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
                           if (b === 0) b = 12;
                           voiceBeatIdx = b - 1;
                         } else if (is12Beat && length === 24) {
-                          voiceBeatIdx = Math.floor((normRot + 0.0001) / 15) % 24;
+                          voiceBeatIdx = (Math.floor((normRot + 0.0001) / 15) - 2 + 24) % 24;
                         } else if (is12Beat && length === 36) {
-                          voiceBeatIdx = Math.floor((normRot + 0.0001) / 10) % 36;
+                          voiceBeatIdx = (Math.floor((normRot + 0.0001) / 10) - 3 + 36) % 36;
                         } else {
                           voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
                         }

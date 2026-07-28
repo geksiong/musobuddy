@@ -179,7 +179,7 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     bpm: 80,
     timeSignature: '12-Beat',
     voices: [
-      { id: 0, sound: MetronomeSound.Clap, volume: 1, beats: 12, active: true, muted: false, pattern: [0, 0, 2, 0, 0, 2, 0, 2, 0, 2, 0, 2] },
+      { id: 0, sound: MetronomeSound.Clap, volume: 1, beats: 12, active: true, muted: false, pattern: [1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2] },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
@@ -191,10 +191,10 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     bpm: 80,
     timeSignature: '12-Beat (2x Palmas)',
     voices: [
-      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [0, 0, 2, 0, 0, 2, 0, 2, 0, 2, 0, 2] },
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2] },
       { 
         id: 1, sound: MetronomeSound.Clap, volume: 0.85, beats: 24, active: true, muted: false, isDoubleTime: true,
-        pattern: [0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2] 
+        pattern: [1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1] 
       },
     ],
     countIn: false,
