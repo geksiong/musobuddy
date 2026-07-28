@@ -224,9 +224,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!ctx || !pattern) return;
 
     const masterVoice = pattern.voices[0];
-    const masterLength = masterVoice.pattern?.length || masterVoice.beats || 4;
-    const masterBaseBeats = (masterVoice.isDoubleTime ? masterLength / 2 : masterLength) || 4;
-    const measureDuration = (60.0 / metronomeBpm) * masterBaseBeats;
+    const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+    const masterSubdivision = masterVoice?.isTripleTime ? 3 : (masterVoice?.isDoubleTime || masterVoice?.isSwing ? 2 : 1);
+    const masterBaseBeats = (masterLength / masterSubdivision) || 4;
+    const quarterDuration = 60.0 / metronomeBpm;
+    const measureDuration = quarterDuration * masterBaseBeats;
+    const swingRatio = pattern.swingRatio ?? (2 / 3);
 
     pattern.voices.forEach((voice, i) => {
       if (!voice.active) return;
@@ -237,26 +240,26 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       const vState = voiceStatesRef.current[i];
       const length = voice.pattern?.length || voice.beats || 4;
-      const interval = measureDuration / length;
+      const voiceSubdivision = voice.isTripleTime ? 3 : (voice.isDoubleTime || voice.isSwing ? 2 : 1);
+      const voiceBaseBeats = (length / voiceSubdivision) || 4;
+      const baseBeatDuration = measureDuration / voiceBaseBeats;
 
       const is12Beat = pattern.type === TimeSignatureType.Flamenco || pattern.timeSignature === '12-Beat' || masterBaseBeats === 12;
       const startBeat = pattern.startBeat || 1;
       
       let startIndex = 0;
       if (is12Beat) {
-        if (voice.isDoubleTime && length === 24) {
+        if (voiceSubdivision === 2 && length === 24) {
           startIndex = ((startBeat - 1) * 2 + 24) % 24;
+        } else if (voiceSubdivision === 3 && length === 36) {
+          startIndex = ((startBeat - 1) * 3 + 36) % 36;
         } else if (length === 12) {
           startIndex = ((startBeat - 1) + 12) % 12;
         } else {
           startIndex = ((startBeat - 1) + length) % length;
         }
       } else {
-        if (voice.isDoubleTime) {
-          startIndex = ((startBeat - 1) * 2 + length) % length;
-        } else {
-          startIndex = ((startBeat - 1) + length) % length;
-        }
+        startIndex = ((startBeat - 1) * voiceSubdivision + length) % length;
       }
 
       while (vState.nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD_TIME) {
@@ -286,7 +289,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }, Math.max(0, delay));
         }
 
-        vState.nextNoteTime += interval;
+        // Calculate step interval based on subdivision mode
+        let stepInterval = measureDuration / length;
+        if (voice.isSwing && length % 2 === 0) {
+          // In swing mode: even step = on-beat (duration = baseBeatDuration * swingRatio)
+          // odd step = off-beat (duration = baseBeatDuration * (1 - swingRatio))
+          if (patternIdx % 2 === 0) {
+            stepInterval = baseBeatDuration * swingRatio;
+          } else {
+            stepInterval = baseBeatDuration * (1 - swingRatio);
+          }
+        }
+
+        vState.nextNoteTime += stepInterval;
         vState.stepIndex++;
       }
     });

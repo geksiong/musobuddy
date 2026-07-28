@@ -492,7 +492,7 @@ export default function MetronomeView() {
               <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
                 {/* Global Pattern Controls */}
                 <div className={cn(
-                  "flex items-center gap-8 p-8 rounded-[2rem] border transition-colors",
+                  "flex flex-wrap items-center gap-8 p-8 rounded-[2rem] border transition-colors",
                   resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-slate-100/50 border-black/5"
                 )}>
                   <div className="flex flex-col gap-2">
@@ -531,7 +531,7 @@ export default function MetronomeView() {
                     </div>
                   </div>
                   
-                  <div className={cn("w-[1px] h-12", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
+                  <div className={cn("w-[1px] h-12 hidden sm:block", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
 
                   <div className="flex flex-col gap-1 flex-1 min-w-[150px]">
                     <div className="flex items-center justify-between">
@@ -557,7 +557,60 @@ export default function MetronomeView() {
                     />
                   </div>
                   
-                  <div className={cn("w-[1px] h-12", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
+                  <div className={cn("w-[1px] h-12 hidden sm:block", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
+
+                  {/* Swing Ratio Control */}
+                  <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-[9px] font-black uppercase tracking-[0.3em]", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>
+                        Swing Ratio
+                      </span>
+                      <span className="text-xs font-mono font-black italic text-[#FF4E00]">
+                        {Math.round((activePattern.swingRatio ?? 0.667) * 100)}% ({((activePattern.swingRatio ?? 0.667) / (1 - (activePattern.swingRatio ?? 0.667))).toFixed(1)}:1)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="range" min="0.50" max="0.75" step="0.01"
+                        value={activePattern.swingRatio ?? 0.667} 
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setActivePattern({ ...activePattern, swingRatio: val });
+                        }}
+                        className={cn(
+                          "w-full h-1 rounded-full appearance-none cursor-pointer accent-[#FF4E00]", 
+                          resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200"
+                        )} 
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      {[
+                        { label: '1:1', ratio: 0.50 },
+                        { label: '3:2 (60%)', ratio: 0.60 },
+                        { label: '2:1 (67%)', ratio: 0.667 },
+                        { label: '3:1 (75%)', ratio: 0.75 },
+                      ].map((preset) => {
+                        const isSel = Math.abs((activePattern.swingRatio ?? 0.667) - preset.ratio) < 0.02;
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => setActivePattern({ ...activePattern, swingRatio: preset.ratio })}
+                            className={cn(
+                              "px-2 py-0.5 rounded text-[8px] font-mono font-bold transition-all",
+                              isSel 
+                                ? "bg-[#FF4E00] text-white" 
+                                : (resolvedTheme === 'dark' ? "bg-white/5 text-white/40 hover:text-white" : "bg-slate-200 text-slate-600 hover:text-slate-900")
+                            )}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className={cn("w-[1px] h-12 hidden sm:block", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
                   
                   <div className="flex flex-col gap-1">
                     <span className={cn("text-[9px] font-black uppercase tracking-[0.3em]", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>Signature</span>
@@ -574,8 +627,53 @@ export default function MetronomeView() {
                 </div>
 
                 {activePattern.voices.map((voice, vIndex) => {
-                  const isDoubleTime = !!voice.isDoubleTime;
+                  const masterVoice = activePattern.voices[0];
+                  const masterLen = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+                  const masterSub = masterVoice?.isTripleTime ? 3 : (masterVoice?.isDoubleTime || masterVoice?.isSwing ? 2 : 1);
+                  const masterBaseBeats = Math.max(1, Math.round(masterLen / masterSub));
+
                   const length = voice.pattern?.length || voice.beats || 4;
+                  const vSub = voice.isTripleTime ? 3 : (voice.isDoubleTime || voice.isSwing ? 2 : 1);
+                  const currentSubMode: 'straight' | 'double' | 'triple' | 'swing' = voice.isSwing ? 'swing' : (voice.isTripleTime ? 'triple' : (voice.isDoubleTime ? 'double' : 'straight'));
+
+                  const handleSubdivisionChange = (targetMode: 'straight' | 'double' | 'triple' | 'swing') => {
+                    const next = { ...activePattern };
+                    const v = next.voices[vIndex];
+                    const curSub = v.isTripleTime ? 3 : (v.isDoubleTime || v.isSwing ? 2 : 1);
+                    const targetSub = targetMode === 'triple' ? 3 : (targetMode === 'double' || targetMode === 'swing' ? 2 : 1);
+
+                    v.isDoubleTime = targetMode === 'double';
+                    v.isTripleTime = targetMode === 'triple';
+                    v.isSwing = targetMode === 'swing';
+                    v.subdivision = targetMode;
+
+                    if (curSub === targetSub) {
+                      setActivePattern({ ...next });
+                      return;
+                    }
+
+                    const curPattern = v.pattern || Array(v.beats || 4).fill(1);
+                    const baseBeatsCount = Math.max(1, Math.round(curPattern.length / curSub));
+
+                    const newPattern: number[] = [];
+                    for (let b = 0; b < baseBeatsCount; b++) {
+                      const origValue = curPattern[b * curSub] ?? 1;
+                      if (targetSub === 1) {
+                        newPattern.push(origValue);
+                      } else if (targetSub === 2) {
+                        newPattern.push(origValue);
+                        newPattern.push(0);
+                      } else if (targetSub === 3) {
+                        newPattern.push(origValue);
+                        newPattern.push(0);
+                        newPattern.push(0);
+                      }
+                    }
+
+                    v.pattern = newPattern;
+                    v.beats = newPattern.length;
+                    setActivePattern({ ...next });
+                  };
 
                   return (
                     <div key={voice.id} className={cn(
@@ -587,9 +685,19 @@ export default function MetronomeView() {
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <span className="text-[9px] font-black text-[#FF4E00] uppercase tracking-[0.3em]">Layer {vIndex + 1}</span>
-                              {isDoubleTime && (
+                              {voice.isSwing && (
                                 <span className="px-1.5 py-0.5 rounded bg-[#FF4E00]/20 text-[#FF4E00] font-mono text-[9px] font-black italic">
-                                  2x
+                                  Swing ({Math.round((activePattern.swingRatio ?? 0.667) * 100)}%)
+                                </span>
+                              )}
+                              {voice.isTripleTime && (
+                                <span className="px-1.5 py-0.5 rounded bg-[#A855F7]/20 text-[#A855F7] font-mono text-[9px] font-black italic">
+                                  3x Triple
+                                </span>
+                              )}
+                              {voice.isDoubleTime && (
+                                <span className="px-1.5 py-0.5 rounded bg-[#00D4FF]/20 text-[#00D4FF] font-mono text-[9px] font-black italic">
+                                  2x Double
                                 </span>
                               )}
                             </div>
@@ -647,49 +755,40 @@ export default function MetronomeView() {
 
                           <div className={cn("w-[1px] h-8 hidden sm:block", resolvedTheme === 'dark' ? "bg-white/10" : "bg-black/10")} />
 
-                          {/* Double Time Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = { ...activePattern };
-                              const v = next.voices[vIndex];
-                              const turningOn = !v.isDoubleTime;
-                              v.isDoubleTime = turningOn;
-
-                              const curPattern = v.pattern || Array(v.beats || 4).fill(1);
-                              if (turningOn) {
-                                // Double the length: interleave off-beats (0s)
-                                const expanded: number[] = [];
-                                for (const val of curPattern) {
-                                  expanded.push(val);
-                                  expanded.push(0); // Half-beat step defaults to silent
-                                }
-                                v.pattern = expanded;
-                                v.beats = expanded.length;
-                              } else {
-                                // Halve the length: retain every even step
-                                const contracted: number[] = [];
-                                for (let idx = 0; idx < curPattern.length; idx += 2) {
-                                  contracted.push(curPattern[idx]);
-                                }
-                                v.pattern = contracted.length > 0 ? contracted : [1];
-                                v.beats = v.pattern.length;
-                              }
-                              setActivePattern({ ...next });
-                            }}
-                            className={cn(
-                              "flex items-center gap-1.5 px-3 py-2 rounded-xl border font-black uppercase text-[10px] tracking-wider transition-all italic shadow-sm",
-                              isDoubleTime
-                                ? "bg-[#FF4E00] border-[#FF4E00] text-white shadow-[#FF4E00]/30"
-                                : resolvedTheme === 'dark'
-                                  ? "bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10"
-                                  : "bg-slate-100 border-black/5 text-slate-500 hover:text-slate-900"
-                            )}
-                            title="Toggle Double Time mode (2x beats packed in row, each half-beat long)"
-                          >
-                            <span className="font-mono font-black text-xs">2x</span>
-                            <span>Double Time</span>
-                          </button>
+                          {/* Subdivision Mode Selector */}
+                          <div className="flex flex-col gap-1">
+                            <span className={cn("text-[8px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")}>Subdivision</span>
+                            <div className={cn(
+                              "flex items-center gap-1 p-1 rounded-xl border",
+                              resolvedTheme === 'dark' ? "bg-black/40 border-white/5" : "bg-slate-100 border-black/5"
+                            )}>
+                              {[
+                                { id: 'straight', label: '1x' },
+                                { id: 'double', label: '2x' },
+                                { id: 'triple', label: '3x' },
+                                { id: 'swing', label: 'Swing' },
+                              ].map((opt) => {
+                                const isSel = currentSubMode === opt.id;
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => handleSubdivisionChange(opt.id as 'straight' | 'double' | 'triple' | 'swing')}
+                                    className={cn(
+                                      "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all italic",
+                                      isSel 
+                                        ? "bg-[#FF4E00] text-white shadow-md shadow-[#FF4E00]/20" 
+                                        : resolvedTheme === 'dark' 
+                                          ? "text-white/40 hover:text-white hover:bg-white/5" 
+                                          : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
+                                    )}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-4">
@@ -700,9 +799,9 @@ export default function MetronomeView() {
                              <button 
                                onClick={() => {
                                  const next = { ...activePattern };
-                                 const step = isDoubleTime ? 2 : 1;
+                                 const step = vSub;
                                  const oldLen = next.voices[vIndex].pattern?.length || next.voices[vIndex].beats || 4;
-                                 const newLen = Math.max(isDoubleTime ? 2 : 1, oldLen - step);
+                                 const newLen = Math.max(vSub, oldLen - step);
                                  next.voices[vIndex].pattern = (next.voices[vIndex].pattern || Array(oldLen).fill(1)).slice(0, newLen);
                                  next.voices[vIndex].beats = newLen;
                                  setActivePattern({ ...next });
@@ -711,19 +810,19 @@ export default function MetronomeView() {
                              >
                                <Minus className="w-3 h-3" />
                              </button>
-                             <span className={cn("w-12 text-center text-xs font-black italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-                               {length} {isDoubleTime ? 'sub' : 'beats'}
+                             <span className={cn("w-14 text-center text-xs font-black italic", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
+                               {length} {vSub > 1 ? 'sub' : 'beats'}
                              </span>
                              <button 
                                onClick={() => {
                                  const next = { ...activePattern };
-                                 const step = isDoubleTime ? 2 : 1;
-                                 const maxLimit = isDoubleTime ? 32 : 16;
+                                 const step = vSub;
+                                 const maxLimit = vSub === 3 ? 36 : (vSub === 2 ? 32 : 16);
                                  const oldLen = next.voices[vIndex].pattern?.length || next.voices[vIndex].beats || 4;
                                  const newLen = Math.min(maxLimit, oldLen + step);
                                  const newArray = [...(next.voices[vIndex].pattern || Array(oldLen).fill(1))];
                                  while (newArray.length < newLen) {
-                                   newArray.push(isDoubleTime && newArray.length % 2 === 1 ? 0 : 1);
+                                   newArray.push(vSub > 1 && newArray.length % vSub !== 0 ? 0 : 1);
                                  }
                                  next.voices[vIndex].pattern = newArray;
                                  next.voices[vIndex].beats = newLen;
@@ -753,71 +852,78 @@ export default function MetronomeView() {
                         </div>
                       </div>
 
-                      {/* Packed Beat Button Grid aligned across all layers */}
-                      <div className="w-full overflow-x-auto pt-4 border-t transition-colors pb-1" style={{ borderColor: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
+                      {/* Packed Beat Button Grid aligned by base beats across all layers */}
+                      <div className="w-full overflow-x-auto min-w-0 pt-4 border-t transition-colors pb-1" style={{ borderColor: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
                         <div 
-                          className="grid gap-1 sm:gap-1.5 w-full min-w-[580px] items-center"
+                          className="grid gap-1 sm:gap-2 w-full min-w-[580px] items-stretch"
                           style={{
-                            gridTemplateColumns: `repeat(${length}, minmax(0, 1fr))`
+                            gridTemplateColumns: `repeat(${masterBaseBeats}, minmax(0, 1fr))`
                           }}
                         >
-                          {voice.pattern?.map((val, i) => {
-                            const voiceBeatIdx = Math.floor((((rotation % 360) + 360) % 360) / (360 / length) + 0.0001) % length;
-                            const isCurrent = voiceBeatIdx === i && isPlaying;
-
-                            // Compute beat label for step i
-                            let labelText = '';
-                            if (is12Beat && length === 24) {
-                              if (i % 2 === 0) {
-                                const b = i === 0 ? 12 : Math.floor(i / 2);
-                                labelText = `${b}`;
-                              } else {
-                                labelText = '&';
-                              }
-                            } else if (isDoubleTime) {
-                              if (i % 2 === 0) {
-                                labelText = `${Math.floor(i / 2) + 1}`;
-                              } else {
-                                labelText = '&';
-                              }
-                            } else {
-                              labelText = `${is12Beat && length === 12 ? (i === 0 ? 12 : i) : (((i + (activePattern?.displayOffset || 0)) % length) + 1)}`;
-                            }
+                          {Array.from({ length: masterBaseBeats }).map((_, beatIdx) => {
+                            const subBeats = voice.pattern?.slice(beatIdx * vSub, (beatIdx + 1) * vSub) || Array(vSub).fill(1);
+                            const swingR = activePattern.swingRatio ?? (2 / 3);
 
                             return (
-                              <button
-                                key={i}
-                                onClick={() => {
-                                  const newPattern = [...(voice.pattern || [])];
-                                  newPattern[i] = (newPattern[i] + 1) % 3;
-                                  const next = { ...activePattern };
-                                  next.voices[vIndex].pattern = newPattern;
-                                  setActivePattern({ ...next });
-                                }}
-                                className={cn(
-                                  "w-full h-11 sm:h-12 rounded-xl transition-all flex flex-col items-center justify-center font-black border relative overflow-hidden min-w-0 px-0.5",
-                                  isDoubleTime ? "text-[8px]" : "text-[9px]",
-                                  voice.muted ? "opacity-30 pointer-events-none grayscale" : (
-                                    val === 2 ? "bg-[#FF4E00] border-[#FF4E00] text-white shadow-lg shadow-[#FF4E00]/20" :
-                                    val === 1 ? (resolvedTheme === 'dark' ? "bg-white/10 border-white/5 text-white" : "bg-slate-300 border-black/5 text-slate-900") :
-                                    (resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/5 text-white/20 hover:border-white/20 hover:text-white/60" : "bg-slate-50 border-black/5 text-slate-300 hover:border-black/20 hover:text-slate-600")
-                                  )
-                                )}
-                              >
-                                {isCurrent && !voice.muted && <div className="absolute inset-0 bg-white/40 animate-pulse" />}
-                                <span className="relative z-10 leading-none truncate w-full text-center">
-                                  {val === 2 ? 'ACC' : val === 1 ? (isDoubleTime && i % 2 === 1 ? 'SUB' : 'BEAT') : ''}
-                                </span>
-                                <span className={cn(
-                                  "absolute bottom-1 right-1 font-mono leading-none", 
-                                  isDoubleTime ? "text-[8px] font-bold" : "text-[7px]",
-                                  val > 0 
-                                    ? (val === 2 ? "text-white/80" : (resolvedTheme === 'dark' ? "text-white/60" : "text-black/60"))
-                                    : (resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")
-                                )}>
-                                  {labelText}
-                                </span>
-                              </button>
+                              <div key={beatIdx} className="flex items-center gap-1 w-full h-full">
+                                {subBeats.map((val, subIdx) => {
+                                  const i = beatIdx * vSub + subIdx;
+                                  const voiceBeatIdx = Math.floor((((rotation % 360) + 360) % 360) / (360 / length) + 0.0001) % length;
+                                  const isCurrent = voiceBeatIdx === i && isPlaying;
+
+                                  // Compute beat label for step i
+                                  let labelText = '';
+                                  const bNum = is12Beat ? (beatIdx === 0 ? 12 : beatIdx) : (((beatIdx + (activePattern?.displayOffset || 0)) % masterBaseBeats) + 1);
+                                  if (vSub === 1) {
+                                    labelText = `${bNum}`;
+                                  } else if (vSub === 2) {
+                                    labelText = subIdx === 0 ? `${bNum}` : '&';
+                                  } else if (vSub === 3) {
+                                    labelText = subIdx === 0 ? `${bNum}` : (subIdx === 1 ? 'a' : 'b');
+                                  }
+
+                                  const flexVal = voice.isSwing
+                                    ? (subIdx === 0 ? swingR : (1 - swingR))
+                                    : 1;
+
+                                  return (
+                                    <button
+                                      key={i}
+                                      style={{ flex: flexVal }}
+                                      onClick={() => {
+                                        const newPattern = [...(voice.pattern || [])];
+                                        newPattern[i] = (newPattern[i] + 1) % 3;
+                                        const next = { ...activePattern };
+                                        next.voices[vIndex].pattern = newPattern;
+                                        setActivePattern({ ...next });
+                                      }}
+                                      className={cn(
+                                        "h-11 sm:h-12 rounded-xl transition-all flex flex-col items-center justify-center font-black border relative overflow-hidden min-w-0 px-0.5",
+                                        vSub > 1 ? "text-[8px]" : "text-[9px]",
+                                        voice.muted ? "opacity-30 pointer-events-none grayscale" : (
+                                          val === 2 ? "bg-[#FF4E00] border-[#FF4E00] text-white shadow-lg shadow-[#FF4E00]/20" :
+                                          val === 1 ? (resolvedTheme === 'dark' ? "bg-white/10 border-white/5 text-white" : "bg-slate-300 border-black/5 text-slate-900") :
+                                          (resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/5 text-white/20 hover:border-white/20 hover:text-white/60" : "bg-slate-50 border-black/5 text-slate-300 hover:border-black/20 hover:text-slate-600")
+                                        )
+                                      )}
+                                    >
+                                      {isCurrent && !voice.muted && <div className="absolute inset-0 bg-white/40 animate-pulse" />}
+                                      <span className="relative z-10 leading-none truncate w-full text-center">
+                                        {val === 2 ? 'ACC' : val === 1 ? (vSub > 1 && subIdx > 0 ? 'SUB' : 'BEAT') : ''}
+                                      </span>
+                                      <span className={cn(
+                                        "absolute bottom-1 right-1 font-mono leading-none", 
+                                        vSub > 1 ? "text-[8px] font-bold" : "text-[7px]",
+                                        val > 0 
+                                          ? (val === 2 ? "text-white/80" : (resolvedTheme === 'dark' ? "text-white/60" : "text-black/60"))
+                                          : (resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")
+                                      )}>
+                                        {labelText}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             );
                           })}
                         </div>
@@ -1178,76 +1284,104 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
   const voiceColors = ["#FF4E00", "#A855F7", "#00D4FF", "#00FFAB", "#FF007F"];
   const masterVoice = voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
-  const masterBaseBeats = (masterVoice?.isDoubleTime ? masterLength / 2 : masterLength) || 4;
+  const masterSubdivision = masterVoice?.isTripleTime ? 3 : (masterVoice?.isDoubleTime || masterVoice?.isSwing ? 2 : 1);
+  const masterBaseBeats = Math.max(1, Math.round(masterLength / masterSubdivision));
   const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
+  const swingRatio = pattern?.swingRatio ?? (2 / 3);
 
   const normRot = ((rotation % 360) + 360) % 360;
 
   return (
-    <div className="w-full max-w-3xl flex flex-col gap-6 items-center py-6 px-4">
+    <div className="w-full max-w-4xl flex flex-col gap-6 items-center py-6 px-4">
       {voices.map((voice, vIndex) => {
         const length = voice.pattern?.length || voice.beats || 4;
-        const displayPattern = voice.pattern || Array(length).fill(1);
+        const vSub = voice.isTripleTime ? 3 : (voice.isDoubleTime || voice.isSwing ? 2 : 1);
         const color = voiceColors[vIndex % voiceColors.length];
-        
+
+        const tagText = voice.isSwing
+          ? `Swing (${Math.round(swingRatio * 100)}%)`
+          : voice.isTripleTime
+          ? '3x Triple Time'
+          : voice.isDoubleTime
+          ? '2x Double Time'
+          : null;
+
         return (
           <div key={voice.id} className="flex flex-col gap-2 w-full">
             <div className="flex justify-between items-center w-full px-1">
               <span className={cn("text-[9px] font-black uppercase tracking-[0.2em] italic opacity-70 flex items-center gap-2", resolvedTheme === 'dark' ? "" : "opacity-90")} style={{ color }}>
                 <span>Layer {vIndex + 1} &bull; {voice.sound}</span>
-                {voice.isDoubleTime && (
+                {tagText && (
                   <span className="px-1.5 py-0.5 rounded bg-[#FF4E00]/20 text-[#FF4E00] font-mono text-[9px] font-black not-italic tracking-normal">
-                    2x Double Time
+                    {tagText}
                   </span>
                 )}
               </span>
               <span className={cn("text-[9px] font-mono font-bold opacity-40", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-                {length} {voice.isDoubleTime ? 'sub-beats' : 'beats'}
+                {length} {vSub > 1 ? 'sub-beats' : 'beats'}
               </span>
             </div>
-            <div className="w-full">
+
+            <div className="w-full overflow-x-auto min-w-0">
               <div 
-                className="grid gap-1 sm:gap-1.5 w-full items-center"
+                className="grid gap-1 sm:gap-2 w-full min-w-[500px] items-stretch"
                 style={{
-                  gridTemplateColumns: `repeat(${length}, minmax(0, 1fr))`
+                  gridTemplateColumns: `repeat(${masterBaseBeats}, minmax(0, 1fr))`
                 }}
               >
-                {displayPattern.map((val, i) => {
-                  let voiceBeatIdx = 0;
-                  if (is12Beat && length === 12) {
-                    let b = Math.floor((normRot + 0.0001) / 30);
-                    if (b === 0) b = 12;
-                    voiceBeatIdx = b - 1;
-                  } else if (is12Beat && length === 24) {
-                    voiceBeatIdx = Math.floor((normRot + 0.0001) / 15) % 24;
-                  } else {
-                    voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
-                  }
-                  const isCurrent = voiceBeatIdx === i && isPlaying;
-                  
+                {Array.from({ length: masterBaseBeats }).map((_, beatIdx) => {
+                  const subBeats = voice.pattern?.slice(beatIdx * vSub, (beatIdx + 1) * vSub) || Array(vSub).fill(1);
+
                   return (
-                    <motion.div
-                      key={i}
-                      initial={false}
-                      animate={{
-                        scale: isCurrent && !voice.muted ? 1.05 : 1,
-                        opacity: voice.muted ? 0.25 : (val === 0 && !isCurrent ? 0.15 : 1),
-                        backgroundColor: !voice.muted ? (
-                          isCurrent ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : (val === 1 ? `${color}25` : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)')))
-                        ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'),
-                        boxShadow: !voice.muted && isCurrent ? `0 0 16px ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.3)'}, 0 0 30px ${color}` : (val === 2 && !voice.muted ? `0 0 10px ${color}44` : 'none')
-                      }}
-                      transition={{ duration: 0.08 }}
-                      className={cn(
-                        "w-full rounded-xl border transition-all flex flex-col items-center justify-center min-w-0 relative overflow-hidden",
-                        voice.isDoubleTime ? "h-8 sm:h-10" : "h-11 sm:h-12",
-                        isCurrent && !voice.muted ? (resolvedTheme === 'dark' ? "border-white" : "border-black") : (resolvedTheme === 'dark' ? "border-white/10" : "border-black/10")
-                      )}
-                    >
-                      {val === 2 && !isCurrent && (
-                        <div className={cn("w-1.5 h-1.5 rounded-full mb-0.5", resolvedTheme === 'dark' ? "bg-white/70" : "bg-black/50")} />
-                      )}
-                    </motion.div>
+                    <div key={beatIdx} className="flex items-center gap-1 w-full h-full">
+                      {subBeats.map((val, subIdx) => {
+                        const i = beatIdx * vSub + subIdx;
+
+                        let voiceBeatIdx = 0;
+                        if (is12Beat && length === 12) {
+                          let b = Math.floor((normRot + 0.0001) / 30);
+                          if (b === 0) b = 12;
+                          voiceBeatIdx = b - 1;
+                        } else if (is12Beat && length === 24) {
+                          voiceBeatIdx = Math.floor((normRot + 0.0001) / 15) % 24;
+                        } else if (is12Beat && length === 36) {
+                          voiceBeatIdx = Math.floor((normRot + 0.0001) / 10) % 36;
+                        } else {
+                          voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
+                        }
+                        const isCurrent = voiceBeatIdx === i && isPlaying;
+
+                        const flexStyle = voice.isSwing
+                          ? (subIdx === 0 ? swingRatio : (1 - swingRatio))
+                          : 1;
+
+                        return (
+                          <motion.div
+                            key={i}
+                            style={{ flex: flexStyle }}
+                            initial={false}
+                            animate={{
+                              scale: isCurrent && !voice.muted ? 1.05 : 1,
+                              opacity: voice.muted ? 0.25 : (val === 0 && !isCurrent ? 0.15 : 1),
+                              backgroundColor: !voice.muted ? (
+                                isCurrent ? (resolvedTheme === 'dark' ? '#FFFFFF' : '#000000') : (val === 2 ? color : (val === 1 ? `${color}25` : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)')))
+                              ) : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'),
+                              boxShadow: !voice.muted && isCurrent ? `0 0 16px ${resolvedTheme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.3)'}, 0 0 30px ${color}` : (val === 2 && !voice.muted ? `0 0 10px ${color}44` : 'none')
+                            }}
+                            transition={{ duration: 0.08 }}
+                            className={cn(
+                              "rounded-xl border transition-all flex flex-col items-center justify-center min-w-0 relative overflow-hidden",
+                              vSub > 1 ? "h-8 sm:h-10" : "h-11 sm:h-12",
+                              isCurrent && !voice.muted ? (resolvedTheme === 'dark' ? "border-white" : "border-black") : (resolvedTheme === 'dark' ? "border-white/10" : "border-black/10")
+                            )}
+                          >
+                            {val === 2 && !isCurrent && (
+                              <div className={cn("w-1.5 h-1.5 rounded-full mb-0.5", resolvedTheme === 'dark' ? "bg-white/70" : "bg-black/50")} />
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
                   );
                 })}
               </div>

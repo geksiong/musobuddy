@@ -22,6 +22,8 @@ export enum MetronomeSound {
   Bodhran = 'bodhran'
 }
 
+export type SubdivisionType = 'straight' | 'double' | 'triple' | 'swing';
+
 export interface MetronomeVoice {
   id: number;
   sound: MetronomeSound;
@@ -30,7 +32,10 @@ export interface MetronomeVoice {
   beats: number; // For polyrhythm: x in x:y
   active: boolean;
   pattern?: number[]; // custom beat pattern: 0: silent, 1: normal, 2: accent
-  isDoubleTime?: boolean; // Double time layer (2x beats per measure, half-beat each)
+  isDoubleTime?: boolean; // Double time layer (2x beats per measure)
+  isTripleTime?: boolean; // Triple time layer (3x beats per measure)
+  isSwing?: boolean; // Swing layer (2x sub-beats with swing ratio timing)
+  subdivision?: SubdivisionType;
 }
 
 export interface BeatPattern {
@@ -44,4 +49,5 @@ export interface BeatPattern {
   isUserPreset?: boolean;
   startBeat?: number; // Starting beat position (e.g. 1 for beat 1, 12 for beat 12)
   displayOffset?: number; // Starting count offset
+  swingRatio?: number; // Swing timing ratio (default 0.667 for 2:1 swing)
 }
