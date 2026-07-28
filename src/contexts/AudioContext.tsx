@@ -82,12 +82,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [dronePulseBpm, setDronePulseBpm] = useState(0);
 
   const droneNodesRef = useRef<Map<string, { 
-    osc1: OscillatorNode; 
-    osc2: OscillatorNode; 
+    oscillators: OscillatorNode[];
+    gains: GainNode[];
+    filters: BiquadFilterNode[];
     lfo?: OscillatorNode;
     lfoGain?: GainNode;
-    gain: GainNode;
+    masterGain: GainNode;
     modGain: GainNode;
+    tone: DroneTone;
   }>>(new Map());
 
   // Ref Note State
@@ -471,13 +473,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!nodes || !audioCtxRef.current) return;
 
     const ctx = audioCtxRef.current;
-    const { osc1, osc2, lfo, lfoGain, gain } = nodes;
+    const { masterGain, oscillators, gains, filters, lfo, lfoGain, modGain } = nodes;
 
     try {
       const now = ctx.currentTime;
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setValueAtTime(gain.gain.value, now);
-      gain.gain.linearRampToValueAtTime(0.0001, now + 0.2);
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(0.0001, now + 0.15);
       
       droneNodesRef.current.delete(note);
       setActiveDrones(prev => {
@@ -489,10 +491,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setTimeout(() => {
         try {
           const stopTime = ctx.currentTime;
-          osc1.stop(stopTime); osc2.stop(stopTime); lfo?.stop(stopTime);
-          osc1.disconnect(); osc2.disconnect(); lfo?.disconnect(); lfoGain?.disconnect(); gain.disconnect();
+          oscillators.forEach(osc => {
+            try { osc.stop(stopTime); osc.disconnect(); } catch (e) {}
+          });
+          lfo?.stop(stopTime);
+          lfo?.disconnect();
+          lfoGain?.disconnect();
+          filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
+          gains.forEach(g => { try { g.disconnect(); } catch (e) {} });
+          modGain.disconnect();
+          masterGain.disconnect();
         } catch (e) {}
-      }, 250);
+      }, 200);
     } catch (e) {}
   }, []);
 
@@ -516,59 +526,360 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     const midiNote = (octave + 1) * 12 + noteIndex;
     const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
-    
-    // Main volume gain
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    masterGain.gain.linearRampToValueAtTime(volume * 0.35, ctx.currentTime + 0.3);
-    
-    // Filter for richness
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(2000, ctx.currentTime);
-    filter.Q.setValueAtTime(1, ctx.currentTime);
-    
-    masterGain.connect(filter);
-    filter.connect(ctx.destination);
+    const now = ctx.currentTime;
 
-    // Modulation gain (for pulse)
+    // Master Volume Gain
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.0001, now);
+    masterGain.gain.linearRampToValueAtTime(volume * 0.35, now + 0.25);
+    masterGain.connect(ctx.destination);
+
+    // Modulation Gain (for pulse BPM slider LFO)
     const modGain = ctx.createGain();
-    modGain.gain.setValueAtTime(1, ctx.currentTime);
+    modGain.gain.setValueAtTime(1, now);
     modGain.connect(masterGain);
 
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const osc3 = ctx.createOscillator(); // Extra harmonic
-    
-    switch (tone) {
-      case DroneTone.Strings:
-        osc1.type = 'sine'; osc2.type = 'triangle'; osc3.type = 'sine';
-        osc2.detune.setValueAtTime(4, ctx.currentTime);
-        osc3.frequency.setValueAtTime(freq * 2, ctx.currentTime);
-        filter.frequency.setValueAtTime(3000, ctx.currentTime);
-        break;
-      case DroneTone.Cello:
-        osc1.type = 'sawtooth'; osc2.type = 'sine'; osc3.type = 'sawtooth';
-        osc1.frequency.setValueAtTime(freq / 2, ctx.currentTime);
-        osc1.detune.setValueAtTime(2, ctx.currentTime);
-        osc3.frequency.setValueAtTime(freq, ctx.currentTime);
-        osc3.detune.setValueAtTime(-2, ctx.currentTime);
-        filter.frequency.setValueAtTime(1200, ctx.currentTime);
-        break;
-      default:
-        osc1.type = 'sine'; osc2.type = 'sine'; osc3.type = 'sine';
+    const oscillators: OscillatorNode[] = [];
+    const gains: GainNode[] = [];
+    const filters: BiquadFilterNode[] = [];
+
+    if (tone === DroneTone.Bagpipe) {
+      // --- Great Highland Bagpipes ---
+      // Reedy, bright, buzzing drone with Bass drone (1 octave down), Tenor drones (1 octave down with detune), and fifth harmonic.
+      const filterBP = ctx.createBiquadFilter();
+      filterBP.type = 'bandpass';
+      filterBP.frequency.setValueAtTime(2200, now);
+      filterBP.Q.setValueAtTime(2.8, now);
+
+      const filterLP = ctx.createBiquadFilter();
+      filterLP.type = 'lowpass';
+      filterLP.frequency.setValueAtTime(3200, now);
+      filterLP.Q.setValueAtTime(1.5, now);
+
+      filterBP.connect(modGain);
+      filterLP.connect(modGain);
+      filters.push(filterBP, filterLP);
+
+      // Bass drone (1 octave down)
+      const oscBass = ctx.createOscillator();
+      oscBass.type = 'sawtooth';
+      oscBass.frequency.setValueAtTime(freq / 2, now);
+      const gainBass = ctx.createGain();
+      gainBass.gain.setValueAtTime(0.5, now);
+      oscBass.connect(gainBass);
+      gainBass.connect(filterLP);
+      oscillators.push(oscBass); gains.push(gainBass);
+
+      // Tenor drone 1 (1 octave down, -5 cents)
+      const oscTenor1 = ctx.createOscillator();
+      oscTenor1.type = 'sawtooth';
+      oscTenor1.frequency.setValueAtTime(freq / 2, now);
+      oscTenor1.detune.setValueAtTime(-5, now);
+      const gainTenor1 = ctx.createGain();
+      gainTenor1.gain.setValueAtTime(0.4, now);
+      oscTenor1.connect(gainTenor1);
+      gainTenor1.connect(filterBP);
+      oscillators.push(oscTenor1); gains.push(gainTenor1);
+
+      // Tenor drone 2 (1 octave down, +6 cents)
+      const oscTenor2 = ctx.createOscillator();
+      oscTenor2.type = 'sawtooth';
+      oscTenor2.frequency.setValueAtTime(freq / 2, now);
+      oscTenor2.detune.setValueAtTime(6, now);
+      const gainTenor2 = ctx.createGain();
+      gainTenor2.gain.setValueAtTime(0.4, now);
+      oscTenor2.connect(gainTenor2);
+      gainTenor2.connect(filterBP);
+      oscillators.push(oscTenor2); gains.push(gainTenor2);
+
+      // Chanter/Reed harmonic bite (fundamental frequency)
+      const oscChanter = ctx.createOscillator();
+      oscChanter.type = 'sawtooth';
+      oscChanter.frequency.setValueAtTime(freq, now);
+      const gainChanter = ctx.createGain();
+      gainChanter.gain.setValueAtTime(0.3, now);
+      oscChanter.connect(gainChanter);
+      gainChanter.connect(filterBP);
+      gainChanter.connect(filterLP);
+      oscillators.push(oscChanter); gains.push(gainChanter);
+
+      // Fifth drone (Fundamental * 1.5)
+      const oscFifth = ctx.createOscillator();
+      oscFifth.type = 'sawtooth';
+      oscFifth.frequency.setValueAtTime((freq / 2) * 1.5, now);
+      const gainFifth = ctx.createGain();
+      gainFifth.gain.setValueAtTime(0.2, now);
+      oscFifth.connect(gainFifth);
+      gainFifth.connect(filterLP);
+      oscillators.push(oscFifth); gains.push(gainFifth);
+
+    } else if (tone === DroneTone.UilleannPipes) {
+      // --- Uilleann Pipes (Irish Bagpipe) ---
+      // Sweeter, warmer, smooth reedy tone with wood pipe body resonance and subtle air bellows drift.
+      const filterLP = ctx.createBiquadFilter();
+      filterLP.type = 'lowpass';
+      filterLP.frequency.setValueAtTime(1600, now);
+      filterLP.Q.setValueAtTime(1.8, now);
+
+      const filterPeak = ctx.createBiquadFilter();
+      filterPeak.type = 'peaking';
+      filterPeak.frequency.setValueAtTime(650, now);
+      filterPeak.Q.setValueAtTime(2.0, now);
+      filterPeak.gain.setValueAtTime(5, now);
+
+      filterPeak.connect(filterLP);
+      filterLP.connect(modGain);
+      filters.push(filterLP, filterPeak);
+
+      // Fundamental pipe (smooth saw/triangle blend)
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(freq, now);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(0.35, now);
+      osc1.connect(gain1);
+      gain1.connect(filterPeak);
+      oscillators.push(osc1); gains.push(gain1);
+
+      // Bass drone (1 octave down triangle)
+      const oscBass = ctx.createOscillator();
+      oscBass.type = 'triangle';
+      oscBass.frequency.setValueAtTime(freq / 2, now);
+      const gainBass = ctx.createGain();
+      gainBass.gain.setValueAtTime(0.45, now);
+      oscBass.connect(gainBass);
+      gainBass.connect(filterPeak);
+      oscillators.push(oscBass); gains.push(gainBass);
+
+      // Baritone / Fifth drone
+      const oscFifth = ctx.createOscillator();
+      oscFifth.type = 'sine';
+      oscFifth.frequency.setValueAtTime((freq / 2) * 1.5, now);
+      const gainFifth = ctx.createGain();
+      gainFifth.gain.setValueAtTime(0.25, now);
+      oscFifth.connect(gainFifth);
+      gainFifth.connect(filterPeak);
+      oscillators.push(oscFifth); gains.push(gainFifth);
+
+      // Gentle bellows air LFO pitch modulation
+      const bellowsLfo = ctx.createOscillator();
+      const bellowsGain = ctx.createGain();
+      bellowsLfo.type = 'sine';
+      bellowsLfo.frequency.setValueAtTime(0.25, now);
+      bellowsGain.gain.setValueAtTime(1.5, now);
+      bellowsLfo.connect(bellowsGain);
+      bellowsGain.connect(osc1.frequency);
+      bellowsGain.connect(oscBass.frequency);
+      bellowsLfo.start(now);
+      oscillators.push(bellowsLfo);
+
+    } else if (tone === DroneTone.Accordion) {
+      // --- Free-reed Accordion (Musette) ---
+      // Free reeds with musette tremolo detune (+14 cents), bass reed 1 octave down, and clarinet rank 1 octave up.
+      const filterLP = ctx.createBiquadFilter();
+      filterLP.type = 'lowpass';
+      filterLP.frequency.setValueAtTime(2600, now);
+      filterLP.Q.setValueAtTime(1.2, now);
+      filterLP.connect(modGain);
+      filters.push(filterLP);
+
+      // Main Reed (Square wave)
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'square';
+      osc1.frequency.setValueAtTime(freq, now);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(0.3, now);
+      osc1.connect(gain1);
+      gain1.connect(filterLP);
+      oscillators.push(osc1); gains.push(gain1);
+
+      // Musette Reed (Square wave, +14 cents sharp detune)
+      const oscMusette = ctx.createOscillator();
+      oscMusette.type = 'square';
+      oscMusette.frequency.setValueAtTime(freq, now);
+      oscMusette.detune.setValueAtTime(14, now);
+      const gainMusette = ctx.createGain();
+      gainMusette.gain.setValueAtTime(0.28, now);
+      oscMusette.connect(gainMusette);
+      gainMusette.connect(filterLP);
+      oscillators.push(oscMusette); gains.push(gainMusette);
+
+      // Bass Reed (1 octave down sawtooth wave)
+      const oscBass = ctx.createOscillator();
+      oscBass.type = 'sawtooth';
+      oscBass.frequency.setValueAtTime(freq / 2, now);
+      oscBass.detune.setValueAtTime(-3, now);
+      const gainBass = ctx.createGain();
+      gainBass.gain.setValueAtTime(0.4, now);
+      oscBass.connect(gainBass);
+      gainBass.connect(filterLP);
+      oscillators.push(oscBass); gains.push(gainBass);
+
+      // High Octave Reed (1 octave up triangle wave)
+      const oscHigh = ctx.createOscillator();
+      oscHigh.type = 'triangle';
+      oscHigh.frequency.setValueAtTime(freq * 2, now);
+      const gainHigh = ctx.createGain();
+      gainHigh.gain.setValueAtTime(0.12, now);
+      oscHigh.connect(gainHigh);
+      gainHigh.connect(filterLP);
+      oscillators.push(oscHigh); gains.push(gainHigh);
+
+    } else if (tone === DroneTone.SynthLead) {
+      // --- Analog Synth Lead ---
+      // Dual saw + pulse + sub-oscillator + resonant lowpass filter with slow cutoff LFO sweep.
+      const filterLP1 = ctx.createBiquadFilter();
+      filterLP1.type = 'lowpass';
+      filterLP1.frequency.setValueAtTime(2200, now);
+      filterLP1.Q.setValueAtTime(3.2, now);
+
+      const filterLP2 = ctx.createBiquadFilter();
+      filterLP2.type = 'lowpass';
+      filterLP2.frequency.setValueAtTime(2800, now);
+      filterLP2.Q.setValueAtTime(1.0, now);
+
+      filterLP1.connect(filterLP2);
+      filterLP2.connect(modGain);
+      filters.push(filterLP1, filterLP2);
+
+      // Osc 1: Sawtooth
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(freq, now);
+      osc1.detune.setValueAtTime(-5, now);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(0.35, now);
+      osc1.connect(gain1);
+      gain1.connect(filterLP1);
+      oscillators.push(osc1); gains.push(gain1);
+
+      // Osc 2: Square
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'square';
+      osc2.frequency.setValueAtTime(freq, now);
+      osc2.detune.setValueAtTime(8, now);
+      const gain2 = ctx.createGain();
+      gain2.gain.setValueAtTime(0.3, now);
+      osc2.connect(gain2);
+      gain2.connect(filterLP1);
+      oscillators.push(osc2); gains.push(gain2);
+
+      // Sub-Oscillator
+      const oscSub = ctx.createOscillator();
+      oscSub.type = 'square';
+      oscSub.frequency.setValueAtTime(freq / 2, now);
+      const gainSub = ctx.createGain();
+      gainSub.gain.setValueAtTime(0.4, now);
+      oscSub.connect(gainSub);
+      gainSub.connect(filterLP1);
+      oscillators.push(oscSub); gains.push(gainSub);
+
+      // Filter Cutoff LFO Sweep
+      const filterLfo = ctx.createOscillator();
+      const filterLfoGain = ctx.createGain();
+      filterLfo.type = 'sine';
+      filterLfo.frequency.setValueAtTime(0.12, now);
+      filterLfoGain.gain.setValueAtTime(400, now);
+      filterLfo.connect(filterLfoGain);
+      filterLfoGain.connect(filterLP1.frequency);
+      filterLfo.start(now);
+      oscillators.push(filterLfo);
+
+    } else if (tone === DroneTone.Cello) {
+      // --- Bowed Cello ---
+      const filterLP = ctx.createBiquadFilter();
+      filterLP.type = 'lowpass';
+      filterLP.frequency.setValueAtTime(1200, now);
+      filterLP.Q.setValueAtTime(1.6, now);
+      filterLP.connect(modGain);
+      filters.push(filterLP);
+
+      // Cello fundamental (1 octave down)
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(freq / 2, now);
+      osc1.detune.setValueAtTime(2, now);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(0.5, now);
+      osc1.connect(gain1);
+      gain1.connect(filterLP);
+      oscillators.push(osc1); gains.push(gain1);
+
+      // Cello octave body
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(freq, now);
+      osc2.detune.setValueAtTime(-2, now);
+      const gain2 = ctx.createGain();
+      gain2.gain.setValueAtTime(0.35, now);
+      osc2.connect(gain2);
+      gain2.connect(filterLP);
+      oscillators.push(osc2); gains.push(gain2);
+
+      // Triangle core
+      const osc3 = ctx.createOscillator();
+      osc3.type = 'triangle';
+      osc3.frequency.setValueAtTime(freq / 2, now);
+      const gain3 = ctx.createGain();
+      gain3.gain.setValueAtTime(0.3, now);
+      osc3.connect(gain3);
+      gain3.connect(filterLP);
+      oscillators.push(osc3); gains.push(gain3);
+
+      // Cello Bow Vibrato
+      const vibLfo = ctx.createOscillator();
+      const vibGain = ctx.createGain();
+      vibLfo.type = 'sine';
+      vibLfo.frequency.setValueAtTime(4.2, now);
+      vibGain.gain.setValueAtTime(3.0, now);
+      vibLfo.connect(vibGain);
+      vibGain.connect(osc1.detune);
+      vibGain.connect(osc2.detune);
+      vibLfo.start(now);
+      oscillators.push(vibLfo);
+
+    } else {
+      // --- Strings Ensemble ---
+      const filterLP = ctx.createBiquadFilter();
+      filterLP.type = 'lowpass';
+      filterLP.frequency.setValueAtTime(3000, now);
+      filterLP.Q.setValueAtTime(0.8, now);
+      filterLP.connect(modGain);
+      filters.push(filterLP);
+
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(freq, now);
+      osc1.detune.setValueAtTime(-6, now);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(0.35, now);
+      osc1.connect(gain1);
+      gain1.connect(filterLP);
+      oscillators.push(osc1); gains.push(gain1);
+
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(freq, now);
+      osc2.detune.setValueAtTime(6, now);
+      const gain2 = ctx.createGain();
+      gain2.gain.setValueAtTime(0.35, now);
+      osc2.connect(gain2);
+      gain2.connect(filterLP);
+      oscillators.push(osc2); gains.push(gain2);
+
+      const osc3 = ctx.createOscillator();
+      osc3.type = 'triangle';
+      osc3.frequency.setValueAtTime(freq / 2, now);
+      const gain3 = ctx.createGain();
+      gain3.gain.setValueAtTime(0.3, now);
+      osc3.connect(gain3);
+      gain3.connect(filterLP);
+      oscillators.push(osc3); gains.push(gain3);
     }
-    
-    osc1.frequency.setValueAtTime(freq, ctx.currentTime);
-    osc2.frequency.setValueAtTime(freq, ctx.currentTime);
-    
-    osc1.connect(modGain);
-    osc2.connect(modGain);
-    osc3.connect(modGain);
-    const now = ctx.currentTime;
-    osc1.start(now);
-    osc2.start(now);
-    osc3.start(now);
+
+    oscillators.forEach(osc => {
+      try { osc.start(now); } catch (e) {}
+    });
 
     let lfo: OscillatorNode | undefined;
     let lfoGain: GainNode | undefined;
@@ -580,14 +891,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       lfo.type = 'sine';
       lfo.frequency.setValueAtTime(lfoFreq, now);
       lfoGain.gain.setValueAtTime(0, now);
-      lfoGain.gain.linearRampToValueAtTime(0.3, now + 0.3); 
+      lfoGain.gain.linearRampToValueAtTime(0.35, now + 0.2); 
       lfo.connect(lfoGain);
       lfoGain.connect(modGain.gain);
       lfo.start(now);
     }
 
     droneNodesRef.current.set(noteWithOctave, { 
-      osc1, osc2, lfo, lfoGain, gain: masterGain, modGain 
+      oscillators, gains, filters, lfo, lfoGain, masterGain, modGain, tone 
     });
 
     setActiveDrones(prev => ({
@@ -599,11 +910,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (isDronePlaying) {
       userDroneNotes.forEach(note => {
-        if (!droneNodesRef.current.has(note)) {
+        const existing = droneNodesRef.current.get(note);
+        if (!existing) {
+          startDroneAudio(note, droneTone, droneVolume, dronePulseBpm);
+        } else if (existing.tone !== droneTone) {
+          stopDroneAudio(note);
           startDroneAudio(note, droneTone, droneVolume, dronePulseBpm);
         }
       });
-      // Cleanup any nodes that are no longer in userDroneNotes
       const currentNodes = Array.from(droneNodesRef.current.keys());
       currentNodes.forEach(note => {
         if (!userDroneNotes.includes(note)) {
@@ -613,21 +927,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       stopAllDrones();
     }
-  }, [isDronePlaying, userDroneNotes, stopAllDrones]);
+  }, [isDronePlaying, userDroneNotes, droneTone, stopAllDrones]);
 
-  // Real-time parameter updates (Volume, Pulse, Tone)
+  // Real-time parameter updates (Volume, Pulse)
   useEffect(() => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
-    droneNodesRef.current.forEach((nodes, note) => {
+    droneNodesRef.current.forEach((nodes) => {
       // Update Volume
-      nodes.gain.gain.setTargetAtTime(droneVolume * 0.4, ctx.currentTime, 0.05);
+      nodes.masterGain.gain.setTargetAtTime(droneVolume * 0.35, ctx.currentTime, 0.05);
 
       // Update Pulse BPM (LFO)
       if (dronePulseBpm > 0) {
         if (!nodes.lfo || !nodes.lfoGain) {
-          // Create LFO if it doesn't exist
           const lfo = ctx.createOscillator();
           const lfoGain = ctx.createGain();
           lfo.type = 'sine';
@@ -640,11 +953,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           nodes.lfo = lfo;
           nodes.lfoGain = lfoGain;
         } else {
-          // Update existing LFO
           nodes.lfo.frequency.setTargetAtTime(dronePulseBpm / 60, ctx.currentTime, 0.05);
         }
       } else if (nodes.lfo && nodes.lfoGain) {
-        // Fade out and stop LFO
         const lfo = nodes.lfo;
         const lfoGain = nodes.lfoGain;
         lfoGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
@@ -658,41 +969,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         nodes.lfo = undefined;
         nodes.lfoGain = undefined;
       }
-
-      // Update Tone (Oscillator types and scaling)
-      const noteMatch = note.match(/^([A-G]#?)(\d)$/);
-      if (noteMatch) {
-        const [, name, octaveStr] = noteMatch;
-        const octave = parseInt(octaveStr);
-        const noteIndex = NOTES.indexOf(name);
-        const midiNote = (octave + 1) * 12 + noteIndex;
-        const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
-
-        switch (droneTone) {
-          case DroneTone.Strings:
-            nodes.osc1.type = 'sine'; nodes.osc2.type = 'triangle';
-            nodes.osc1.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
-            nodes.osc2.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
-            nodes.osc2.detune.setTargetAtTime(2, ctx.currentTime, 0.05);
-            nodes.osc1.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
-            break;
-          case DroneTone.Cello:
-            nodes.osc1.type = 'sawtooth'; nodes.osc2.type = 'sine';
-            nodes.osc1.frequency.setTargetAtTime(freq / 2, ctx.currentTime, 0.05);
-            nodes.osc2.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
-            nodes.osc1.detune.setTargetAtTime(1, ctx.currentTime, 0.05);
-            nodes.osc2.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
-            break;
-          default:
-            nodes.osc1.type = 'sine'; nodes.osc2.type = 'sine';
-            nodes.osc1.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
-            nodes.osc2.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
-            nodes.osc1.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
-            nodes.osc2.detune.setTargetAtTime(0, ctx.currentTime, 0.05);
-        }
-      }
     });
-  }, [droneVolume, dronePulseBpm, droneTone]);
+  }, [droneVolume, dronePulseBpm]);
 
   // --- Ref Note Logic ---
   const stopRefNote = useCallback(() => {
