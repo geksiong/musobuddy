@@ -6,7 +6,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Play, Pause, Plus, Minus, Trash2, RotateCcw, Volume2, VolumeX,
-  X, SlidersHorizontal, Music, ChevronUp, ChevronDown, Save, Edit2
+  X, SlidersHorizontal, Music, ChevronUp, ChevronDown, Save, Edit2,
+  Check, Flame, Layers, User, Search
 } from 'lucide-react';
 import { useMetronome } from '../../hooks/useMetronome.ts';
 import { useAudio } from '../../contexts/AudioContext.tsx';
@@ -151,6 +152,81 @@ export default function MetronomeView() {
     return TEMPO_NAMES.find(t => currentBpm >= t.min && currentBpm < t.max)?.name || 'Custom';
   };
 
+  const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false);
+  const [presetSearchQuery, setPresetSearchQuery] = useState('');
+  const [presetCategoryFilter, setPresetCategoryFilter] = useState<'all' | 'standard' | 'flamenco' | 'polyrhythm' | 'custom'>('all');
+
+  const standardPresets = DEFAULT_PRESETS.filter(p => p.type === TimeSignatureType.Standard);
+  const flamencoPresets = DEFAULT_PRESETS.filter(p => p.type === TimeSignatureType.Flamenco);
+  const polyrhythmPresets = DEFAULT_PRESETS.filter(p => p.type === TimeSignatureType.Polyrhythm);
+
+  const filterPresetList = (list: BeatPattern[]) => {
+    if (!presetSearchQuery.trim()) return list;
+    const q = presetSearchQuery.toLowerCase().trim();
+    return list.filter(p => p.name.toLowerCase().includes(q) || p.timeSignature.toLowerCase().includes(q));
+  };
+
+  const filteredStandard = filterPresetList(standardPresets);
+  const filteredFlamenco = filterPresetList(flamencoPresets);
+  const filteredPolyrhythms = filterPresetList(polyrhythmPresets);
+  const filteredUser = filterPresetList(userPresets);
+
+  const renderPresetItem = (preset: BeatPattern) => {
+    const isSelected = activePattern?.id === preset.id;
+    return (
+      <div
+        key={preset.id}
+        onClick={() => {
+          setActivePattern(JSON.parse(JSON.stringify(preset)));
+          setBpm(preset.bpm);
+          setIsPresetDialogOpen(false);
+        }}
+        className={cn(
+          "px-4 py-3 rounded-2xl transition-all text-left flex items-center justify-between group cursor-pointer relative overflow-hidden select-none border",
+          isSelected
+            ? resolvedTheme === 'dark'
+              ? "bg-[#FF4E00]/20 border-[#FF4E00]/50 text-white font-bold ring-1 ring-[#FF4E00]/40 shadow-lg shadow-[#FF4E00]/10"
+              : "bg-[#FF4E00]/10 border-[#FF4E00]/30 text-[#FF4E00] font-bold ring-1 ring-[#FF4E00]/20 shadow-sm"
+            : resolvedTheme === 'dark'
+              ? "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/15 text-white/80 hover:text-white"
+              : "bg-white border-black/5 hover:bg-slate-50 hover:border-black/10 text-slate-700 hover:text-slate-900 shadow-sm"
+        )}
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className={cn(
+            "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all",
+            isSelected 
+              ? "bg-[#FF4E00] text-white" 
+              : resolvedTheme === 'dark'
+                ? "bg-white/10 text-white/30 group-hover:text-white/60"
+                : "bg-slate-100 text-slate-400 group-hover:text-slate-600"
+          )}>
+            <Check className={cn("w-3 h-3 stroke-[3]", !isSelected && "opacity-0 group-hover:opacity-100")} />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-black uppercase italic tracking-tight truncate">
+              {preset.name}
+            </span>
+            <span className={cn("text-[9px] font-medium", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+              {preset.voices.length} {preset.voices.length === 1 ? 'layer' : 'layers'} &bull; {preset.bpm} BPM default
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 ml-3">
+          <span className={cn(
+            "text-[10px] font-mono px-2 py-0.5 rounded-lg border font-bold",
+            resolvedTheme === 'dark' 
+              ? "bg-white/10 border-white/10 text-white/80" 
+              : "bg-slate-100 border-black/5 text-slate-700"
+          )}>
+            {preset.timeSignature}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   const offset = activePattern?.displayOffset || 0;
   const displayBeat = (Math.floor((((rotation % 360) + 360) % 360) / (360 / masterLength) + 0.0001) + offset) % masterLength;
 
@@ -260,91 +336,372 @@ export default function MetronomeView() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
-          {[...DEFAULT_PRESETS, ...userPresets].map(preset => (
-            <div 
-              key={preset.id}
-              onClick={() => {
-                setActivePattern(JSON.parse(JSON.stringify(preset)));
-                setBpm(preset.bpm);
-              }}
-              className={cn(
-                "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2 group relative overflow-hidden cursor-pointer",
-                activePattern?.id === preset.id 
-                  ? resolvedTheme === 'dark'
-                    ? "bg-white/10 border-[#FF4E00]/50 shadow-[0_20px_40px_rgba(255,78,0,0.15)]" 
-                    : "bg-white border-[#FF4E00]/30 shadow-xl shadow-[#FF4E00]/10"
-                  : resolvedTheme === 'dark'
-                    ? "bg-white/5 border-white/5 hover:border-white/10" 
-                    : "bg-white border-black/5 hover:border-black/10 shadow-sm"
-              )}
-            >
-              {activePattern?.id === preset.id && (
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF4E00]/10 blur-3xl -mr-16 -mt-16 pointer-events-none" />
-              )}
-              <div className="flex items-center justify-between relative z-10">
-                {renamingId === preset.id ? (
-                  <input
-                    autoFocus
-                    className={cn(
-                      "border rounded px-2 py-1 text-sm font-black uppercase tracking-tight focus:outline-none focus:border-[#FF4E00] w-full mr-4 italic",
-                      resolvedTheme === 'dark' ? "bg-white/10 border-white/20 text-white" : "bg-slate-50 border-black/10 text-slate-900"
-                    )}
-                    defaultValue={preset.name}
-                    onBlur={(e) => handleSaveName(preset.id, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveName(preset.id, e.currentTarget.value);
-                      if (e.key === 'Escape') setRenamingId(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <span className={cn(
-                    "text-sm font-black uppercase tracking-tight transition-colors italic",
-                    activePattern?.id === preset.id 
-                      ? "text-[#FF4E00]" 
-                      : resolvedTheme === 'dark' ? "text-white group-hover:text-white/80" : "text-slate-900 group-hover:text-slate-700"
-                  )}>
-                    {preset.name}
-                  </span>
-                )}
-                <div className="flex items-center gap-2 relative z-20">
-                  <span className={cn("text-[9px] font-black uppercase tracking-widest", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>{preset.timeSignature}</span>
-                  {preset.isUserPreset && (
-                    <div className="flex items-center gap-2 relative z-50">
-                      <button 
-                        type="button"
-                        onClick={(e) => handleEditPresetName(preset.id, e)}
-                        className={cn(
-                          "p-2 rounded-xl transition-all",
-                          resolvedTheme === 'dark' ? "bg-white/10 text-white/50 hover:text-white hover:bg-white/20" : "bg-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-200"
-                        )}
-                        title="Rename Preset"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={(e) => handleDeletePreset(preset.id, e)}
-                        className="p-2 bg-red-500/10 text-red-500/50 hover:text-red-500 hover:bg-red-500/20 rounded-xl transition-all"
-                        title="Delete Preset"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
+        {/* Preset Selection & Edit Card */}
+        <div className="flex flex-col gap-2">
+          {/* Unified Preset Card with Top Browse, Rhythm Info, and Action Buttons */}
+          <div className={cn(
+            "w-full p-4 rounded-2xl border transition-all flex flex-col gap-3.5 relative overflow-hidden shadow-sm",
+            resolvedTheme === 'dark'
+              ? "bg-white/5 border-white/10"
+              : "bg-white border-black/10 shadow-sm"
+          )}>
+            {/* Top Bar: Category Label & Browse Button */}
+            <div className={cn(
+              "flex items-center justify-between gap-2 border-b pb-2.5",
+              resolvedTheme === 'dark' ? "border-white/5" : "border-slate-100"
+            )}>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "text-[9px] font-black uppercase tracking-[0.2em] italic",
+                  resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400"
+                )}>
+                  Preset
+                </span>
+                <span className={cn(
+                  "text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border italic",
+                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60" : "bg-slate-100 border-black/5 text-slate-600"
+                )}>
+                  {activePattern?.type === TimeSignatureType.Flamenco 
+                    ? 'Flamenco' 
+                    : activePattern?.type === TimeSignatureType.Polyrhythm 
+                    ? 'Polyrhythm' 
+                    : activePattern?.isUserPreset 
+                    ? 'Custom' 
+                    : 'Standard'}
+                </span>
               </div>
-              <div className="flex items-center gap-3">
-                <span className={cn("text-[10px] font-bold uppercase tracking-widest leading-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>{preset.bpm} BPM</span>
-                <div className={cn("w-1 h-1 rounded-full", resolvedTheme === 'dark' ? "bg-white/10" : "bg-slate-200")} />
-                <span className={cn("text-[10px] font-bold uppercase tracking-widest leading-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-                  {preset.voices.length} {preset.voices.length === 1 ? 'Layer' : 'Layers'}
-                  {preset.isUserPreset && <span className="ml-2 text-[8px] border border-white/10 px-1 rounded text-white/20">Custom</span>}
+
+              <button
+                type="button"
+                onClick={() => setIsPresetDialogOpen(true)}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider italic flex items-center gap-1.5 border transition-all shrink-0 cursor-pointer",
+                  resolvedTheme === 'dark'
+                    ? "bg-white/10 border-white/15 text-white hover:bg-[#FF4E00] hover:border-[#FF4E00]"
+                    : "bg-slate-100 border-black/10 text-slate-700 hover:bg-[#FF4E00] hover:text-white hover:border-[#FF4E00]"
+                )}
+                title="Browse All Presets"
+              >
+                <span>Browse Presets</span>
+                <SlidersHorizontal className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Current Rhythm Info */}
+            <div className="flex flex-col gap-1">
+              {activePattern && renamingId === activePattern.id ? (
+                <input
+                  autoFocus
+                  className={cn(
+                    "border rounded-xl px-2.5 py-1 text-sm font-black uppercase italic focus:outline-none focus:border-[#FF4E00] w-full",
+                    resolvedTheme === 'dark' ? "bg-white/10 border-white/20 text-white" : "bg-slate-50 border-black/10 text-slate-900"
+                  )}
+                  defaultValue={activePattern.name}
+                  onBlur={(e) => handleSaveName(activePattern.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveName(activePattern.id, e.currentTarget.value);
+                    if (e.key === 'Escape') setRenamingId(null);
+                  }}
+                />
+              ) : (
+                <h4 className={cn(
+                  "text-base font-black uppercase tracking-tight italic",
+                  resolvedTheme === 'dark' ? "text-white" : "text-slate-900"
+                )}>
+                  {activePattern?.name || 'Select Preset...'}
+                </h4>
+              )}
+
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className={cn(
+                  "text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border",
+                  resolvedTheme === 'dark' ? "bg-white/10 border-white/10 text-white/80" : "bg-slate-100 border-black/5 text-slate-700"
+                )}>
+                  {activePattern?.timeSignature}
+                </span>
+                <span className={cn("text-[10px] font-bold uppercase tracking-wider", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                  &bull; {activePattern?.bpm} BPM &bull; {activePattern?.voices.length} {activePattern?.voices.length === 1 ? 'layer' : 'layers'}
                 </span>
               </div>
             </div>
-          ))}
+
+            {/* Actions: Edit Pattern & Custom preset rename/delete controls */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowEditor(true)}
+                className="flex-1 py-2 px-3 rounded-xl bg-[#FF4E00]/10 text-[#FF4E00] hover:bg-[#FF4E00] hover:text-white font-black text-[10px] uppercase tracking-wider italic transition-all border border-[#FF4E00]/20 cursor-pointer flex items-center justify-center gap-1.5"
+                title="Edit Pattern Sounds & Layers"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Edit Pattern</span>
+              </button>
+
+              {activePattern?.isUserPreset && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => activePattern && handleEditPresetName(activePattern.id, e)}
+                    className={cn(
+                      "p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1 text-[10px] font-bold uppercase italic",
+                      resolvedTheme === 'dark' ? "bg-white/10 border-white/10 text-white/70 hover:text-white" : "bg-slate-100 border-black/5 text-slate-600 hover:text-slate-900"
+                    )}
+                    title="Rename Preset"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Rename</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => activePattern && handleDeletePreset(activePattern.id, e)}
+                    className="p-2 bg-red-500/10 text-red-500/70 hover:text-red-500 rounded-xl transition-all border border-red-500/10 cursor-pointer flex items-center gap-1 text-[10px] font-bold uppercase italic"
+                    title="Delete Preset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Modal Dialog Overlay */}
+          <AnimatePresence>
+            {isPresetDialogOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                {/* Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsPresetDialogOpen(false)}
+                  className="absolute inset-0 bg-black/75 backdrop-blur-md"
+                />
+
+                {/* Dialog Content Window */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 12 }}
+                  transition={{ type: "spring", duration: 0.25, bounce: 0.1 }}
+                  className={cn(
+                    "relative w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10",
+                    resolvedTheme === 'dark'
+                      ? "bg-[#141417] border-white/15 text-white shadow-black/80"
+                      : "bg-white border-black/10 text-slate-900 shadow-slate-900/25"
+                  )}
+                >
+                  {/* Dialog Header */}
+                  <div className={cn(
+                    "p-5 border-b flex items-center justify-between shrink-0",
+                    resolvedTheme === 'dark' ? "border-white/10 bg-white/[0.02]" : "border-slate-100 bg-slate-50/50"
+                  )}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-2xl bg-[#FF4E00]/15 text-[#FF4E00] flex items-center justify-center font-black">
+                        <Music className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black uppercase italic tracking-tight leading-none">
+                          Metronome Presets
+                        </h3>
+                        <p className={cn("text-[10px] font-bold tracking-wider uppercase mt-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                          Select Standard, Flamenco or Polyrhythms
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsPresetDialogOpen(false)}
+                      className={cn(
+                        "p-2 rounded-xl border transition-all",
+                        resolvedTheme === 'dark'
+                          ? "bg-white/5 border-white/10 hover:bg-white/15 text-white/60 hover:text-white"
+                          : "bg-slate-100 border-black/5 hover:bg-slate-200 text-slate-500 hover:text-slate-900"
+                      )}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Search Bar & Category Quick Filters */}
+                  <div className="p-4 border-b shrink-0 border-white/5 flex flex-col gap-3">
+                    <div className={cn(
+                      "flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border transition-all",
+                      resolvedTheme === 'dark' ? "bg-white/5 border-white/10 focus-within:border-[#FF4E00]" : "bg-slate-100 border-black/5 focus-within:border-[#FF4E00]"
+                    )}>
+                      <Search className="w-4 h-4 opacity-40 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Search presets by name or signature..."
+                        value={presetSearchQuery}
+                        onChange={(e) => setPresetSearchQuery(e.target.value)}
+                        className="bg-transparent text-xs font-semibold focus:outline-none w-full placeholder:text-slate-400"
+                        autoFocus
+                      />
+                      {presetSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setPresetSearchQuery('')}
+                          className="p-1 rounded-full text-xs opacity-50 hover:opacity-100 hover:bg-white/10"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick Filter Buttons */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      {[
+                        { id: 'all', label: 'All', icon: SlidersHorizontal, count: DEFAULT_PRESETS.length + userPresets.length },
+                        { id: 'standard', label: 'Standard', icon: Music, count: standardPresets.length },
+                        { id: 'flamenco', label: 'Flamenco', icon: Flame, count: flamencoPresets.length },
+                        { id: 'polyrhythm', label: 'Polyrhythms', icon: Layers, count: polyrhythmPresets.length },
+                        { id: 'custom', label: 'Custom', icon: User, count: userPresets.length },
+                      ].map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = presetCategoryFilter === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setPresetCategoryFilter(tab.id as any)}
+                            className={cn(
+                              "px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider italic flex items-center gap-1.5 transition-all cursor-pointer border select-none",
+                              isActive
+                                ? "bg-[#FF4E00] border-[#FF4E00] text-white shadow-sm"
+                                : resolvedTheme === 'dark'
+                                  ? "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+                                  : "bg-slate-100 border-black/5 text-slate-600 hover:text-slate-900 hover:bg-slate-200"
+                            )}
+                          >
+                            <Icon className="w-3 h-3" />
+                            <span>{tab.label}</span>
+                            <span className={cn(
+                              "px-1.5 py-0.2 text-[8px] font-mono rounded font-bold ml-0.5",
+                              isActive 
+                                ? "bg-black/25 text-white" 
+                                : resolvedTheme === 'dark' ? "bg-white/10 text-white/50" : "bg-black/5 text-slate-500"
+                            )}>
+                              {tab.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Dialog Scrollable List */}
+                  <div className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-5 flex-1 min-h-0">
+                    {/* Section 1: Standard */}
+                    {(presetCategoryFilter === 'all' || presetCategoryFilter === 'standard') && filteredStandard.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className={cn(
+                          "px-2 pb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] italic border-b",
+                          resolvedTheme === 'dark' ? "text-[#FF4E00] border-white/10" : "text-[#FF4E00] border-slate-200"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            <Music className="w-3.5 h-3.5" />
+                            <span>Standard Rhythms</span>
+                          </div>
+                          <span className="opacity-50 font-mono text-[9px]">{filteredStandard.length}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {filteredStandard.map(preset => renderPresetItem(preset))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 2: Flamenco */}
+                    {(presetCategoryFilter === 'all' || presetCategoryFilter === 'flamenco') && filteredFlamenco.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className={cn(
+                          "px-2 pb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] italic border-b",
+                          resolvedTheme === 'dark' ? "text-amber-400 border-white/10" : "text-amber-600 border-slate-200"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            <Flame className="w-3.5 h-3.5" />
+                            <span>Flamenco Compás</span>
+                          </div>
+                          <span className="opacity-50 font-mono text-[9px]">{filteredFlamenco.length}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {filteredFlamenco.map(preset => renderPresetItem(preset))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 3: Polyrhythms */}
+                    {(presetCategoryFilter === 'all' || presetCategoryFilter === 'polyrhythm') && filteredPolyrhythms.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className={cn(
+                          "px-2 pb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] italic border-b",
+                          resolvedTheme === 'dark' ? "text-purple-400 border-white/10" : "text-purple-600 border-slate-200"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>Polyrhythms</span>
+                          </div>
+                          <span className="opacity-50 font-mono text-[9px]">{filteredPolyrhythms.length}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {filteredPolyrhythms.map(preset => renderPresetItem(preset))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 4: My Presets */}
+                    {(presetCategoryFilter === 'all' || presetCategoryFilter === 'custom') && filteredUser.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className={cn(
+                          "px-2 pb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] italic border-b",
+                          resolvedTheme === 'dark' ? "text-emerald-400 border-white/10" : "text-emerald-600 border-slate-200"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            <User className="w-3.5 h-3.5" />
+                            <span>My Custom Presets</span>
+                          </div>
+                          <span className="opacity-50 font-mono text-[9px]">{filteredUser.length}</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {filteredUser.map(preset => renderPresetItem(preset))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty state when no presets match */}
+                    {!((presetCategoryFilter === 'all' || presetCategoryFilter === 'standard') && filteredStandard.length > 0) &&
+                     !((presetCategoryFilter === 'all' || presetCategoryFilter === 'flamenco') && filteredFlamenco.length > 0) &&
+                     !((presetCategoryFilter === 'all' || presetCategoryFilter === 'polyrhythm') && filteredPolyrhythms.length > 0) &&
+                     !((presetCategoryFilter === 'all' || presetCategoryFilter === 'custom') && filteredUser.length > 0) && (
+                      <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
+                        <Search className="w-8 h-8 opacity-20" />
+                        <span className="text-sm font-bold opacity-60">No presets found</span>
+                        <span className="text-xs opacity-40">Try adjusting your search query or quick filter category</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dialog Footer */}
+                  <div className={cn(
+                    "p-4 border-t flex items-center justify-between shrink-0",
+                    resolvedTheme === 'dark' ? "border-white/10 bg-white/[0.02]" : "border-slate-100 bg-slate-50/50"
+                  )}>
+                    <span className={cn("text-[10px] font-bold uppercase tracking-wider", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                      {DEFAULT_PRESETS.length + userPresets.length} Total Presets
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsPresetDialogOpen(false)}
+                      className="px-5 py-2 rounded-xl bg-[#FF4E00] text-white font-black text-xs uppercase tracking-wider italic hover:bg-[#FF4E00]/90 transition-all shadow-md shadow-[#FF4E00]/20"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
