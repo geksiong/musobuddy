@@ -36,6 +36,7 @@ import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
 import ScoreAudioPlayer from '../Score/ScoreAudioPlayer.tsx';
 import { ScoreFormat } from '../Score/types.ts';
 import { DroneTone } from '../Drone/types.ts';
+import { DRONE_TONES } from '../Drone/constants.ts';
 
 interface PracticeToolsPanelProps {
   onNavigate?: (view: 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment') => void;
@@ -80,7 +81,7 @@ export default function PracticeToolsPanel({ onNavigate, fileInputRef }: Practic
     setAccompanimentVolume
   } = useAccompaniment();
 
-  const [droneOctave, setDroneOctave] = useState<'3' | '4'>('4');
+  const [droneOctave, setDroneOctave] = useState<'2' | '3' | '4'>('4');
 
   // Collapsible state persisted in localStorage
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -426,8 +427,15 @@ export default function PracticeToolsPanel({ onNavigate, fileInputRef }: Practic
                           resolvedTheme === 'dark' ? "border-white/10 bg-black/20 text-white" : "border-slate-300 bg-white text-slate-900"
                         )}
                       >
-                        <option value={DroneTone.Strings} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Strings</option>
-                        <option value={DroneTone.Cello} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Cello</option>
+                        {DRONE_TONES.map(tone => (
+                          <option 
+                            key={tone} 
+                            value={tone} 
+                            className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}
+                          >
+                            {tone.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                          </option>
+                        ))}
                       </select>
                       <button
                         onClick={() => onNavigate?.('drone')}
@@ -484,11 +492,22 @@ export default function PracticeToolsPanel({ onNavigate, fileInputRef }: Practic
                       </span>
                       <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 p-0.5 rounded-md">
                         <button
+                          onClick={() => setDroneOctave('2')}
+                          className={cn(
+                            "px-1.5 py-0.5 text-[8px] font-bold rounded transition-all",
+                            droneOctave === '2' ? "bg-purple-500 text-white" : "text-slate-400 hover:text-slate-200"
+                          )}
+                          title="Bass Octave (2)"
+                        >
+                          Oct 2
+                        </button>
+                        <button
                           onClick={() => setDroneOctave('3')}
                           className={cn(
                             "px-1.5 py-0.5 text-[8px] font-bold rounded transition-all",
                             droneOctave === '3' ? "bg-purple-500 text-white" : "text-slate-400 hover:text-slate-200"
                           )}
+                          title="Low Octave (3)"
                         >
                           Oct 3
                         </button>
@@ -498,6 +517,7 @@ export default function PracticeToolsPanel({ onNavigate, fileInputRef }: Practic
                             "px-1.5 py-0.5 text-[8px] font-bold rounded transition-all",
                             droneOctave === '4' ? "bg-purple-500 text-white" : "text-slate-400 hover:text-slate-200"
                           )}
+                          title="Standard Octave (4)"
                         >
                           Oct 4
                         </button>
