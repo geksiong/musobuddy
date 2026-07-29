@@ -39,7 +39,7 @@ export default function MetronomeView() {
 
   const masterVoice = activePattern?.voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
-  const is12Beat = masterLength === 12 || activePattern?.type === TimeSignatureType.Flamenco || activePattern?.timeSignature === '12-Beat';
+  const is12Beat = masterLength === 12 || activePattern?.timeSignature === '12-Beat';
   const startBeat = activePattern?.startBeat || 1;
 
   const lastBeatTimeRef = useRef<number>(performance.now());
@@ -56,7 +56,7 @@ export default function MetronomeView() {
 
   useEffect(() => {
     const startBeat = activePattern?.startBeat || 1;
-    const is12Beat = masterLength === 12 || activePattern?.type === TimeSignatureType.Flamenco || activePattern?.timeSignature === '12-Beat';
+    const is12Beat = masterLength === 12 || activePattern?.timeSignature === '12-Beat';
 
     const baseStartAngle = is12Beat
       ? ((startBeat % 12) / 12) * 360
@@ -1502,7 +1502,7 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
   const masterBaseBeats = (masterVoice?.isDoubleTime ? masterLength / 2 : masterLength) || 4;
   const radius = 135;
 
-  const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
+  const is12Beat = masterBaseBeats === 12 || pattern?.timeSignature === '12-Beat';
   const voiceColors = VOICE_COLORS;
 
   const normRot = ((rotation % 360) + 360) % 360;
@@ -1680,7 +1680,7 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
   const masterBaseBeats = (masterVoice?.isDoubleTime ? masterLength / 2 : masterLength) || 4;
 
-  const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
+  const is12Beat = masterBaseBeats === 12 || pattern?.timeSignature === '12-Beat';
   const voiceColors = VOICE_COLORS;
 
   const normRot = ((rotation % 360) + 360) % 360;
@@ -1834,7 +1834,7 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
   const masterSubdivision = masterVoice?.isTripleTime ? 3 : (masterVoice?.isDoubleTime || masterVoice?.isSwing ? 2 : 1);
   const masterBaseBeats = Math.max(1, Math.round(masterLength / masterSubdivision));
-  const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
+  const is12Beat = masterBaseBeats === 12 || pattern?.timeSignature === '12-Beat';
   const startBeat = pattern?.startBeat || 1;
   const swingRatio = pattern?.swingRatio ?? (2 / 3);
 
