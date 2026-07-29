@@ -5,7 +5,16 @@
 
 import { NOTES } from '../constants.ts';
 
-export type InstrumentName = 'guitar' | 'ukulele' | 'mandolin';
+export type InstrumentName = 
+  | 'guitar' 
+  | 'bass' 
+  | 'bass5' 
+  | 'ukulele' 
+  | 'mandolin' 
+  | 'banjo' 
+  | 'bouzouki' 
+  | 'cavaquinho' 
+  | 'charango';
 
 export interface TuningInfo {
   name: string;
@@ -73,6 +82,83 @@ export const INSTRUMENT_CONFIGS: Record<InstrumentName, InstrumentConfig> = {
         midi: [38, 43, 50, 55, 59, 62],
         notes: ['D2', 'G2', 'D3', 'G3', 'B3', 'D4'],
       },
+      openC: {
+        name: 'Open C (C G C G C E)',
+        midi: [36, 43, 50, 55, 60, 64],
+        notes: ['C2', 'G2', 'C3', 'G3', 'C4', 'E4'],
+      },
+      ebStandard: {
+        name: 'Eb Standard (Eb Ab Db Gb Bb Eb)',
+        midi: [39, 44, 49, 54, 58, 63],
+        notes: ['Eb2', 'Ab2', 'Db3', 'Gb3', 'Bb3', 'Eb4'],
+      },
+      dStandard: {
+        name: 'D Standard (D G C F A D)',
+        midi: [38, 43, 48, 53, 57, 62],
+        notes: ['D2', 'G2', 'C3', 'F3', 'A3', 'D4'],
+      },
+      openE: {
+        name: 'Open E (E B E G# B E)',
+        midi: [40, 47, 52, 56, 59, 64],
+        notes: ['E2', 'B2', 'E3', 'G#3', 'B3', 'E4'],
+      },
+      dropC: {
+        name: 'Drop C (C G C F A D)',
+        midi: [36, 43, 48, 53, 57, 62],
+        notes: ['C2', 'G2', 'C3', 'F3', 'A3', 'D4'],
+      },
+    },
+  },
+  bass: {
+    name: 'bass',
+    displayName: 'Bass (4-String)',
+    strings: 4,
+    fretsOnChord: 4,
+    maxFrets: 18,
+    maxSpan: 4,
+    defaultTuning: 'standard',
+    tunings: {
+      standard: {
+        name: 'Standard (E A D G)',
+        midi: [28, 33, 38, 43],
+        notes: ['E1', 'A1', 'D2', 'G2'],
+      },
+      dropD: {
+        name: 'Drop D (D A D G)',
+        midi: [26, 33, 38, 43],
+        notes: ['D1', 'A1', 'D2', 'G2'],
+      },
+      dStandard: {
+        name: 'D Standard (D G C F)',
+        midi: [26, 31, 36, 41],
+        notes: ['D1', 'G1', 'C2', 'F2'],
+      },
+      halfStepDown: {
+        name: 'Eb Standard (Eb Ab Db Gb)',
+        midi: [27, 32, 37, 42],
+        notes: ['Eb1', 'Ab1', 'Db2', 'Gb2'],
+      },
+    },
+  },
+  bass5: {
+    name: 'bass5',
+    displayName: 'Bass (5-String)',
+    strings: 5,
+    fretsOnChord: 4,
+    maxFrets: 18,
+    maxSpan: 4,
+    defaultTuning: 'standard',
+    tunings: {
+      standard: {
+        name: 'Standard (B E A D G)',
+        midi: [23, 28, 33, 38, 43],
+        notes: ['B0', 'E1', 'A1', 'D2', 'G2'],
+      },
+      highC: {
+        name: 'Tenor / High C (E A D G C)',
+        midi: [28, 33, 38, 43, 48],
+        notes: ['E1', 'A1', 'D2', 'G2', 'C3'],
+      },
     },
   },
   ukulele: {
@@ -94,6 +180,21 @@ export const INSTRUMENT_CONFIGS: Record<InstrumentName, InstrumentConfig> = {
         midi: [55, 60, 64, 69],
         notes: ['G3', 'C4', 'E4', 'A4'],
       },
+      baritone: {
+        name: 'Baritone (D G B E)',
+        midi: [50, 55, 59, 64],
+        notes: ['D3', 'G3', 'B3', 'E4'],
+      },
+      tenorD: {
+        name: 'Tenor D-Tuning (A D F# B)',
+        midi: [69, 62, 66, 71],
+        notes: ['A4', 'D4', 'F#4', 'B4'],
+      },
+      slackKey: {
+        name: 'Slack Key Open G (G C E G)',
+        midi: [55, 60, 64, 67],
+        notes: ['G3', 'C4', 'E4', 'G4'],
+      },
     },
   },
   mandolin: {
@@ -109,6 +210,120 @@ export const INSTRUMENT_CONFIGS: Record<InstrumentName, InstrumentConfig> = {
         name: 'Standard (G D A E)',
         midi: [55, 62, 69, 76],
         notes: ['G3', 'D4', 'A4', 'E5'],
+      },
+      sawmill: {
+        name: 'Sawmill GDGD (G D G D)',
+        midi: [55, 62, 67, 74],
+        notes: ['G3', 'D4', 'G4', 'D5'],
+      },
+      openG: {
+        name: 'Open G (G D G B)',
+        midi: [55, 62, 67, 71],
+        notes: ['G3', 'D4', 'G4', 'B4'],
+      },
+      mandola: {
+        name: 'Mandola CGDA (C G D A)',
+        midi: [48, 55, 62, 69],
+        notes: ['C3', 'G3', 'D4', 'A4'],
+      },
+    },
+  },
+  banjo: {
+    name: 'banjo',
+    displayName: '5-String Banjo',
+    strings: 5,
+    fretsOnChord: 5,
+    maxFrets: 18,
+    maxSpan: 5,
+    defaultTuning: 'openG',
+    tunings: {
+      openG: {
+        name: 'Open G (g D G B D)',
+        midi: [67, 50, 55, 59, 62],
+        notes: ['G4', 'D3', 'G3', 'B3', 'D4'],
+      },
+      cTuning: {
+        name: 'Drop C (g C G B D)',
+        midi: [67, 48, 55, 59, 62],
+        notes: ['G4', 'C3', 'G3', 'B3', 'D4'],
+      },
+      doubleC: {
+        name: 'Double C (g C G C D)',
+        midi: [67, 48, 55, 60, 62],
+        notes: ['G4', 'C3', 'G3', 'C4', 'D4'],
+      },
+      sawmill: {
+        name: 'Sawmill / Mountain (g D G C D)',
+        midi: [67, 50, 55, 60, 62],
+        notes: ['G4', 'D3', 'G3', 'C4', 'D4'],
+      },
+      openD: {
+        name: 'Open D (f# D F# A D)',
+        midi: [66, 50, 54, 57, 62],
+        notes: ['F#4', 'D3', 'F#3', 'A3', 'D4'],
+      },
+    },
+  },
+  bouzouki: {
+    name: 'bouzouki',
+    displayName: 'Irish Bouzouki',
+    strings: 4,
+    fretsOnChord: 5,
+    maxFrets: 18,
+    maxSpan: 5,
+    defaultTuning: 'gdad',
+    tunings: {
+      gdad: {
+        name: 'Irish GDAD (G D A D)',
+        midi: [43, 50, 57, 62],
+        notes: ['G2', 'D3', 'A3', 'D4'],
+      },
+      gdae: {
+        name: 'Octave Mandolin GDAE (G D A E)',
+        midi: [43, 50, 57, 64],
+        notes: ['G2', 'D3', 'A3', 'E4'],
+      },
+      cfad: {
+        name: 'Greek CFAD (C F A D)',
+        midi: [48, 53, 57, 62],
+        notes: ['C3', 'F3', 'A3', 'D4'],
+      },
+    },
+  },
+  cavaquinho: {
+    name: 'cavaquinho',
+    displayName: 'Cavaquinho',
+    strings: 4,
+    fretsOnChord: 5,
+    maxFrets: 15,
+    maxSpan: 5,
+    defaultTuning: 'standard',
+    tunings: {
+      standard: {
+        name: 'Standard Brazilian (D G B D)',
+        midi: [62, 67, 71, 74],
+        notes: ['D4', 'G4', 'B4', 'D5'],
+      },
+      portuguese: {
+        name: 'Portuguese (D A B E)',
+        midi: [62, 69, 71, 76],
+        notes: ['D4', 'A4', 'B4', 'E5'],
+      },
+    },
+  },
+  charango: {
+    name: 'charango',
+    displayName: 'Charango',
+    strings: 5,
+    fretsOnChord: 5,
+    maxFrets: 15,
+    maxSpan: 5,
+    defaultTuning: 'standard',
+    tunings: {
+      standard: {
+        name: 'Standard (G C E A E)',
+        midi: [67, 72, 64, 69, 64],
+        notes: ['G4', 'C5', 'E4', 'A4', 'E4'],
       },
     },
   },
@@ -395,11 +610,11 @@ export function generateChordVoicings(
 
   // Convert to final GeneratedPosition format
   const result: GeneratedPosition[] = topCandidates.map(c => {
-    const fingers = computeFingers(c.frets, c.barres);
+    const fingering = computeFingersAndBarres(c.frets, numStrings);
     const { noteNames, pitchClasses, inversionLabel, tags, fretSpan } = computeVoicingMetadata(
       c.frets,
       c.baseFret,
-      c.barres,
+      fingering.barres,
       tuning,
       parsed
     );
@@ -412,9 +627,9 @@ export function generateChordVoicings(
 
     return {
       frets: c.frets,
-      fingers,
+      fingers: fingering.fingers,
       baseFret: displayBaseFret,
-      barres: c.barres,
+      barres: fingering.barres,
       score: c.score,
       noteNames,
       pitchClasses,
@@ -428,6 +643,155 @@ export function generateChordVoicings(
   return result;
 }
 
+export interface FingeringResult {
+  fingers: number[];
+  barres: number[];
+  isPractical: boolean;
+  penalty: number;
+}
+
+/**
+ * Assign ergonomic fingerings (1=index, 2=middle, 3=ring, 4=pinky) and detect valid barres.
+ */
+export function computeFingersAndBarres(frets: number[], numStrings: number): FingeringResult {
+  const fingers = new Array(frets.length).fill(0);
+  const barres: number[] = [];
+  let isPractical = true;
+  let penalty = 0;
+
+  const fretted = frets
+    .map((f, i) => ({ fret: f, stringIndex: i }))
+    .filter(item => item.fret > 0);
+
+  if (fretted.length === 0) {
+    return { fingers, barres, isPractical: true, penalty: 0 };
+  }
+
+  const minFret = Math.min(...fretted.map(item => item.fret));
+  const maxFret = Math.max(...fretted.map(item => item.fret));
+  const span = maxFret - minFret;
+
+  // 1. Barre Detection
+  const stringsAtMinFret = fretted.filter(item => item.fret === minFret).map(item => item.stringIndex);
+  let isBarre = false;
+
+  if (stringsAtMinFret.length >= 2 && !frets.includes(0)) {
+    const minString = Math.min(...stringsAtMinFret);
+    const maxString = Math.max(...stringsAtMinFret);
+
+    // Check if all intermediate strings between minString and maxString are valid under a barre
+    let barreValid = true;
+    for (let s = minString; s <= maxString; s++) {
+      if (frets[s] === 0 || (frets[s] > 0 && frets[s] < minFret)) {
+        barreValid = false;
+        break;
+      }
+    }
+
+    if (barreValid) {
+      isBarre = true;
+      barres.push(minFret);
+      for (let s = minString; s <= maxString; s++) {
+        if (frets[s] === minFret) {
+          fingers[s] = 1;
+        }
+      }
+    }
+  }
+
+  // 2. Process remaining fretted strings
+  const remaining = fretted.filter(item => fingers[item.stringIndex] === 0);
+
+  // Group remaining strings by fret ascending
+  const fretMap = new Map<number, number[]>();
+  for (const item of remaining) {
+    if (!fretMap.has(item.fret)) fretMap.set(item.fret, []);
+    fretMap.get(item.fret)!.push(item.stringIndex);
+  }
+
+  const sortedFrets = Array.from(fretMap.keys()).sort((a, b) => a - b);
+  let lastAssignedFinger = isBarre ? 1 : 0;
+
+  for (let idx = 0; idx < sortedFrets.length; idx++) {
+    const f = sortedFrets[idx];
+    const stringsOnFret = fretMap.get(f)!;
+    // Sort strings by index
+    stringsOnFret.sort((a, b) => a - b);
+
+    // Remaining distinct frets to process including this one
+    const remainingDistinctFrets = sortedFrets.length - idx;
+
+    // Calculate ideal finger based on fret distance, bounded by remaining available fingers
+    const fretOffset = f - minFret;
+    const maxAllowedFingerForThisFret = Math.max(1, 4 - (remainingDistinctFrets - 1));
+    
+    let baseFingerForFret = lastAssignedFinger + 1;
+    if (1 + fretOffset > baseFingerForFret && 1 + fretOffset <= maxAllowedFingerForThisFret) {
+      baseFingerForFret = 1 + fretOffset;
+    }
+
+    baseFingerForFret = Math.min(4, Math.max(1, baseFingerForFret));
+
+    // Assign fingers to each string on this fret
+    for (let i = 0; i < stringsOnFret.length; i++) {
+      const sIndex = stringsOnFret[i];
+      let assignedFinger = baseFingerForFret + i;
+
+      if (assignedFinger > 4) {
+        isPractical = false;
+        penalty += 150;
+        assignedFinger = 4;
+      }
+
+      fingers[sIndex] = assignedFinger;
+      lastAssignedFinger = Math.max(lastAssignedFinger, assignedFinger);
+    }
+  }
+
+  // 3. Ergonomic & Physical Feasibility Checks
+  if (numStrings <= 4) {
+    if (span > 6) {
+      isPractical = false;
+      penalty += 200;
+    }
+  } else {
+    if (span > 4) {
+      isPractical = false;
+      penalty += 200;
+    }
+  }
+
+  // Check for impossible same-finger usage on non-contiguous strings without a valid barre
+  const fingerToStringsMap = new Map<number, number[]>();
+  for (let i = 0; i < fingers.length; i++) {
+    const fing = fingers[i];
+    if (fing > 0 && frets[i] > 0) {
+      if (!fingerToStringsMap.has(fing)) fingerToStringsMap.set(fing, []);
+      fingerToStringsMap.get(fing)!.push(i);
+    }
+  }
+
+  for (const [fing, strIndices] of fingerToStringsMap.entries()) {
+    if (strIndices.length > 1) {
+      strIndices.sort((a, b) => a - b);
+      const minS = strIndices[0];
+      const maxS = strIndices[strIndices.length - 1];
+
+      if (!(fing === 1 && isBarre)) {
+        for (let s = minS; s <= maxS; s++) {
+          if (frets[s] === 0 || (frets[s] > 0 && frets[s] !== frets[minS])) {
+            isPractical = false;
+            penalty += 250; // Heavily penalize impossible same-finger non-adjacent pressing
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return { fingers, barres, isPractical, penalty };
+}
+
 /**
  * Score a voicing candidate based on musical correctness, pitch coverage, and physical playability
  */
@@ -439,6 +803,12 @@ function scoreVoicing(
   numStrings: number
 ): { score: number; barres: number[] } {
   let score = 100;
+
+  const fingering = computeFingersAndBarres(frets, numStrings);
+  score -= fingering.penalty;
+  if (!fingering.isPractical) {
+    score -= 300; // Filter out impractical voicings
+  }
 
   const fretted = frets.filter(f => f > 0);
   const soundingIndices = frets.map((f, i) => (f >= 0 ? i : -1)).filter(i => i >= 0);
@@ -469,29 +839,27 @@ function scoreVoicing(
     const maxFret = Math.max(...fretted);
     const span = maxFret - minFret;
     if (numStrings <= 4) {
-      // Mandolin/Ukulele frets are closer together; scale span reach penalty gently
       score += Math.max(-20, (4 - span) * 10);
     } else {
-      score += (4 - span) * 20; // Prefer smaller fret reach for guitar
+      score += (4 - span) * 20;
     }
 
-    // Position height: prefer lower fretboard positions for ease
     score += Math.max(0, (12 - minFret) * 4);
   }
 
   // 4. Closed 4-string chop chord / movable shape bonus
   if (numStrings <= 4 && frets.length === 4 && frets.every(f => f > 0)) {
-    score += 60; // High bonus for 4-string closed chop chords
+    score += 60;
   }
 
   // 5. Open strings bonus
   const openCount = frets.filter(f => f === 0).length;
   score += openCount * 25;
 
-  // 5. Sounding string count
+  // 6. Sounding string count
   score += soundingIndices.length * 15;
 
-  // 6. Muted string penalty
+  // 7. Muted string penalty
   const mutedCount = frets.filter(f => f === -1).length;
   score -= mutedCount * 15;
 
@@ -500,66 +868,11 @@ function scoreVoicing(
     if (frets[i] === -1) score -= 35;
   }
 
-  // 7. Barre detection & bonus
-  const barres: number[] = [];
-  if (fretted.length >= 2) {
-    const minFret = Math.min(...fretted);
-    const stringsAtMinFret = frets.map((f, i) => (f === minFret ? i : -1)).filter(i => i >= 0);
-
-    if (stringsAtMinFret.length >= 2) {
-      // Check if no string has a lower fret than minFret
-      const lowestFretInVoicing = Math.min(...frets.filter(f => f > 0));
-      if (lowestFretInVoicing === minFret && !frets.includes(0)) {
-        barres.push(minFret);
-        score += 35; // Clean barre chord bonus
-      }
-    }
+  if (fingering.barres.length > 0) {
+    score += 35; // Clean barre chord bonus
   }
 
-  return { score, barres };
-}
-
-/**
- * Assign ergonomic fingerings (1=index, 2=middle, 3=ring, 4=pinky)
- */
-function computeFingers(frets: number[], barres: number[]): number[] {
-  const fingers = new Array(frets.length).fill(0);
-  const fretted = frets.map((f, i) => ({ fret: f, stringIndex: i })).filter(item => item.fret > 0);
-
-  if (fretted.length === 0) return fingers;
-
-  const minFret = Math.min(...fretted.map(item => item.fret));
-
-  // If a barre exists at minFret, Finger 1 takes all strings at minFret
-  let currentFinger = 1;
-  const isBarreAtMin = barres.includes(minFret);
-
-  if (isBarreAtMin) {
-    fretted.forEach(item => {
-      if (item.fret === minFret) {
-        fingers[item.stringIndex] = 1;
-      }
-    });
-    currentFinger = 2;
-  }
-
-  // Group remaining fretted strings by fret ascending
-  const remaining = fretted.filter(item => fingers[item.stringIndex] === 0);
-  remaining.sort((a, b) => a.fret - b.fret || a.stringIndex - b.stringIndex);
-
-  let lastFret = -1;
-  for (const item of remaining) {
-    if (lastFret !== -1 && item.fret > lastFret) {
-      currentFinger = Math.min(4, currentFinger + 1);
-    }
-    fingers[item.stringIndex] = currentFinger;
-    lastFret = item.fret;
-    if (!isBarreAtMin && currentFinger < 4) {
-      currentFinger++;
-    }
-  }
-
-  return fingers;
+  return { score, barres: fingering.barres };
 }
 
 /**

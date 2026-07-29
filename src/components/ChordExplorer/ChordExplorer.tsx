@@ -694,9 +694,9 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
     const target = voicing || currentVoicing;
     if (!target) return;
 
-    const audioInstrument = instrument === 'ukulele' || instrument === 'mandolin' || instrument === 'guitar'
-      ? InstrumentType.Guitar 
-      : InstrumentType.Piano;
+    const audioInstrument = (instrument === 'bass' || instrument === 'bass5')
+      ? InstrumentType.Bass 
+      : InstrumentType.Guitar;
 
     let delay = 0;
     target.frets.forEach((fret, stringIdx) => {
@@ -729,33 +729,44 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
     <div className="flex flex-col gap-5 w-full h-full p-4 md:p-6 overflow-y-auto">
       {/* Header & Controls */}
       <div className="flex flex-col gap-4">
-        {/* Instrument & Engine Selector Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Instrument Selector */}
+        {/* Row 1: Instrument Selector */}
+        <div className="flex flex-col gap-1.5 w-full">
+          <div className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+            Instrument
+          </div>
           <div className={cn(
-            "flex p-1 rounded-xl border gap-1 transition-colors",
+            "flex p-1.5 rounded-xl border gap-1.5 transition-colors overflow-x-auto w-full no-scrollbar",
             resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
           )}>
-            {(['guitar', 'ukulele', 'mandolin'] as InstrumentName[]).map(inst => (
-              <button
-                key={inst}
-                onClick={() => { 
-                  setInstrument(inst); 
-                  setTuningKey('standard');
-                  setPositionIndex(0); 
-                }}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all",
-                  instrument === inst 
-                    ? "bg-emerald-500 text-white shadow-lg" 
-                    : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white/60" : "text-slate-400 hover:text-slate-900")
-                )}
-              >
-                {inst}
-              </button>
-            ))}
+            {(Object.keys(INSTRUMENT_CONFIGS) as InstrumentName[]).map(instKey => {
+              const config = INSTRUMENT_CONFIGS[instKey];
+              return (
+                <button
+                  key={instKey}
+                  onClick={() => { 
+                    setInstrument(instKey); 
+                    setTuningKey(config.defaultTuning || 'standard');
+                    setPositionIndex(0); 
+                  }}
+                  className={cn(
+                    "px-3.5 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
+                    instrument === instKey 
+                      ? "bg-emerald-500 text-white shadow-lg" 
+                      : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white/70" : "text-slate-500 hover:text-slate-900")
+                  )}
+                >
+                  {config.displayName}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
+        {/* Row 2: Engine Mode & Quick Settings */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+            Chord Search Parameters
+          </div>
           {/* Engine Mode Pills */}
           <div className={cn(
             "flex p-1 rounded-xl border gap-1 transition-colors items-center",
