@@ -40,6 +40,7 @@ export default function MetronomeView() {
   const masterVoice = activePattern?.voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
   const is12Beat = masterLength === 12 || activePattern?.type === TimeSignatureType.Flamenco || activePattern?.timeSignature === '12-Beat';
+  const startBeat = activePattern?.startBeat || 1;
 
   const lastBeatTimeRef = useRef<number>(performance.now());
   const prevBeatRef = useRef<number>(currentBeat);
@@ -57,8 +58,8 @@ export default function MetronomeView() {
     const startBeat = activePattern?.startBeat || 1;
     const is12Beat = masterLength === 12 || activePattern?.type === TimeSignatureType.Flamenco || activePattern?.timeSignature === '12-Beat';
 
-    const baseStartAngle = (is12Beat && masterLength === 12)
-      ? (startBeat / 12) * 360
+    const baseStartAngle = is12Beat
+      ? ((startBeat % 12) / 12) * 360
       : ((startBeat - 1) / masterLength) * 360;
 
     if (!isRhythmActive) {
@@ -1375,12 +1376,14 @@ export default function MetronomeView() {
                               <div key={beatIdx} className="flex items-center gap-1 w-full h-full">
                                 {subBeats.map((val, subIdx) => {
                                   const i = beatIdx * vSub + subIdx;
-                                  const voiceBeatIdx = Math.floor((((rotation % 360) + 360) % 360) / (360 / length) + 0.0001) % length;
+                                  const baseStartAngle = is12Beat ? ((startBeat % 12) / 12) * 360 : 0;
+                                  const elapsedAngle = (((((rotation % 360) + 360) % 360) - baseStartAngle + 360) % 360);
+                                  const voiceBeatIdx = Math.floor(elapsedAngle / (360 / length) + 0.0001) % length;
                                   const isCurrent = voiceBeatIdx === i && isPlaying;
 
                                   // Compute beat label for step i
                                   let labelText = '';
-                                  const bNum = is12Beat ? (beatIdx === 0 ? 12 : beatIdx) : (((beatIdx + (activePattern?.displayOffset || 0)) % voiceBaseBeats) + 1);
+                                  const bNum = is12Beat ? (((startBeat - 1 + beatIdx) % 12) + 1) : (((beatIdx + (activePattern?.displayOffset || 0)) % voiceBaseBeats) + 1);
                                   if (vSub === 1) {
                                     labelText = `${bNum}`;
                                   } else if (vSub === 2) {
@@ -1583,26 +1586,14 @@ function CircularVisualizer({ isPlaying, pattern, rotation, displayBeat, resolve
           return (
             <div key={voice.id} className="absolute inset-0 pointer-events-none">
               {Array.from({ length }).map((_, i) => {
-                const angle = (is12Beat && length === 24)
-                  ? ((i + 2) / 24) * 360
-                  : (is12Beat && length === 36)
-                    ? ((i + 3) / 36) * 360
-                    : (is12Beat && length === 12)
-                      ? ((i + 1) / 12) * 360
-                      : (i * 360) / length;
+                const subdivision = is12Beat ? (length / 12) : 1;
+                const angle = is12Beat
+                  ? ((((startBeat % 12) + (i / subdivision)) % 12) / 12) * 360
+                  : (i * 360) / length;
 
-                let voiceBeatIdx = 0;
-                if (is12Beat && length === 12) {
-                  let b = Math.floor((normRot + 0.0001) / 30);
-                  if (b === 0) b = 12;
-                  voiceBeatIdx = b - 1;
-                } else if (is12Beat && length === 24) {
-                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 15) - 2 + 24) % 24;
-                } else if (is12Beat && length === 36) {
-                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 10) - 3 + 36) % 36;
-                } else {
-                  voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
-                }
+                const baseStartAngle = is12Beat ? ((startBeat % 12) / 12) * 360 : 0;
+                const elapsedAngle = (normRot - baseStartAngle + 360) % 360;
+                const voiceBeatIdx = Math.floor((elapsedAngle + 0.0001) / (360 / length)) % length;
 
                 const isOver = voiceBeatIdx === i && isPlaying;
                 const val = voice.pattern ? voice.pattern[i] : (i === 0 ? 2 : 1);
@@ -1751,26 +1742,14 @@ function RingsVisualizer({ isPlaying, pattern, rotation, displayBeat, resolvedTh
               </svg>
 
               {Array.from({ length }).map((_, i) => {
-                const angle = (is12Beat && length === 24)
-                  ? ((i + 2) / 24) * 360
-                  : (is12Beat && length === 36)
-                    ? ((i + 3) / 36) * 360
-                    : (is12Beat && length === 12)
-                      ? ((i + 1) / 12) * 360
-                      : (i * 360) / length;
+                const subdivision = is12Beat ? (length / 12) : 1;
+                const angle = is12Beat
+                  ? ((((startBeat % 12) + (i / subdivision)) % 12) / 12) * 360
+                  : (i * 360) / length;
 
-                let voiceBeatIdx = 0;
-                if (is12Beat && length === 12) {
-                  let b = Math.floor((normRot + 0.0001) / 30);
-                  if (b === 0) b = 12;
-                  voiceBeatIdx = b - 1;
-                } else if (is12Beat && length === 24) {
-                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 15) - 2 + 24) % 24;
-                } else if (is12Beat && length === 36) {
-                  voiceBeatIdx = (Math.floor((normRot + 0.0001) / 10) - 3 + 36) % 36;
-                } else {
-                  voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
-                }
+                const baseStartAngle = is12Beat ? ((startBeat % 12) / 12) * 360 : 0;
+                const elapsedAngle = (normRot - baseStartAngle + 360) % 360;
+                const voiceBeatIdx = Math.floor((elapsedAngle + 0.0001) / (360 / length)) % length;
 
                 const isOver = voiceBeatIdx === i && isPlaying;
                 const val = voice.pattern ? voice.pattern[i] : (i === 0 ? 2 : 1);
@@ -1856,6 +1835,7 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
   const masterSubdivision = masterVoice?.isTripleTime ? 3 : (masterVoice?.isDoubleTime || masterVoice?.isSwing ? 2 : 1);
   const masterBaseBeats = Math.max(1, Math.round(masterLength / masterSubdivision));
   const is12Beat = masterBaseBeats === 12 || pattern?.type === TimeSignatureType.Flamenco || pattern?.timeSignature === '12-Beat';
+  const startBeat = pattern?.startBeat || 1;
   const swingRatio = pattern?.swingRatio ?? (2 / 3);
 
   const normRot = ((rotation % 360) + 360) % 360;
@@ -1907,18 +1887,9 @@ function LinearVisualizer({ isPlaying, pattern, rotation, resolvedTheme }: { isP
                       {subBeats.map((val, subIdx) => {
                         const i = beatIdx * vSub + subIdx;
 
-                        let voiceBeatIdx = 0;
-                        if (is12Beat && length === 12) {
-                          let b = Math.floor((normRot + 0.0001) / 30);
-                          if (b === 0) b = 12;
-                          voiceBeatIdx = b - 1;
-                        } else if (is12Beat && length === 24) {
-                          voiceBeatIdx = (Math.floor((normRot + 0.0001) / 15) - 2 + 24) % 24;
-                        } else if (is12Beat && length === 36) {
-                          voiceBeatIdx = (Math.floor((normRot + 0.0001) / 10) - 3 + 36) % 36;
-                        } else {
-                          voiceBeatIdx = Math.floor(normRot / (360 / length) + 0.0001) % length;
-                        }
+                        const baseStartAngle = is12Beat ? ((startBeat % 12) / 12) * 360 : 0;
+                        const elapsedAngle = (normRot - baseStartAngle + 360) % 360;
+                        const voiceBeatIdx = Math.floor((elapsedAngle + 0.0001) / (360 / length)) % length;
                         const isCurrent = voiceBeatIdx === i && isPlaying;
 
                         const flexStyle = voice.isSwing

@@ -324,20 +324,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const is12Beat = pattern.type === TimeSignatureType.Flamenco || pattern.timeSignature === '12-Beat' || masterBaseBeats === 12;
       const startBeat = pattern.startBeat || 1;
       
-      let startIndex = 0;
-      if (is12Beat) {
-        if (voiceSubdivision === 2 && length === 24) {
-          startIndex = ((startBeat - 1) * 2 + 24) % 24;
-        } else if (voiceSubdivision === 3 && length === 36) {
-          startIndex = ((startBeat - 1) * 3 + 36) % 36;
-        } else if (length === 12) {
-          startIndex = ((startBeat - 1) + 12) % 12;
-        } else {
-          startIndex = ((startBeat - 1) + length) % length;
-        }
-      } else {
-        startIndex = ((startBeat - 1) * voiceSubdivision + length) % length;
-      }
+      const startIndex = 0;
 
       while (vState.nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD_TIME) {
         let playValue = 0;
