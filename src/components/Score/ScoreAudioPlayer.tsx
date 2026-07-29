@@ -75,7 +75,7 @@ export default function ScoreAudioPlayer({
   const [isDragging, setIsDragging] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('audio_player_collapsed');
-    return saved !== null ? JSON.parse(saved) : true;
+    return saved !== null ? JSON.parse(saved) : false;
   });
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -842,14 +842,6 @@ export default function ScoreAudioPlayer({
               exit={{ opacity: 0 }}
               className="px-6 pb-6 flex flex-col gap-6"
             >
-              {/* Visualizer & Header Info */}
-              <div className="flex items-center justify-between gap-8 pt-4 border-t border-black/5">
-                <div className="hidden md:block">
-                  <p className={cn("text-[10px] font-bold opacity-50 uppercase tracking-tighter", resolvedTheme === 'dark' ? "text-white" : "text-slate-500")}>Professional Playback Control</p>
-                  <p className={cn("text-[8px] font-bold opacity-30 mt-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-400")}>{isMidi ? 'MIDI SYMBOLIC ENGINE' : 'PCM AUDIO ENGINE'}</p>
-                </div>
-              </div>
-
               {/* Progress Bar with Loop Markers */}
               <div className="flex flex-col gap-3">
                 {/* MIDI Channels (Conditional) */}
