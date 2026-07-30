@@ -923,42 +923,128 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
         <button
           onClick={() => handleAuditionVoicing()}
           disabled={!currentVoicing}
-          className="px-3 py-2 rounded-xl bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all hover:bg-emerald-600 disabled:opacity-40"
+          className="px-3 py-2 rounded-xl bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all hover:bg-emerald-600 disabled:opacity-40 cursor-pointer"
         >
           <Volume2 className="w-3.5 h-3.5" />
           Play Strum
         </button>
       </div>
 
-      {/* Main Diagram Area */}
+      {/* Main Diagram Area: Directly below selectors & formula banner */}
       <div className="flex-1 flex flex-col items-center justify-center relative min-h-[300px]">
         {currentVoicing ? (
           <div className="flex flex-col items-center gap-4 w-full">
-            {/* Voicing Tags Badges */}
-            <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-md">
-              {currentVoicing.tags?.map((tag, i) => (
-                <span 
-                  key={i} 
-                  className={cn(
-                    "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
-                    tag === 'Barre Chord' ? "bg-purple-500/10 border-purple-500/30 text-purple-400" :
-                    tag === 'Open Position' ? "bg-amber-500/10 border-amber-500/30 text-amber-400" :
-                    tag === 'Root in Bass' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                    resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40" : "bg-slate-200 border-black/10 text-slate-600"
-                  )}
-                >
-                  {tag}
-                </span>
-              ))}
-              {currentVoicing.inversionLabel && (
-                <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">
-                  {currentVoicing.inversionLabel}
-                </span>
-              )}
+
+            {/* Chord Diagram with Left / Right Arrows directly on sides */}
+            <div className="flex items-center justify-center gap-3 sm:gap-6 w-full py-1">
+              {/* Left Arrow Button */}
+              <button 
+                onClick={handlePrevPosition}
+                disabled={activeVoicings.length <= 1}
+                className={cn(
+                  "p-2.5 sm:p-3 rounded-full transition-all active:scale-95 disabled:opacity-20 shrink-0 cursor-pointer",
+                  resolvedTheme === 'dark' 
+                    ? "bg-white/10 text-white hover:bg-emerald-500 hover:text-white" 
+                    : "bg-slate-200 text-slate-800 hover:bg-emerald-500 hover:text-white shadow-xs"
+                )}
+                title="Previous Voicing"
+              >
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+
+              {/* SVG Chord Diagram (Unbordered) */}
+              <div className="relative group flex items-center justify-center px-2 py-1">
+                <div className="absolute -inset-4 bg-emerald-500/5 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative flex flex-col items-center">
+                  <ChordDiagram 
+                    position={currentVoicing} 
+                    numStrings={instConfig.strings}
+                    numFrets={instConfig.fretsOnChord}
+                    tuningMidi={currentTuning.midi}
+                    rootPitchClass={parsedChord.rootPitchClass}
+                    rootKey={selectedKey}
+                    selectedSuffix={selectedSuffix}
+                    dotDisplayMode={dotDisplayMode}
+                  />
+                </div>
+              </div>
+
+              {/* Right Arrow Button */}
+              <button 
+                onClick={handleNextPosition}
+                disabled={activeVoicings.length <= 1}
+                className={cn(
+                  "p-2.5 sm:p-3 rounded-full transition-all active:scale-95 disabled:opacity-20 shrink-0 cursor-pointer",
+                  resolvedTheme === 'dark' 
+                    ? "bg-white/10 text-white hover:bg-emerald-500 hover:text-white" 
+                    : "bg-slate-200 text-slate-800 hover:bg-emerald-500 hover:text-white shadow-xs"
+                )}
+                title="Next Voicing"
+              >
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
             </div>
 
+            {/* Voicing Counter & Badges Row */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className={cn("text-[10px] font-black tracking-widest uppercase transition-colors", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
+                  Voicing {positionIndex + 1}
+                </span>
+                <span className={cn("text-[8px] font-bold uppercase tracking-[0.15em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                  of {activeVoicings.length} generated positions
+                </span>
+              </div>
+
+              {/* Voicing Tags Badges */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-md">
+                {currentVoicing.tags?.map((tag, i) => (
+                  <span 
+                    key={i} 
+                    className={cn(
+                      "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
+                      tag === 'Barre Chord' ? "bg-purple-500/10 border-purple-500/30 text-purple-400" :
+                      tag === 'Open Position' ? "bg-amber-500/10 border-amber-500/30 text-amber-400" :
+                      tag === 'Root in Bass' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                      resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40" : "bg-slate-200 border-black/10 text-slate-600"
+                    )}
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {currentVoicing.inversionLabel && (
+                  <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                    {currentVoicing.inversionLabel}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Voicing Thumbnail Pills Selector */}
+            {activeVoicings.length > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xs my-0.5">
+                {activeVoicings.map((v, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setPositionIndex(i);
+                      handleAuditionVoicing(v);
+                    }}
+                    className={cn(
+                      "w-6 h-6 rounded-lg text-[9px] font-mono font-bold flex items-center justify-center transition-all border cursor-pointer",
+                      positionIndex === i 
+                        ? "bg-emerald-500 border-emerald-400 text-white shadow-md scale-110"
+                        : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-black/5 text-slate-500 hover:bg-slate-200")
+                    )}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Diagram Control Bar: Dot Mode Toggle & Harmonic Color Key */}
-            <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-md px-1">
+            <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-md px-1 mt-1">
               {/* Display Mode Pills */}
               <div className={cn(
                 "flex p-1 rounded-xl border gap-1 transition-colors items-center",
@@ -972,7 +1058,7 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
                     key={mode}
                     onClick={() => setDotDisplayMode(mode)}
                     className={cn(
-                      "px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all",
+                      "px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer",
                       dotDisplayMode === mode
                         ? "bg-emerald-500 text-white shadow-md"
                         : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white/70" : "text-slate-400 hover:text-slate-900")
@@ -1008,29 +1094,9 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
               </div>
             </div>
 
-            {/* SVG Chord Diagram Card */}
-            <div className="relative group">
-              <div className="absolute -inset-6 bg-emerald-500/5 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className={cn(
-                "relative p-6 rounded-[2rem] border shadow-xl transition-colors flex flex-col items-center",
-                resolvedTheme === 'dark' ? "bg-slate-900/80 border-white/10" : "bg-white border-black/5"
-              )}>
-                <ChordDiagram 
-                  position={currentVoicing} 
-                  numStrings={instConfig.strings}
-                  numFrets={instConfig.fretsOnChord}
-                  tuningMidi={currentTuning.midi}
-                  rootPitchClass={parsedChord.rootPitchClass}
-                  rootKey={selectedKey}
-                  selectedSuffix={selectedSuffix}
-                  dotDisplayMode={dotDisplayMode}
-                />
-              </div>
-            </div>
-
             {/* String-by-String Note & Interval Breakdown */}
             <div className={cn(
-              "w-full max-w-md p-3.5 rounded-2xl border flex flex-col gap-2 transition-colors",
+              "w-full max-w-md p-3.5 rounded-2xl border flex flex-col gap-2 transition-colors mt-1",
               resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-black/5"
             )}>
               <button 
@@ -1097,62 +1163,6 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
               )}
             </div>
 
-            {/* Voicing Carousel Controls */}
-            <div className="flex items-center gap-5 mt-1">
-              <button 
-                onClick={handlePrevPosition}
-                disabled={activeVoicings.length <= 1}
-                className={cn(
-                  "p-2 rounded-full border transition-all active:scale-95 disabled:opacity-30",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10" : "bg-white border-black/10 text-slate-600 hover:text-slate-900 hover:bg-slate-100 shadow-sm"
-                )}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              
-              <div className="flex flex-col items-center gap-0.5">
-                <span className={cn("text-[10px] font-black tracking-widest uppercase transition-colors", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>
-                  Voicing {positionIndex + 1}
-                </span>
-                <span className={cn("text-[8px] font-bold uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")}>
-                  of {activeVoicings.length} generated positions
-                </span>
-              </div>
-
-              <button 
-                onClick={handleNextPosition}
-                disabled={activeVoicings.length <= 1}
-                className={cn(
-                  "p-2 rounded-full border transition-all active:scale-95 disabled:opacity-30",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10" : "bg-white border-black/10 text-slate-600 hover:text-slate-900 hover:bg-slate-100 shadow-sm"
-                )}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Voicing Thumbnail Pills Selector */}
-            {activeVoicings.length > 1 && (
-              <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xs mt-1">
-                {activeVoicings.map((v, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setPositionIndex(i);
-                      handleAuditionVoicing(v);
-                    }}
-                    className={cn(
-                      "w-6 h-6 rounded-lg text-[9px] font-mono font-bold flex items-center justify-center transition-all border",
-                      positionIndex === i 
-                        ? "bg-emerald-500 border-emerald-400 text-white shadow-md scale-110"
-                        : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-black/5 text-slate-500 hover:bg-slate-200")
-                    )}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         ) : (
           <div className={cn("text-[10px] font-bold uppercase tracking-widest text-center px-8 py-12 transition-colors", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")}>
