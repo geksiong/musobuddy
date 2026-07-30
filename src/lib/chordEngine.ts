@@ -52,9 +52,9 @@ export const INSTRUMENT_CONFIGS: Record<InstrumentName, InstrumentConfig> = {
     name: 'guitar',
     displayName: 'Guitar',
     strings: 6,
-    fretsOnChord: 4,
+    fretsOnChord: 5,
     maxFrets: 18,
-    maxSpan: 4,
+    maxSpan: 5,
     defaultTuning: 'standard',
     tunings: {
       standard: {
@@ -544,16 +544,14 @@ export function generateChordVoicings(
 
         // Calculate score & barres
         const frettedInSearch = currentFrets.filter(f => f > 0);
-        const isOpenOnly = frettedInSearch.length === 0;
-        const hasOpen = currentFrets.includes(0);
-        const effectiveBaseFret = (isOpenOnly || hasOpen) ? 1 : B;
+        const effectiveBaseFret = frettedInSearch.length > 0 ? Math.min(...frettedInSearch) : 1;
 
         const { score, barres } = scoreVoicing(currentFrets, effectiveBaseFret, parsed, tuning, numStrings);
         if (score > 0) {
           candidates.push({
             frets: [...currentFrets],
             baseFret: effectiveBaseFret,
-            barres: (isOpenOnly || hasOpen) ? [] : barres,
+            barres,
             score,
           });
         }
@@ -619,11 +617,9 @@ export function generateChordVoicings(
       parsed
     );
 
-    // Calculate actual baseFret for rendering (1 if open strings present, otherwise min fretted)
+    // Calculate actual baseFret for rendering (lowest fretted position or 1)
     const fretted = c.frets.filter(f => f > 0);
-    const displayBaseFret = (c.frets.includes(0) || fretted.length === 0) 
-      ? 1 
-      : Math.min(...fretted);
+    const displayBaseFret = fretted.length > 0 ? Math.min(...fretted) : 1;
 
     return {
       frets: c.frets,

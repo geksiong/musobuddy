@@ -276,7 +276,7 @@ export function getIntervalInfo(notePitchClass: number, rootPitchClass: number, 
 function ChordDiagram({ 
   position, 
   numStrings = 6, 
-  numFrets = 4,
+  numFrets = 5,
   tuningMidi = [64, 59, 55, 50, 45, 40],
   rootPitchClass = 0,
   rootKey = 'C',
@@ -304,16 +304,15 @@ function ChordDiagram({
   const barres = position.barres || [];
 
   const fretted = frets.filter(f => f > 0);
-  const isOpenOnly = fretted.length === 0;
-  const hasOpen = frets.includes(0);
+  const minFretted = fretted.length > 0 ? Math.min(...fretted) : 1;
+  const maxFretted = fretted.length > 0 ? Math.max(...fretted) : 1;
 
-  const effectiveBaseFret = (isOpenOnly || hasOpen) 
-    ? 1 
-    : (position.baseFret && position.baseFret > 0 ? position.baseFret : (fretted.length > 0 ? Math.min(...fretted) : 1));
+  const effectiveBaseFret = position.baseFret && position.baseFret > 0 
+    ? position.baseFret 
+    : minFretted;
 
-  const maxFretInPos = fretted.length > 0 ? Math.max(...fretted) : 0;
-  const maxRelativeFret = fretted.length > 0 ? maxFretInPos - effectiveBaseFret + 1 : numFrets;
-  const actualNumFrets = Math.max(numFrets, maxRelativeFret);
+  const fretSpan = fretted.length > 0 ? (maxFretted - effectiveBaseFret + 1) : 0;
+  const actualNumFrets = Math.max(numFrets, fretSpan, 5);
 
   const width = (numStrings - 1) * S + padding * 2;
   const height = actualNumFrets * S + padding * 2;
@@ -321,10 +320,11 @@ function ChordDiagram({
   return (
     <svg width={width} height={height + 25} viewBox={`0 0 ${width} ${height + 25}`} className="overflow-visible select-none">
       {/* Base Fret Number */}
-      {effectiveBaseFret > 1 && !isOpenOnly && !hasOpen && (
+      {effectiveBaseFret > 1 && (
         <text 
-          x={padding - 24} 
+          x={padding - 8} 
           y={padding + S/2 + 4} 
+          textAnchor="end"
           className="text-[10px] font-black fill-emerald-500 uppercase italic"
         >
           {effectiveBaseFret}fr
@@ -594,8 +594,8 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
       const isOpenOnly = fretted.length === 0;
       const hasOpen = pos.frets.includes(0);
 
-      const baseFret = (hasOpen || isOpenOnly) ? 1 : (pos.baseFret || (fretted.length > 0 ? Math.min(...fretted) : 1));
-      const barres = (hasOpen || isOpenOnly) ? [] : (fingering.barres.length > 0 ? fingering.barres : (pos.barres || []));
+      const baseFret = pos.baseFret || (fretted.length > 0 ? Math.min(...fretted) : 1);
+      const barres = fingering.barres.length > 0 ? fingering.barres : (pos.barres || []);
       const fingers = isOpenOnly ? new Array(pos.frets.length).fill(0) : (fingering.fingers || pos.fingers || []);
 
       const fretSpan = fretted.length > 0 ? Math.max(...fretted) - Math.min(...fretted) : 0;
@@ -650,8 +650,8 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
 
       const normalized: GeneratedPosition = {
         ...v,
-        baseFret: (isOpenOnly || hasOpen) ? 1 : v.baseFret,
-        barres: (isOpenOnly || hasOpen) ? [] : v.barres,
+        baseFret: fretted.length > 0 ? Math.min(...fretted) : 1,
+        barres: v.barres || [],
         fingers: isOpenOnly ? new Array(v.frets.length).fill(0) : v.fingers,
         fretSpan: isOpenOnly ? 0 : v.fretSpan,
       };
