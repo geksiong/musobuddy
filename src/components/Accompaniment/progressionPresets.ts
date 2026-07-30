@@ -11,6 +11,48 @@ export interface ProgressionPreset {
   description: string;
   bpm?: number;
   chordsPerBeat: string[];
+  isCustom?: boolean;
+}
+
+export const USER_PRESETS_STORAGE_KEY = 'accompaniment_user_presets';
+
+export function getUserPresets(): ProgressionPreset[] {
+  try {
+    const data = localStorage.getItem(USER_PRESETS_STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error('Failed to load user presets from localStorage', e);
+    return [];
+  }
+}
+
+export function saveUserPreset(preset: Omit<ProgressionPreset, 'id' | 'isCustom'> & { id?: string }): ProgressionPreset[] {
+  try {
+    const current = getUserPresets();
+    const newPreset: ProgressionPreset = {
+      ...preset,
+      id: preset.id || `user_preset_${Date.now()}`,
+      isCustom: true,
+    };
+    const updated = [newPreset, ...current.filter(p => p.id !== newPreset.id)];
+    localStorage.setItem(USER_PRESETS_STORAGE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch (e) {
+    console.error('Failed to save user preset to localStorage', e);
+    return getUserPresets();
+  }
+}
+
+export function deleteUserPreset(id: string): ProgressionPreset[] {
+  try {
+    const current = getUserPresets();
+    const updated = current.filter(p => p.id !== id);
+    localStorage.setItem(USER_PRESETS_STORAGE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch (e) {
+    console.error('Failed to delete user preset from localStorage', e);
+    return getUserPresets();
+  }
 }
 
 export const PROGRESSION_PRESETS: ProgressionPreset[] = [

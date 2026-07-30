@@ -3,7 +3,55 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export const CHORD_ROOTS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+export const CHORD_ROOTS_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+export const CHORD_ROOTS_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+export const CHORD_ROOTS = CHORD_ROOTS_SHARP;
+
+export const ENHARMONIC_SWAP_MAP: Record<string, string> = {
+  'C#': 'Db', 'Db': 'C#',
+  'D#': 'Eb', 'Eb': 'D#',
+  'F#': 'Gb', 'Gb': 'F#',
+  'G#': 'Ab', 'Ab': 'G#',
+  'A#': 'Bb', 'Bb': 'A#',
+};
+
+export const ROOT_OFFSETS_MAP: Record<string, number> = {
+  'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4,
+  'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+};
+
+export function transposeChord(chordName: string, semitones: number, forceAccidental?: 'sharp' | 'flat'): string {
+  if (!chordName || chordName.trim() === '') return chordName;
+
+  const match = chordName.match(/^([A-G][#b]?)(.*)$/);
+  if (!match) return chordName;
+
+  const [, root, suffix] = match;
+  const rootIndex = ROOT_OFFSETS_MAP[root];
+  if (rootIndex === undefined) return chordName;
+
+  const newIndex = (rootIndex + semitones % 12 + 12) % 12;
+
+  const useFlats = forceAccidental === 'flat' || (forceAccidental === undefined && chordName.includes('b'));
+  const targetScale = useFlats ? CHORD_ROOTS_FLAT : CHORD_ROOTS_SHARP;
+
+  const newRoot = targetScale[newIndex];
+  return `${newRoot}${suffix}`;
+}
+
+export function toggleEnharmonicSpelling(chordName: string): string {
+  if (!chordName || chordName.trim() === '') return chordName;
+
+  const match = chordName.match(/^([A-G][#b]?)(.*)$/);
+  if (!match) return chordName;
+
+  const [, root, suffix] = match;
+  const swappedRoot = ENHARMONIC_SWAP_MAP[root];
+  if (!swappedRoot) return chordName; // e.g. C, D, E don't have standard single accidentals
+
+  return `${swappedRoot}${suffix}`;
+}
 
 export const CHORD_TYPES = [
   { label: 'Major', suffix: '', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },

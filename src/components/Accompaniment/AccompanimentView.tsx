@@ -7,7 +7,8 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
-  Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles
+  Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles,
+  ArrowLeftRight, BookmarkPlus, Save, Hash
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useMetronome } from '../../hooks/useMetronome.ts';
@@ -16,8 +17,13 @@ import { useAccompaniment, getEffectiveChord } from '../../contexts/Accompanimen
 import { InstrumentType } from '../../types.ts';
 import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
-import { CHORD_ROOTS, CHORD_TYPES, ARPEGGIO_PRESETS, getChordTypeInfo } from './constants.ts';
-import { PROGRESSION_PRESETS, ProgressionPreset } from './progressionPresets.ts';
+import { 
+  CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, 
+  getChordTypeInfo, transposeChord, toggleEnharmonicSpelling 
+} from './constants.ts';
+import { 
+  PROGRESSION_PRESETS, ProgressionPreset, getUserPresets, saveUserPreset, deleteUserPreset 
+} from './progressionPresets.ts';
 import { DEFAULT_PRESETS } from '../Metronome/constants.ts';
 
 const INSTRUMENTS = [
@@ -61,8 +67,85 @@ export default function AccompanimentView() {
   const [activeRightTab, setActiveRightTab] = useState<'library' | 'explorer' | 'presets'>('library');
   const [presetFilterTimeSig, setPresetFilterTimeSig] = useState<string>('ALL');
 
+  // Enharmonic and Transposition state
+  const [accidentalMode, setAccidentalMode] = useState<'sharp' | 'flat'>('sharp');
+  const [transposeShift, setTransposeShift] = useState<number>(0);
+
+  // User Custom Presets state
+  const [userPresets, setUserPresets] = useState<ProgressionPreset[]>(() => getUserPresets());
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [presetNameInput, setPresetNameInput] = useState('');
+  const [presetGenreInput, setPresetGenreInput] = useState('Pop');
+  const [presetDescInput, setPresetDescInput] = useState('');
+
   const { isPlaying: isMetronomeRunning, start: startMetronome, stop: stopMetronome, activePattern, setActivePattern, setBpm } = useMetronome();
   const { playChord } = useAudio();
+
+  // Transpose handlers
+  const handleTranspose = (semitones: number) => {
+    const updated = progression.map(slot => ({
+      ...slot,
+      name: slot.name ? transposeChord(slot.name, semitones, accidentalMode) : '',
+    }));
+    setProgression(updated);
+    setTransposeShift(prev => prev + semitones);
+  };
+
+  const handleResetTranspose = () => {
+    if (transposeShift === 0) return;
+    handleTranspose(-transposeShift);
+    setTransposeShift(0);
+  };
+
+  const handleToggleProgressionEnharmonics = () => {
+    const updated = progression.map(slot => ({
+      ...slot,
+      name: slot.name ? toggleEnharmonicSpelling(slot.name) : '',
+    }));
+    setProgression(updated);
+  };
+
+  const handleSwapSelectedBeatEnharmonic = () => {
+    if (selectedBeatIndex === null || !progression[selectedBeatIndex]?.name) return;
+    const currentChord = progression[selectedBeatIndex].name;
+    const swapped = toggleEnharmonicSpelling(currentChord);
+    const updated = [...progression];
+    updated[selectedBeatIndex] = { ...updated[selectedBeatIndex], name: swapped };
+    setProgression(updated);
+    playChord(swapped, selectedInstrument, accompanimentVolume);
+    setTrackedChord(swapped);
+  };
+
+  // Preset Save & Delete handlers
+  const handleSaveCustomPreset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!presetNameInput.trim()) return;
+
+    const chordsPerBeat = progression.map(p => p.name || '');
+    const timeSig = (activePattern?.timeSignature as '4/4' | '3/4' | '6/8' | '5/4') || '4/4';
+
+    const updatedList = saveUserPreset({
+      name: presetNameInput.trim(),
+      genre: presetGenreInput,
+      timeSignature: timeSig,
+      description: presetDescInput.trim() || 'Custom chord progression',
+      bpm: activePattern?.voices[0]?.beats ? 120 : undefined,
+      chordsPerBeat,
+    });
+
+    setUserPresets(updatedList);
+    setIsSaveModalOpen(false);
+    setPresetNameInput('');
+    setPresetDescInput('');
+    setActiveRightTab('presets');
+    setPresetFilterTimeSig('CUSTOM');
+  };
+
+  const handleDeleteUserPreset = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updatedList = deleteUserPreset(id);
+    setUserPresets(updatedList);
+  };
 
   const handleSelectPreset = (preset: ProgressionPreset) => {
     // 1. Convert preset chordsPerBeat to progression slots
@@ -277,6 +360,77 @@ export default function AccompanimentView() {
             </div>
           </div>
 
+          {/* Transposition & Preset Toolbar */}
+          <div className={cn(
+            "flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-xl border text-[10px] font-bold transition-colors",
+            resolvedTheme === 'dark' ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"
+          )}>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-slate-400 font-mono uppercase text-[9px] mr-0.5">Transpose:</span>
+              <button
+                onClick={() => handleTranspose(-1)}
+                className={cn(
+                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px] font-mono",
+                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700 shadow-xs"
+                )}
+                title="Transpose current progression down 1 semitone (-1)"
+              >
+                -1 st
+              </button>
+
+              <button
+                onClick={() => handleTranspose(1)}
+                className={cn(
+                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px] font-mono",
+                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700 shadow-xs"
+                )}
+                title="Transpose current progression up 1 semitone (+1)"
+              >
+                +1 st
+              </button>
+
+              {transposeShift !== 0 && (
+                <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-2 py-0.5 rounded-lg text-[9px] font-mono">
+                  <span>{transposeShift > 0 ? `+${transposeShift}` : transposeShift} st</span>
+                  <button 
+                    onClick={handleResetTranspose}
+                    className="hover:text-emerald-400 text-slate-400 ml-1 font-bold"
+                    title="Reset transposition to original key"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={handleToggleProgressionEnharmonics}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px] ml-1",
+                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white/80" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700 shadow-xs"
+                )}
+                title="Swap enharmonic spelling across all chords in progression (e.g. C# ↔ Db)"
+              >
+                <ArrowLeftRight className="w-3 h-3 text-emerald-500" />
+                <span>♯ ↔ ♭ All</span>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setIsSaveModalOpen(true)}
+              disabled={progression.every(p => !p.name || p.name.trim() === '')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all text-[9px] font-bold shadow-xs",
+                progression.some(p => p.name && p.name.trim() !== '')
+                  ? (resolvedTheme === 'dark' ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30" : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700")
+                  : "opacity-40 cursor-not-allowed"
+              )}
+              title="Save current progression as a custom preset"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5" />
+              <span>Save as Preset</span>
+            </button>
+          </div>
+
           {/* Quick Actions & Selection Banner */}
           <div className="flex flex-wrap items-center justify-between mb-4 gap-2 text-[10px] font-bold">
             <div className="flex items-center gap-2">
@@ -293,6 +447,19 @@ export default function AccompanimentView() {
             </div>
 
             <div className="flex items-center gap-1.5 flex-wrap">
+              {selectedBeatIndex !== null && progression[selectedBeatIndex]?.name ? (
+                <button
+                  onClick={handleSwapSelectedBeatEnharmonic}
+                  className={cn(
+                    "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px]",
+                    resolvedTheme === 'dark' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                  )}
+                  title="Swap enharmonic spelling for selected chord (e.g. C#7 ↔ Db7)"
+                >
+                  <ArrowLeftRight className="w-3 h-3" /> Swap ♯/♭
+                </button>
+              ) : null}
+
               <button
                 onClick={() => selectedBeatIndex !== null && insertBeat(selectedBeatIndex, '')}
                 disabled={selectedBeatIndex === null}
@@ -610,9 +777,48 @@ export default function AccompanimentView() {
           <div className="flex-1 p-4 flex flex-col overflow-y-auto min-h-0">
             {activeRightTab === 'library' ? (
               <div className="flex flex-col gap-4 h-full">
-                {/* Target Beat Indicator Banner */}
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest text-[9px]">Root Note:</span>
+                {/* Target Beat & Enharmonic Toggle Banner */}
+                <div className="flex items-center justify-between text-[10px] font-bold flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 uppercase tracking-widest text-[9px]">Root Note:</span>
+                    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-200/60 dark:bg-white/10 border border-slate-300 dark:border-white/10">
+                      <button
+                        onClick={() => {
+                          setAccidentalMode('sharp');
+                          if (selectedLibraryRoot.includes('b')) {
+                            setSelectedLibraryRoot(toggleEnharmonicSpelling(selectedLibraryRoot));
+                          }
+                        }}
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[8px] font-black transition-all",
+                          accidentalMode === 'sharp'
+                            ? "bg-emerald-500 text-white shadow-xs"
+                            : "text-slate-500 dark:text-white/40 hover:text-slate-800 dark:hover:text-white"
+                        )}
+                        title="Display Sharp roots (#)"
+                      >
+                        ♯ Sharps
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAccidentalMode('flat');
+                          if (selectedLibraryRoot.includes('#')) {
+                            setSelectedLibraryRoot(toggleEnharmonicSpelling(selectedLibraryRoot));
+                          }
+                        }}
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[8px] font-black transition-all",
+                          accidentalMode === 'flat'
+                            ? "bg-emerald-500 text-white shadow-xs"
+                            : "text-slate-500 dark:text-white/40 hover:text-slate-800 dark:hover:text-white"
+                        )}
+                        title="Display Flat roots (♭)"
+                      >
+                        ♭ Flats
+                      </button>
+                    </div>
+                  </div>
+
                   <span className="text-[9px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                     {selectedBeatIndex !== null ? `Target Beat ${selectedBeatIndex + 1}` : 'Target: New Beat'}
                   </span>
@@ -623,7 +829,7 @@ export default function AccompanimentView() {
                   "grid grid-cols-6 gap-1 p-1.5 rounded-xl border transition-colors",
                   resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
                 )}>
-                  {CHORD_ROOTS.map(root => (
+                  {(accidentalMode === 'flat' ? CHORD_ROOTS_FLAT : CHORD_ROOTS_SHARP).map(root => (
                     <button
                       key={root}
                       onClick={() => setSelectedLibraryRoot(root)}
@@ -672,37 +878,45 @@ export default function AccompanimentView() {
             ) : (
               <div className="flex flex-col gap-3 h-full min-h-0">
                 <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest text-[9px]">Time Signature Filter:</span>
+                  <span className="text-slate-400 uppercase tracking-widest text-[9px]">Filter Presets:</span>
                   <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    {PROGRESSION_PRESETS.filter(p => presetFilterTimeSig === 'ALL' || p.timeSignature === presetFilterTimeSig).length} Presets
+                    {[...userPresets, ...PROGRESSION_PRESETS].filter(p => {
+                      if (presetFilterTimeSig === 'ALL') return true;
+                      if (presetFilterTimeSig === 'CUSTOM') return p.isCustom;
+                      return p.timeSignature === presetFilterTimeSig;
+                    }).length} Presets
                   </span>
                 </div>
 
-                {/* Time signature pills */}
+                {/* Filter Pills */}
                 <div className={cn(
-                  "grid grid-cols-5 gap-1 p-1 rounded-xl border transition-colors",
+                  "grid grid-cols-6 gap-1 p-1 rounded-xl border transition-colors",
                   resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
                 )}>
-                  {['ALL', '4/4', '3/4', '6/8', '5/4'].map(ts => (
+                  {['ALL', 'CUSTOM', '4/4', '3/4', '6/8', '5/4'].map(ts => (
                     <button
                       key={ts}
                       onClick={() => setPresetFilterTimeSig(ts)}
                       className={cn(
-                        "py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all text-center",
+                        "py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all text-center",
                         presetFilterTimeSig === ts
                           ? (resolvedTheme === 'dark' ? "bg-white text-black shadow" : "bg-slate-900 text-white shadow")
                           : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-500 hover:text-slate-900")
                       )}
                     >
-                      {ts}
+                      {ts === 'CUSTOM' ? '★ Custom' : ts}
                     </button>
                   ))}
                 </div>
 
                 {/* List of Presets */}
                 <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2.5">
-                  {PROGRESSION_PRESETS
-                    .filter(p => presetFilterTimeSig === 'ALL' || p.timeSignature === presetFilterTimeSig)
+                  {[...userPresets, ...PROGRESSION_PRESETS]
+                    .filter(p => {
+                      if (presetFilterTimeSig === 'ALL') return true;
+                      if (presetFilterTimeSig === 'CUSTOM') return p.isCustom;
+                      return p.timeSignature === presetFilterTimeSig;
+                    })
                     .map(preset => {
                       const explicitChords = preset.chordsPerBeat.filter(c => c.trim() !== '');
                       const uniqueExplicitChords = Array.from(new Set(explicitChords));
@@ -723,9 +937,16 @@ export default function AccompanimentView() {
                           {/* Top row: Title & Badges */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex flex-col">
-                              <span className="text-xs font-black tracking-tight group-hover:text-emerald-500 transition-colors">
-                                {preset.name}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-black tracking-tight group-hover:text-emerald-500 transition-colors">
+                                  {preset.name}
+                                </span>
+                                {preset.isCustom && (
+                                  <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+                                    ★ Custom
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[9px] text-slate-400 font-medium">
                                 {preset.description}
                               </span>
@@ -741,6 +962,16 @@ export default function AccompanimentView() {
                               )}>
                                 {preset.genre}
                               </span>
+
+                              {preset.isCustom && (
+                                <button
+                                  onClick={(e) => handleDeleteUserPreset(preset.id, e)}
+                                  className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors ml-1"
+                                  title="Delete custom preset"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -774,6 +1005,121 @@ export default function AccompanimentView() {
           </div>
         </section>
       </div>
+
+      {/* Save Custom Preset Modal */}
+      {isSaveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className={cn(
+              "w-full max-w-md rounded-2xl border p-6 flex flex-col gap-4 shadow-2xl relative",
+              resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            )}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <BookmarkPlus className="w-5 h-5 text-emerald-500" />
+                <h3 className="text-sm font-black uppercase tracking-wider">Save Custom Preset</h3>
+              </div>
+              <button 
+                onClick={() => setIsSaveModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomPreset} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-slate-400">Preset Name</label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="e.g. Neo-Soul Groove in Eb"
+                  value={presetNameInput}
+                  onChange={(e) => setPresetNameInput(e.target.value)}
+                  className={cn(
+                    "w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:border-emerald-500",
+                    resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Genre</label>
+                  <select
+                    value={presetGenreInput}
+                    onChange={(e) => setPresetGenreInput(e.target.value)}
+                    className={cn(
+                      "w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:border-emerald-500 cursor-pointer",
+                      resolvedTheme === 'dark' ? "bg-slate-800 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                    )}
+                  >
+                    {['Pop', 'Rock', 'Jazz', 'J-Pop', 'Bossa Nova', 'Blues', 'R&B', 'Acoustic', 'Custom'].map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Time Signature</label>
+                  <div className={cn(
+                    "w-full px-3 py-2 rounded-xl border text-xs font-bold font-mono opacity-80",
+                    resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-slate-200"
+                  )}>
+                    {activePattern?.timeSignature || '4/4'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold uppercase text-slate-400">Description (Optional)</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. Smooth 7th chords with chromatic walkthrough"
+                  value={presetDescInput}
+                  onChange={(e) => setPresetDescInput(e.target.value)}
+                  className={cn(
+                    "w-full px-3 py-2 rounded-xl border text-xs font-medium outline-none focus:border-emerald-500",
+                    resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                  )}
+                />
+              </div>
+
+              {/* Chords Sequence Preview */}
+              <div className="flex flex-col gap-1 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+                <span className="text-[9px] font-bold uppercase text-slate-400">Progression Preview ({totalMeasures} {totalMeasures === 1 ? 'Bar' : 'Bars'})</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {progression.filter(p => p.name && p.name.trim() !== '').map((p, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-mono font-bold">
+                      {p.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsSaveModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-md"
+                >
+                  <Save className="w-3.5 h-3.5" /> Save Preset
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
