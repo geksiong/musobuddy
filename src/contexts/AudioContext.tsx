@@ -63,9 +63,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isAccompanimentPlaying, _setIsAccompanimentPlaying] = useState(false);
   const isAccompanimentPlayingRef = useRef(false);
 
+  const defaultPattern = DEFAULT_PRESETS.find(p => p.id === '4-4') || DEFAULT_PRESETS[0] || null;
   const [metronomeBpm, setMetronomeBpm] = useState(120);
-  const [metronomePattern, _setMetronomePattern] = useState<BeatPattern | null>(DEFAULT_PRESETS[0] || null);
-  const metronomePatternRef = useRef<BeatPattern | null>(DEFAULT_PRESETS[0] || null);
+  const [metronomePattern, _setMetronomePattern] = useState<BeatPattern | null>(defaultPattern);
+  const metronomePatternRef = useRef<BeatPattern | null>(defaultPattern);
   const [metronomeVolume, setMetronomeVolume] = useState(0.8);
   const metronomeVolumeRef = useRef(0.8);
   const [currentBeat, setCurrentBeat] = useState(0);
