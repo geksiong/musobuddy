@@ -723,28 +723,31 @@ export function computeFingersAndBarres(frets: number[], numStrings: number): Fi
 
     // Calculate ideal finger based on fret distance, bounded by remaining available fingers
     const fretOffset = f - minFret;
-    const maxAllowedFingerForThisFret = Math.max(1, 4 - (remainingDistinctFrets - 1));
+    const maxAllowedBaseFinger = 4 - (stringsOnFret.length - 1) - (remainingDistinctFrets - 1);
     
     let baseFingerForFret = lastAssignedFinger + 1;
-    if (1 + fretOffset > baseFingerForFret && 1 + fretOffset <= maxAllowedFingerForThisFret) {
+    if (1 + fretOffset > baseFingerForFret && 1 + fretOffset <= maxAllowedBaseFinger) {
       baseFingerForFret = 1 + fretOffset;
     }
 
-    baseFingerForFret = Math.min(4, Math.max(1, baseFingerForFret));
+    baseFingerForFret = Math.min(Math.max(lastAssignedFinger + 1, 1), Math.max(1, maxAllowedBaseFinger));
 
-    // Assign fingers to each string on this fret
-    for (let i = 0; i < stringsOnFret.length; i++) {
-      const sIndex = stringsOnFret[i];
-      let assignedFinger = baseFingerForFret + i;
-
-      if (assignedFinger > 4) {
-        isPractical = false;
-        penalty += 150;
-        assignedFinger = 4;
+    // Check if individual fingers can be assigned without exceeding 4
+    if (baseFingerForFret + stringsOnFret.length - 1 <= 4) {
+      for (let i = 0; i < stringsOnFret.length; i++) {
+        const sIndex = stringsOnFret[i];
+        const assignedFinger = baseFingerForFret + i;
+        fingers[sIndex] = assignedFinger;
+        lastAssignedFinger = Math.max(lastAssignedFinger, assignedFinger);
       }
-
-      fingers[sIndex] = assignedFinger;
-      lastAssignedFinger = Math.max(lastAssignedFinger, assignedFinger);
+    } else {
+      // Assign shared finger (partial barre / flattened finger) across strings on this fret
+      const sharedFinger = Math.min(4, Math.max(2, lastAssignedFinger + 1));
+      for (let i = 0; i < stringsOnFret.length; i++) {
+        const sIndex = stringsOnFret[i];
+        fingers[sIndex] = sharedFinger;
+      }
+      lastAssignedFinger = Math.max(lastAssignedFinger, sharedFinger);
     }
   }
 

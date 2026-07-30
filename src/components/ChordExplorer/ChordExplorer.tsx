@@ -27,6 +27,7 @@ import {
   GeneratedPosition, 
   generateChordVoicings, 
   parseChordInfo,
+  computeFingersAndBarres,
   normalizeKey,
   normalizeSuffix
 } from '../../lib/chordEngine.ts';
@@ -588,13 +589,14 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
 
     return chordData.positions.map((pos) => {
       const parsed = parseChordInfo(selectedKey, selectedSuffix);
+      const fingering = computeFingersAndBarres(pos.frets, instConfig.strings);
       const fretted = pos.frets.filter(f => f > 0);
       const isOpenOnly = fretted.length === 0;
       const hasOpen = pos.frets.includes(0);
 
-      const baseFret = (hasOpen || isOpenOnly) ? 1 : (pos.baseFret || 1);
-      const barres = (hasOpen || isOpenOnly) ? [] : (pos.barres || []);
-      const fingers = isOpenOnly ? new Array(pos.frets.length).fill(0) : (pos.fingers || []);
+      const baseFret = (hasOpen || isOpenOnly) ? 1 : (pos.baseFret || (fretted.length > 0 ? Math.min(...fretted) : 1));
+      const barres = (hasOpen || isOpenOnly) ? [] : (fingering.barres.length > 0 ? fingering.barres : (pos.barres || []));
+      const fingers = isOpenOnly ? new Array(pos.frets.length).fill(0) : (fingering.fingers || pos.fingers || []);
 
       const fretSpan = fretted.length > 0 ? Math.max(...fretted) - Math.min(...fretted) : 0;
       const noteNames = pos.frets.map((f, i) => {
