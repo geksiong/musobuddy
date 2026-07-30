@@ -198,6 +198,10 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     timeSignature: '12-Beat',
     voices: [
       { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1, 2] },
+      { 
+        id: 1, sound: MetronomeSound.Clap, volume: 0.85, beats: 24, active: true, muted: false, isDoubleTime: true,
+        pattern: [0, 1, 1, 0, 2, 0, 0, 1, 1, 0, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0] 
+      },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
@@ -206,10 +210,11 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
   {
     id: 'bulerias-1',
     name: 'Buleriás 1',
-    bpm: 200,
+    bpm: 180,
     timeSignature: '12-Beat',
     voices: [
       { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [2, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 1, sound: MetronomeSound.Clap, volume: 0.9, beats: 12, active: true, muted: false, pattern: [0, 2, 2, 0, 2, 2, 0, 2, 2, 0, 2, 2] },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
@@ -218,10 +223,11 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
   {
     id: 'bulerias-2',
     name: 'Buleriás 2',
-    bpm: 200,
+    bpm: 180,
     timeSignature: '12-Beat',
     voices: [
       { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [2, 1, 1, 2, 1, 1, 1, 2, 2, 1, 2, 1] },
+      { id: 1, sound: MetronomeSound.Clap, volume: 0.9, beats: 12, active: true, muted: false, pattern: [0, 2, 2, 0, 2, 2, 0, 2, 2, 0, 2, 2] },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
@@ -229,15 +235,35 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
   },
   {
     id: 'siguiriyas',
-    name: 'Siguiriyas',
+    name: 'Siguiriyas (Seguiriyas)',
     bpm: 60,
     timeSignature: '12-Beat',
     voices: [
       { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 1] },
+      { 
+        id: 1, sound: MetronomeSound.Clap, volume: 0.85, beats: 24, active: true, muted: true, isDoubleTime: true,
+        pattern: [2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 1, 0, 2, 0, 1, 0, 1, 0, 2, 0, 1, 0] 
+      },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
     startBeat: 1,
+  },
+  {
+    id: 'siguiriyas-start8',
+    name: 'Siguiriyas (Seguiriyas) (alt)',
+    bpm: 60,
+    timeSignature: '12-Beat',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 12, active: true, muted: false, pattern: [2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 1] },
+      { 
+        id: 1, sound: MetronomeSound.Clap, volume: 0.85, beats: 24, active: true, muted: true, isDoubleTime: true,
+        pattern: [2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 1, 0, 2, 0, 1, 0, 1, 0, 2, 0, 1, 0] 
+      },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 8,
   },
   {
     id: 'flamenco-4-beat',
@@ -247,6 +273,33 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     voices: [
       { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 4, active: true, muted: false, pattern: [2, 1, 1, 1] },
       { id: 1, sound: MetronomeSound.Clap, volume: 0.8, beats: 8, active: true, muted: false, isDoubleTime: true, pattern: [0, 1, 2, 1, 0, 1, 2, 1] },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 1,
+  },
+  {
+    id: 'tangos',
+    name: 'Tangos',
+    bpm: 120,
+    timeSignature: '4/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 4, active: true, muted: false, pattern: [2, 1, 2, 1] },
+      { id: 1, sound: MetronomeSound.Clap, volume: 0.8, beats: 8, active: true, muted: false, isDoubleTime: true, pattern: [0, 0, 2, 1, 1, 0, 2, 0] },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 1,
+  },
+  {
+    id: 'tangos-2p',
+    name: 'Tangos (2 Palmeros)',
+    bpm: 120,
+    timeSignature: '4/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 4, active: true, muted: false, pattern: [2, 1, 2, 1] },
+      { id: 1, sound: MetronomeSound.Clap, volume: 0.8, beats: 8, active: true, muted: false, isDoubleTime: true, pattern: [0, 0, 2, 0, 2, 0, 1, 0] },
+      { id: 2, sound: MetronomeSound.ClockTick, volume: 0.8, beats: 8, active: true, muted: false, isDoubleTime: true, pattern: [0, 1, 0, 1, 0, 0, 1, 0] },
     ],
     countIn: false,
     type: TimeSignatureType.Flamenco,
@@ -265,6 +318,20 @@ export const DEFAULT_PRESETS: BeatPattern[] = [
     type: TimeSignatureType.Flamenco,
     startBeat: 1,
   },
+  {
+    id: 'fandango-de-huelva',
+    name: 'Fandango de Huelva',
+    bpm: 120,
+    timeSignature: '6/4',
+    voices: [
+      { id: 0, sound: MetronomeSound.Woodblock, volume: 1, beats: 6, active: true, muted: false, pattern: [2, 1, 1, 1, 1, 1] },
+      { id: 1, sound: MetronomeSound.Clap, volume: 0.8, beats: 6, active: true, muted: false, isDoubleTime: false, pattern: [2, 1, 1, 2, 2, 0] },
+    ],
+    countIn: false,
+    type: TimeSignatureType.Flamenco,
+    startBeat: 1,
+  },
+
   {
     id: 'flamenco-6-beat',
     name: 'Zapateado / Guajira (6-Beat 3+3)',
