@@ -21,6 +21,14 @@ export const ROOT_OFFSETS_MAP: Record<string, number> = {
   'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
 };
 
+export function formatChordName(chordName: string): string {
+  if (!chordName || chordName.trim() === '') return chordName;
+  return chordName
+    .replace(/#/g, '♯')
+    .replace(/([A-G])b/g, '$1♭')
+    .replace(/b(\d+)/g, '♭$1');
+}
+
 export function transposeChord(chordName: string, semitones: number, forceAccidental?: 'sharp' | 'flat'): string {
   if (!chordName || chordName.trim() === '') return chordName;
 
@@ -67,7 +75,7 @@ export const CHORD_TYPES = [
   { label: 'Minor Maj 7', suffix: 'mmaj7', color: 'bg-violet-600/10 text-violet-600 dark:text-violet-400' },
   { label: 'Minor Maj 7b5', suffix: 'mmaj7b5', color: 'bg-fuchsia-600/10 text-fuchsia-600 dark:text-fuchsia-400' },
   { label: 'Minor Maj 9', suffix: 'mmaj9', color: 'bg-rose-600/10 text-rose-600 dark:text-rose-400' },
-  { label: '7 #9', suffix: '7#9', color: 'bg-orange-600/10 text-orange-600 dark:text-orange-400' },
+  { label: '7 ♯9', suffix: '7#9', color: 'bg-orange-600/10 text-orange-600 dark:text-orange-400' },
   { label: 'Suspended 2', suffix: 'sus2', color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400' },
   { label: 'Suspended 4', suffix: 'sus4', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
   { label: 'Add 9', suffix: 'add9', color: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' },

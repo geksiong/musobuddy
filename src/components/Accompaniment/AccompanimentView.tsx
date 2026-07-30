@@ -19,7 +19,7 @@ import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
   CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, 
-  getChordTypeInfo, transposeChord, toggleEnharmonicSpelling 
+  getChordTypeInfo, transposeChord, toggleEnharmonicSpelling, formatChordName 
 } from './constants.ts';
 import { 
   PROGRESSION_PRESETS, ProgressionPreset, getUserPresets, saveUserPreset, deleteUserPreset 
@@ -653,11 +653,11 @@ export default function AccompanimentView() {
                             {/* Center Chord Display */}
                             <div className="flex flex-col items-center justify-center my-0.5">
                               {isExplicit ? (
-                                <span className="text-xl font-black font-mono tracking-tighter">{chordSlot.name}</span>
+                                <span className="text-xl font-black font-mono tracking-tighter">{formatChordName(chordSlot.name)}</span>
                               ) : (
                                 <div className="flex flex-col items-center">
                                   <span className="text-xs font-bold font-mono opacity-50 italic">
-                                    {effective?.chord ? `(${effective.chord})` : '—'}
+                                    {effective?.chord ? `(${formatChordName(effective.chord)})` : '—'}
                                   </span>
                                 </div>
                               )}
@@ -769,7 +769,7 @@ export default function AccompanimentView() {
 
             {/* Active Chord Badge */}
             <div className="text-[9px] font-black text-emerald-500 px-2.5 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-1 shrink-0">
-              {activeExplorerChord}
+              {formatChordName(activeExplorerChord)}
             </div>
           </div>
 
@@ -840,13 +840,13 @@ export default function AccompanimentView() {
                           : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-500 hover:text-slate-900")
                       )}
                     >
-                      {root}
+                      {formatChordName(root)}
                     </button>
                   ))}
                 </div>
 
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                  Chord Types ({selectedLibraryRoot}):
+                  Chord Types ({formatChordName(selectedLibraryRoot)}):
                 </span>
 
                 {/* Grid of Chords for Selected Root */}
@@ -862,7 +862,7 @@ export default function AccompanimentView() {
                           type.color
                         )}
                       >
-                        <span className="text-lg font-black font-mono tracking-tighter">{chordName}</span>
+                        <span className="text-lg font-black font-mono tracking-tighter">{formatChordName(chordName)}</span>
                         <span className="text-[7px] font-black uppercase tracking-widest opacity-50 group-hover:opacity-100 transition-opacity text-center">
                           {type.label}
                         </span>
@@ -919,7 +919,7 @@ export default function AccompanimentView() {
                     })
                     .map(preset => {
                       const explicitChords = preset.chordsPerBeat.filter(c => c.trim() !== '');
-                      const uniqueExplicitChords = Array.from(new Set(explicitChords));
+                      const uniqueExplicitChords = Array.from(new Set<string>(explicitChords));
                       const beatsPerMeasure = preset.timeSignature === '4/4' ? 4 : preset.timeSignature === '3/4' ? 3 : preset.timeSignature === '6/8' ? 6 : 5;
                       const totalMeasures = Math.ceil(preset.chordsPerBeat.length / beatsPerMeasure);
 
@@ -984,7 +984,7 @@ export default function AccompanimentView() {
                                   key={i}
                                   className="font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px]"
                                 >
-                                  {c}
+                                  {formatChordName(c)}
                                 </span>
                               ))}
                               {uniqueExplicitChords.length > 6 && (
@@ -1095,7 +1095,7 @@ export default function AccompanimentView() {
                 <div className="flex flex-wrap gap-1 mt-1">
                   {progression.filter(p => p.name && p.name.trim() !== '').map((p, i) => (
                     <span key={i} className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-mono font-bold">
-                      {p.name}
+                      {formatChordName(p.name)}
                     </span>
                   ))}
                 </div>

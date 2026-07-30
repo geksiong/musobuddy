@@ -21,6 +21,7 @@ import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { useAudio } from '../../contexts/AudioContext.tsx';
 import { InstrumentType } from '../../types.ts';
+import { formatChordName } from '../Accompaniment/constants.ts';
 import { 
   InstrumentName, 
   INSTRUMENT_CONFIGS, 
@@ -72,7 +73,7 @@ const ALL_SUFFIXES = [
 
 export type DotDisplayMode = 'intervals' | 'fingers' | 'notes';
 
-const PITCH_NAMES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const PITCH_NAMES_SHARP = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const PITCH_NAMES_FLAT  = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 
 export function getNoteName(midiNote: number, rootKey: string = 'C'): string {
@@ -837,7 +838,7 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
             >
               {ALL_KEYS.map(k => (
                 <option key={k} value={k} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                  {k}
+                  {formatChordName(k)}
                 </option>
               ))}
             </select>
@@ -862,7 +863,7 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
             >
               {ALL_SUFFIXES.map(s => (
                 <option key={s} value={s} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                  {s}
+                  {formatChordName(s)}
                 </option>
               ))}
             </select>
@@ -906,7 +907,7 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
           </div>
           <div className="flex flex-col">
             <span className="text-[11px] font-black tracking-wide">
-              {parsedChord.normalizedRoot}{parsedChord.formula.label !== 'Major' ? parsedChord.suffix : ''}
+              {formatChordName(`${parsedChord.normalizedRoot}${parsedChord.formula.label !== 'Major' ? parsedChord.suffix : ''}`)}
               <span className={cn("ml-2 text-[9px] font-bold uppercase tracking-widest", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
                 ({parsedChord.formula.label})
               </span>
@@ -914,7 +915,7 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
             <div className="flex items-center gap-1.5 mt-0.5">
               {parsedChord.noteNames.map((note, idx) => (
                 <span key={idx} className="text-[9px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                  {note}
+                  {formatChordName(note)}
                 </span>
               ))}
             </div>
