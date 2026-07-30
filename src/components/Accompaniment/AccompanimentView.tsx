@@ -18,7 +18,7 @@ import { InstrumentType } from '../../types.ts';
 import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
-  CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, 
+  CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, ARPEGGIO_RATES,
   getChordTypeInfo, transposeChord, toggleEnharmonicSpelling, formatChordName 
 } from './constants.ts';
 import { 
@@ -27,10 +27,15 @@ import {
 import { DEFAULT_PRESETS } from '../Metronome/constants.ts';
 
 const INSTRUMENTS = [
-  { id: InstrumentType.Piano, label: 'Piano', icon: Music },
-  { id: InstrumentType.Organ, label: 'Organ', icon: KeyboardIcon },
-  { id: InstrumentType.Strings, label: 'Strings', icon: Layers },
-  { id: InstrumentType.Guitar, label: 'Guitar', icon: GuitarIcon }
+  { id: InstrumentType.Piano, label: 'Acoustic Piano', icon: Music },
+  { id: InstrumentType.ElectricPiano, label: 'Electric Piano (Rhodes)', icon: KeyboardIcon },
+  { id: InstrumentType.Guitar, label: 'Acoustic Guitar', icon: GuitarIcon },
+  { id: InstrumentType.Bass, label: 'Plucked Bass', icon: GuitarIcon },
+  { id: InstrumentType.Strings, label: 'Symphonic Strings', icon: Layers },
+  { id: InstrumentType.Organ, label: 'Hammond Organ', icon: KeyboardIcon },
+  { id: InstrumentType.Flute, label: 'Concert Flute', icon: Sparkles },
+  { id: InstrumentType.Brass, label: 'Brass Section', icon: Radio },
+  { id: InstrumentType.Marimba, label: 'Acoustic Marimba', icon: ListMusic },
 ];
 
 function KeyboardIcon({ className }: { className?: string }) {
@@ -52,6 +57,7 @@ export default function AccompanimentView() {
     selectedBeatIndex, setSelectedBeatIndex,
     clearBeat, deleteBeat, insertBeat, addBeat, addMeasure, clearAll,
     arpeggioPreset, setArpeggioPreset,
+    arpeggioRate, setArpeggioRate,
     selectedInstrument, setSelectedInstrument,
     isBassEnabled, setIsBassEnabled,
     selectedLibraryRoot, setSelectedLibraryRoot,
@@ -322,7 +328,7 @@ export default function AccompanimentView() {
               <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")} />
             </div>
 
-            {/* Arpeggio Selector */}
+            {/* Arpeggio Pattern Selector */}
             <div className="relative group shrink-0">
               <select
                 value={arpeggioPreset}
@@ -334,9 +340,35 @@ export default function AccompanimentView() {
                   "appearance-none border px-3 pr-8 py-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer outline-none focus:border-emerald-500/50",
                   resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:text-white" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
                 )}
+                title="Select arpeggio pattern"
               >
                 {ARPEGGIO_PRESETS.map(preset => (
-                  <option key={preset} value={preset} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>{preset}</option>
+                  <option key={preset} value={preset} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
+                    {preset}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")} />
+            </div>
+
+            {/* Rate / Subdivision Selector (Double Time, Triplets, Sixteenths) */}
+            <div className="relative group shrink-0">
+              <select
+                value={arpeggioRate}
+                onChange={(e) => {
+                  setArpeggioRate(e.target.value);
+                  e.target.blur();
+                }}
+                className={cn(
+                  "appearance-none border px-3 pr-8 py-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer outline-none focus:border-emerald-500/50",
+                  arpeggioRate !== '1x' ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 font-extrabold" : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:text-white" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100")
+                )}
+                title="Subdivision Speed (1x Normal, 2x Double Time, 3x Triplets, 4x Sixteenths)"
+              >
+                {ARPEGGIO_RATES.map(rate => (
+                  <option key={rate.id} value={rate.id} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
+                    {rate.label}
+                  </option>
                 ))}
               </select>
               <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")} />
@@ -413,6 +445,27 @@ export default function AccompanimentView() {
                 <ArrowLeftRight className="w-3 h-3 text-emerald-500" />
                 <span>♯ ↔ ♭ All</span>
               </button>
+
+              <div className="h-4 w-px bg-slate-300 dark:bg-white/10 mx-1 hidden sm:block" />
+
+              <span className="text-slate-400 font-mono uppercase text-[9px] mr-0.5 hidden sm:inline">Speed:</span>
+              <div className="flex items-center gap-1">
+                {ARPEGGIO_RATES.map(rate => (
+                  <button
+                    key={rate.id}
+                    onClick={() => setArpeggioRate(rate.id)}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md border text-[9px] font-mono transition-all",
+                      arpeggioRate === rate.id
+                        ? "bg-emerald-500 text-white border-emerald-500 font-bold shadow-xs"
+                        : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100")
+                    )}
+                    title={rate.description}
+                  >
+                    {rate.shortLabel}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button

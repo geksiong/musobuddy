@@ -5,10 +5,14 @@
 
 export enum InstrumentType {
   Piano = 'piano',
+  ElectricPiano = 'epiano',
   Organ = 'organ',
   Strings = 'strings',
   Guitar = 'guitar',
-  Bass = 'bass'
+  Bass = 'bass',
+  Flute = 'flute',
+  Brass = 'brass',
+  Marimba = 'marimba'
 }
 
 export * from './components/Metronome/types.ts';

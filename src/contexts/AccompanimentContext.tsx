@@ -46,6 +46,8 @@ interface AccompanimentContextType {
   clearAll: () => void;
   arpeggioPreset: string;
   setArpeggioPreset: (preset: string) => void;
+  arpeggioRate: string;
+  setArpeggioRate: (rate: string) => void;
   selectedInstrument: InstrumentType;
   setSelectedInstrument: (inst: InstrumentType) => void;
   isBassEnabled: boolean;
@@ -68,20 +70,27 @@ const AccompanimentContext = createContext<AccompanimentContextType | null>(null
 
 const SyncEngine: React.FC = () => {
   const { 
-    isPlaying, progression, arpeggioPreset, selectedInstrument, isBassEnabled,
+    isPlaying, progression, arpeggioPreset, arpeggioRate, selectedInstrument, isBassEnabled,
     setCurrentIndex, setIsPendingStart, accompanimentVolume
   } = useAccompaniment();
-  const { currentBeat, activePattern } = useMetronome();
+  const { currentBeat, activePattern, bpm } = useMetronome();
   const { playChord, playNote, setIsAccompanimentPlaying, isMetronomePlaying } = useAudio();
   const lastBeatRef = useRef<number>(-1);
   const playbackStartBeatRef = useRef<number>(0);
   const pendingStartRef = useRef<boolean>(false);
+  const subBeatTimersRef = useRef<NodeJS.Timeout[]>([]);
 
   const masterVoice = activePattern?.voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
 
+  const clearSubBeatTimers = () => {
+    subBeatTimersRef.current.forEach(t => clearTimeout(t));
+    subBeatTimersRef.current = [];
+  };
+
   useEffect(() => {
     setIsAccompanimentPlaying(isPlaying);
+    if (!isPlaying) clearSubBeatTimers();
   }, [isPlaying, setIsAccompanimentPlaying]);
 
   useEffect(() => {
@@ -100,6 +109,7 @@ const SyncEngine: React.FC = () => {
       pendingStartRef.current = false;
       setIsPendingStart(false);
       lastBeatRef.current = -1;
+      clearSubBeatTimers();
     }
   }, [isPlaying, isMetronomePlaying, masterLength, setIsPendingStart]); 
 
@@ -128,53 +138,189 @@ const SyncEngine: React.FC = () => {
 
       const currentChord = effectiveInfo.chord;
       const isExplicit = effectiveInfo.isExplicit;
-      const intervals = getIntervalsForChord(currentChord);
+      const baseIntervals = getIntervalsForChord(currentChord) || [0, 4, 7];
       const beatInMeasure = effectiveBeat % masterLength;
 
       if (currentBeat !== lastBeatRef.current) {
-        if (arpeggioPreset === 'Block') {
-          if (isExplicit || beatInMeasure === 0) {
-            playChord(currentChord, selectedInstrument, accompanimentVolume);
-          }
-        }
+        clearSubBeatTimers();
 
+        // 1. Play Bass Note on Measure Downbeat if enabled
         if (isBassEnabled && beatInMeasure === 0) {
-          playNote(intervals[0] - 24, 2.0, InstrumentType.Bass, accompanimentVolume);
+          playNote(baseIntervals[0] - 24, 2.0, InstrumentType.Bass, accompanimentVolume);
         }
 
-        if (arpeggioPreset !== 'Block') {
-          const len = intervals.length;
-          let noteIndex = 0;
-          switch (arpeggioPreset) {
-            case 'Up': noteIndex = effectiveBeat % len; break;
-            case 'Down': noteIndex = (len - 1) - (effectiveBeat % len); break;
-            case 'Up-Down': {
-              const mod = effectiveBeat % (len * 2 - 2);
-              noteIndex = mod < len ? mod : (len * 2 - 2) - mod;
-              break;
-            }
-            case 'Converge': {
-              const cIdx = effectiveBeat % len;
-              noteIndex = cIdx % 2 === 0 ? cIdx / 2 : (len - 1) - Math.floor(cIdx / 2);
-              break;
-            }
-            case 'Diverge': {
-              const mid = Math.floor(len / 2);
-              const dIdx = effectiveBeat % len;
-              noteIndex = dIdx % 2 === 0 ? mid + dIdx / 2 : mid - (dIdx + 1) / 2;
-              break;
-            }
-            case 'Stutter': noteIndex = Math.floor(effectiveBeat / 2) % len; break;
-            case 'Random': noteIndex = Math.floor(Math.random() * len); break;
+        // 2. Determine Sub-Beat Subdivisions & Rate
+        let notesPerBeat = 1;
+        if (arpeggioRate === '2x') notesPerBeat = 2;
+        else if (arpeggioRate === '3x') notesPerBeat = 3;
+        else if (arpeggioRate === '4x') notesPerBeat = 4;
+        else if (arpeggioRate === '0.5x') notesPerBeat = 0.5;
+
+        // Override subdivision for preset-specific rhythmic patterns
+        if (arpeggioPreset.includes('Double-Time') || arpeggioPreset === 'Bossa Nova Rhythm' || arpeggioPreset === 'Montuno / Latin') {
+          notesPerBeat = Math.max(notesPerBeat, 2);
+        } else if (arpeggioPreset === '16th Quad Arpeggio' || arpeggioPreset === 'Fingerstyle Folk') {
+          notesPerBeat = Math.max(notesPerBeat, 4);
+        }
+
+        // Handle 0.5x Half Time (play only on even beats)
+        if (notesPerBeat === 0.5) {
+          if (effectiveBeat % 2 !== 0) {
+            lastBeatRef.current = currentBeat;
+            return;
           }
-          playNote(intervals[noteIndex], 0.4, selectedInstrument, accompanimentVolume);
+          notesPerBeat = 1;
+        }
+
+        const currentBpm = Math.max(30, bpm || 120);
+        const beatDurationMs = (60 / currentBpm) * 1000;
+        const subStepDurationMs = beatDurationMs / notesPerBeat;
+
+        // Extended 2-octave intervals for multi-octave presets
+        let intervals = [...baseIntervals];
+        if (arpeggioPreset.includes('2 Octaves')) {
+          intervals = [...baseIntervals, ...baseIntervals.map(i => i + 12)];
+        }
+
+        // Trigger Sub-Beats
+        for (let s = 0; s < notesPerBeat; s++) {
+          const delayMs = s * subStepDurationMs;
+          const globalStepIndex = Math.floor(effectiveBeat * notesPerBeat + s);
+
+          const triggerNote = () => {
+            if (arpeggioPreset === 'Block') {
+              if (s === 0 && (isExplicit || beatInMeasure === 0)) {
+                playChord(currentChord, selectedInstrument, accompanimentVolume);
+              }
+            } else if (arpeggioPreset === 'Double-Time Strum') {
+              // Alternating strum on sub-beats
+              playChord(currentChord, selectedInstrument, accompanimentVolume * (s === 0 ? 1.0 : 0.8));
+            } else {
+              const len = intervals.length;
+              let noteIndex = 0;
+
+              switch (arpeggioPreset) {
+                case 'Up':
+                case 'Double-Time Up':
+                  noteIndex = globalStepIndex % len;
+                  break;
+
+                case 'Down':
+                  noteIndex = (len - 1) - (globalStepIndex % len);
+                  break;
+
+                case 'Up-Down':
+                case 'Double-Time Up-Down': {
+                  const mod = globalStepIndex % (len * 2 - 2 || 1);
+                  noteIndex = mod < len ? mod : (len * 2 - 2) - mod;
+                  break;
+                }
+
+                case 'Up (2 Octaves)':
+                  noteIndex = globalStepIndex % len;
+                  break;
+
+                case 'Down (2 Octaves)':
+                  noteIndex = (len - 1) - (globalStepIndex % len);
+                  break;
+
+                case 'Up-Down (2 Octaves)': {
+                  const mod = globalStepIndex % (len * 2 - 2 || 1);
+                  noteIndex = mod < len ? mod : (len * 2 - 2) - mod;
+                  break;
+                }
+
+                case 'Alberti Bass': {
+                  // Classic Alberti Pattern: Root, 5th, 3rd, 5th
+                  const albertiSeq = [0, len - 1, Math.min(1, len - 1), len - 1];
+                  noteIndex = albertiSeq[globalStepIndex % albertiSeq.length];
+                  break;
+                }
+
+                case 'Pedal Point': {
+                  // Alternates root note with moving chord tones
+                  if (globalStepIndex % 2 === 0) {
+                    noteIndex = 0;
+                  } else {
+                    const movingIdx = Math.floor(globalStepIndex / 2) % (len - 1 || 1) + 1;
+                    noteIndex = Math.min(movingIdx, len - 1);
+                  }
+                  break;
+                }
+
+                case 'Fingerstyle Folk': {
+                  // Folk pattern: Root, 3rd, 5th, 3rd, Octave/Upper, 5th, 3rd, 5th
+                  const folkSeq = [0, 1, 2, 1, Math.min(3, len - 1), 2, 1, 2];
+                  noteIndex = folkSeq[globalStepIndex % folkSeq.length] % len;
+                  break;
+                }
+
+                case 'Bossa Nova Rhythm': {
+                  // Syncopated Brazilian Bossa pattern
+                  const bossaSeq = [0, len - 1, Math.min(1, len - 1), 0, len - 1];
+                  noteIndex = bossaSeq[globalStepIndex % bossaSeq.length] % len;
+                  break;
+                }
+
+                case 'Montuno / Latin': {
+                  // Afro-Cuban Piano Montuno pattern with octave jumps
+                  const montunoSeq = [0, len - 1, Math.min(1, len - 1), len - 1, 0, len - 1];
+                  noteIndex = montunoSeq[globalStepIndex % montunoSeq.length] % len;
+                  break;
+                }
+
+                case '16th Quad Arpeggio': {
+                  noteIndex = globalStepIndex % len;
+                  break;
+                }
+
+                case 'Converge': {
+                  const cIdx = globalStepIndex % len;
+                  noteIndex = cIdx % 2 === 0 ? cIdx / 2 : (len - 1) - Math.floor(cIdx / 2);
+                  break;
+                }
+
+                case 'Diverge': {
+                  const mid = Math.floor(len / 2);
+                  const dIdx = globalStepIndex % len;
+                  noteIndex = dIdx % 2 === 0 ? mid + dIdx / 2 : mid - (dIdx + 1) / 2;
+                  break;
+                }
+
+                case 'Stutter':
+                  noteIndex = Math.floor(globalStepIndex / 2) % len;
+                  break;
+
+                case 'Random':
+                  noteIndex = Math.floor(Math.random() * len);
+                  break;
+
+                default:
+                  noteIndex = globalStepIndex % len;
+              }
+
+              // Dynamic duration based on sub-step rate
+              const noteDuration = Math.min(0.8, (beatDurationMs / notesPerBeat) / 1000 * 1.4);
+              const noteVolume = accompanimentVolume * (s === 0 ? 1.0 : 0.88); // Accent beat downbeat
+
+              playNote(intervals[noteIndex], noteDuration, selectedInstrument, noteVolume);
+            }
+          };
+
+          if (delayMs <= 2) {
+            triggerNote();
+          } else {
+            const timer = setTimeout(triggerNote, delayMs);
+            subBeatTimersRef.current.push(timer);
+          }
         }
       }
       lastBeatRef.current = currentBeat;
     } else {
       lastBeatRef.current = -1;
+      clearSubBeatTimers();
     }
-  }, [currentBeat, isPlaying, progression, arpeggioPreset, masterLength, selectedInstrument, isBassEnabled, setCurrentIndex, playChord, playNote, accompanimentVolume, setIsPendingStart]);
+  }, [currentBeat, isPlaying, progression, arpeggioPreset, arpeggioRate, masterLength, selectedInstrument, isBassEnabled, setCurrentIndex, playChord, playNote, accompanimentVolume, setIsPendingStart, bpm]);
 
   return null;
 };
@@ -189,6 +335,7 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
   ]);
   const [selectedBeatIndex, setSelectedBeatIndex] = useState<number | null>(0);
   const [arpeggioPreset, setArpeggioPreset] = useState('Block');
+  const [arpeggioRate, setArpeggioRate] = useState('1x');
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentType>(InstrumentType.Piano);
   const [isBassEnabled, setIsBassEnabled] = useState(false);
   const [selectedLibraryRoot, setSelectedLibraryRoot] = useState('C');
@@ -260,6 +407,7 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     selectedBeatIndex, setSelectedBeatIndex,
     clearBeat, deleteBeat, insertBeat, addBeat, addMeasure, clearAll,
     arpeggioPreset, setArpeggioPreset,
+    arpeggioRate, setArpeggioRate,
     selectedInstrument, setSelectedInstrument,
     isBassEnabled, setIsBassEnabled,
     selectedLibraryRoot, setSelectedLibraryRoot,

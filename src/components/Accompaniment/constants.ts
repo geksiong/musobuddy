@@ -105,4 +105,42 @@ export function getChordTypeInfo(chordName: string) {
   return CHORD_TYPES[0];
 }
 
-export const ARPEGGIO_PRESETS = ['Block', 'Up', 'Down', 'Up-Down', 'Converge', 'Diverge', 'Stutter', 'Random'];
+export const ARPEGGIO_PRESETS = [
+  'Block',
+  'Up',
+  'Down',
+  'Up-Down',
+  'Converge',
+  'Diverge',
+  'Stutter',
+  'Random',
+  'Up (2 Octaves)',
+  'Down (2 Octaves)',
+  'Up-Down (2 Octaves)',
+  'Alberti Bass',
+  'Pedal Point',
+  'Double-Time Up',
+  'Double-Time Up-Down',
+  'Double-Time Strum',
+  'Fingerstyle Folk',
+  'Bossa Nova Rhythm',
+  'Montuno / Latin',
+  '16th Quad Arpeggio'
+];
+
+export interface ArpeggioRateOption {
+  id: string;
+  label: string;
+  shortLabel: string;
+  multiplier: number; // notes per quarter note beat
+  description: string;
+}
+
+export const ARPEGGIO_RATES: ArpeggioRateOption[] = [
+  { id: '1x', label: '1x (Quarter Notes)', shortLabel: '1x Normal', multiplier: 1, description: '1 note per beat' },
+  { id: '2x', label: '2x (Double Time / 8th Notes)', shortLabel: '2x Double Time', multiplier: 2, description: '2 notes per beat (8th notes)' },
+  { id: '3x', label: '3x (Triplets / 8th Triplets)', shortLabel: '3x Triplets', multiplier: 3, description: '3 notes per beat (8th triplets)' },
+  { id: '4x', label: '4x (Sixteenth Notes)', shortLabel: '4x Quad Time', multiplier: 4, description: '4 notes per beat (16th notes)' },
+  { id: '0.5x', label: '0.5x (Half Time)', shortLabel: '0.5x Half Time', multiplier: 0.5, description: '1 note every 2 beats' },
+];
+
