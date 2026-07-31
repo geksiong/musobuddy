@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { 
   Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
   Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles,
-  ArrowLeftRight, BookmarkPlus, Save, Hash
+  ArrowLeftRight, BookmarkPlus, Save, Hash, Search
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useMetronome } from '../../hooks/useMetronome.ts';
@@ -73,6 +73,7 @@ export default function AccompanimentView() {
 
   const [activeRightTab, setActiveRightTab] = useState<'library' | 'explorer' | 'presets'>('library');
   const [presetFilterTimeSig, setPresetFilterTimeSig] = useState<string>('ALL');
+  const [presetSearchQuery, setPresetSearchQuery] = useState<string>('');
 
   // Enharmonic and Transposition state
   const [accidentalMode, setAccidentalMode] = useState<'sharp' | 'flat'>('sharp');
@@ -936,15 +937,49 @@ export default function AccompanimentView() {
               </div>
             ) : (
               <div className="flex flex-col gap-3 h-full min-h-0">
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-widest text-[9px]">Filter Presets:</span>
-                  <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    {[...userPresets, ...PROGRESSION_PRESETS].filter(p => {
-                      if (presetFilterTimeSig === 'ALL') return true;
-                      if (presetFilterTimeSig === 'CUSTOM') return p.isCustom;
-                      return p.timeSignature === presetFilterTimeSig;
-                    }).length} Presets
-                  </span>
+                {/* Search & Filter Header */}
+                <div className="flex flex-col gap-2">
+                  <div className="relative">
+                    <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
+                    <input 
+                      type="text"
+                      placeholder="Search presets (e.g., Tangos, Flamenco, Jazz, C7, Paco)..."
+                      value={presetSearchQuery}
+                      onChange={(e) => setPresetSearchQuery(e.target.value)}
+                      className={cn(
+                        "w-full pl-8 pr-8 py-1.5 rounded-xl border text-xs font-medium outline-none transition-all focus:border-emerald-500",
+                        resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/30" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400"
+                      )}
+                    />
+                    {presetSearchQuery && (
+                      <button
+                        onClick={() => setPresetSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] font-bold">
+                    <span className="text-slate-400 uppercase tracking-widest text-[9px]">Filter Time Sig:</span>
+                    <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      {[...userPresets, ...PROGRESSION_PRESETS].filter(p => {
+                        const matchesTs = presetFilterTimeSig === 'ALL' 
+                          ? true 
+                          : presetFilterTimeSig === 'CUSTOM' 
+                            ? p.isCustom 
+                            : p.timeSignature === presetFilterTimeSig;
+                        const query = presetSearchQuery.trim().toLowerCase();
+                        if (!query) return matchesTs;
+                        const matchName = p.name.toLowerCase().includes(query);
+                        const matchGenre = p.genre.toLowerCase().includes(query);
+                        const matchDesc = p.description.toLowerCase().includes(query);
+                        const matchChords = p.chordsPerBeat.some(c => c.toLowerCase().includes(query));
+                        return matchesTs && (matchName || matchGenre || matchDesc || matchChords);
+                      }).length} Presets
+                    </span>
+                  </div>
                 </div>
 
                 {/* Filter Pills */}
@@ -972,9 +1007,18 @@ export default function AccompanimentView() {
                 <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2.5">
                   {[...userPresets, ...PROGRESSION_PRESETS]
                     .filter(p => {
-                      if (presetFilterTimeSig === 'ALL') return true;
-                      if (presetFilterTimeSig === 'CUSTOM') return p.isCustom;
-                      return p.timeSignature === presetFilterTimeSig;
+                      const matchesTs = presetFilterTimeSig === 'ALL' 
+                        ? true 
+                        : presetFilterTimeSig === 'CUSTOM' 
+                          ? p.isCustom 
+                          : p.timeSignature === presetFilterTimeSig;
+                      const query = presetSearchQuery.trim().toLowerCase();
+                      if (!query) return matchesTs;
+                      const matchName = p.name.toLowerCase().includes(query);
+                      const matchGenre = p.genre.toLowerCase().includes(query);
+                      const matchDesc = p.description.toLowerCase().includes(query);
+                      const matchChords = p.chordsPerBeat.some(c => c.toLowerCase().includes(query));
+                      return matchesTs && (matchName || matchGenre || matchDesc || matchChords);
                     })
                     .map(preset => {
                       const explicitChords = preset.chordsPerBeat.filter(c => c.trim() !== '');
