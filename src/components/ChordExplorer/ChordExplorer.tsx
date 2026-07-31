@@ -935,7 +935,7 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
       </div>
 
       {/* Main Diagram Area: Directly below selectors & formula banner */}
-      <div className="flex-1 flex flex-col items-center justify-center relative min-h-[300px]">
+      <div className="flex-1 flex flex-col items-center justify-start pt-1 relative min-h-[280px]">
         {currentVoicing ? (
           <div className="flex flex-col items-center gap-4 w-full">
 
