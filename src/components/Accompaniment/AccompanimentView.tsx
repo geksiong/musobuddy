@@ -17,6 +17,7 @@ import { useAccompaniment, getEffectiveChord } from '../../contexts/Accompanimen
 import { InstrumentType } from '../../types.ts';
 import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
 import GrooveEnginePanel from './GrooveEnginePanel.tsx';
+import SongLibraryPanel from './SongLibraryPanel.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
   CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, ARPEGGIO_RATES,
@@ -71,7 +72,7 @@ export default function AccompanimentView() {
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
-  const [activeRightTab, setActiveRightTab] = useState<'library' | 'explorer' | 'presets'>('library');
+  const [activeRightTab, setActiveRightTab] = useState<'songs' | 'library' | 'explorer' | 'presets'>('songs');
   const [presetFilterTimeSig, setPresetFilterTimeSig] = useState<string>('ALL');
   const [presetSearchQuery, setPresetSearchQuery] = useState<string>('');
 
@@ -788,6 +789,19 @@ export default function AccompanimentView() {
           <div className="p-4 pb-0 flex items-center justify-between border-b border-slate-200 dark:border-white/10">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
               <button
+                onClick={() => setActiveRightTab('songs')}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0",
+                  activeRightTab === 'songs'
+                    ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
+                    : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
+                )}
+              >
+                <Music className="w-3.5 h-3.5 text-emerald-500" />
+                Song Library
+              </button>
+
+              <button
                 onClick={() => setActiveRightTab('library')}
                 className={cn(
                   "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0",
@@ -797,7 +811,7 @@ export default function AccompanimentView() {
                 )}
               >
                 <BookOpen className="w-3.5 h-3.5" />
-                Library
+                Chords
               </button>
 
               <button
@@ -835,7 +849,9 @@ export default function AccompanimentView() {
 
           {/* Tab Content Area */}
           <div className="flex-1 p-4 flex flex-col overflow-y-auto min-h-0">
-            {activeRightTab === 'library' ? (
+            {activeRightTab === 'songs' ? (
+              <SongLibraryPanel />
+            ) : activeRightTab === 'library' ? (
               <div className="flex flex-col gap-4 h-full">
                 {/* Target Beat & Enharmonic Toggle Banner */}
                 <div className="flex items-center justify-between text-[10px] font-bold flex-wrap gap-2">

@@ -490,6 +490,94 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       { id: 'p2', name: 'Snare / Clap', sound: MetronomeSound.Clap, volume: 0.8, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
       { id: 'p3', name: 'Kick', sound: MetronomeSound.Kick, volume: 0.9, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
     ]
+  },
+  {
+    id: 'jazz-waltz-34',
+    name: '3/4 Jazz Swing Waltz',
+    genre: 'Jazz',
+    timeSignature: '3/4',
+    subdivisionsPerBeat: 2,
+    defaultBpm: 115,
+    swingRatio: 0.667,
+    hasEarlyPush: true,
+    description: 'Elegant 3/4 Jazz waltz with swinging ride cymbal, walking bass, and soft comping on beat 2 and 3.',
+    chordPattern: [
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'WALKING', 'OFF', 'FIFTH', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'p1', name: 'Ride Cymbal Swing', sound: MetronomeSound.HiHat, volume: 0.8, pattern: [2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Snare Brush', sound: MetronomeSound.Snare, volume: 0.5, pattern: [0, 0, 1, 0, 1, 0] },
+      { id: 'p3', name: 'Hi-Hat Foot (2 & 3)', sound: MetronomeSound.Woodblock, volume: 0.6, pattern: [0, 0, 2, 0, 2, 0] }
+    ]
+  },
+  {
+    id: 'ballad-68',
+    name: '6/8 Slow Soul / Acoustic Ballad',
+    genre: 'Pop',
+    timeSignature: '6/8',
+    subdivisionsPerBeat: 2,
+    defaultBpm: 68,
+    hasEarlyPush: false,
+    description: 'Rolling 6/8 compound meter rhythm with arpeggiated piano/guitar feels, snare rim click on beat 4, and warm bass pulses.',
+    chordPattern: [
+      'CHORD_ACCENT', 'ARPEGGIO', 'ARPEGGIO', 'CHORD', 'ARPEGGIO', 'ARPEGGIO',
+      'CHORD', 'ARPEGGIO', 'ARPEGGIO', 'CHORD', 'ARPEGGIO', 'ARPEGGIO'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'OFF', 'FIFTH', 'OFF', 'OFF',
+      'ROOT', 'OFF', 'OFF', 'FIFTH', 'OFF', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'p1', name: 'Hi-Hat 6/8 Pulse', sound: MetronomeSound.HiHat, volume: 0.7, pattern: [2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1] },
+      { id: 'p2', name: 'Snare Rim (Beat 4)', sound: MetronomeSound.Snare, volume: 0.85, pattern: [0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0] },
+      { id: 'p3', name: 'Kick (Beats 1 & 4)', sound: MetronomeSound.Kick, volume: 0.9, pattern: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0] }
+    ]
+  },
+  {
+    id: '54-cool-jazz',
+    name: '5/4 Cool Jazz Stride',
+    genre: 'Jazz',
+    timeSignature: '5/4',
+    subdivisionsPerBeat: 2,
+    defaultBpm: 140,
+    swingRatio: 0.667,
+    hasEarlyPush: true,
+    description: 'Asymmetric 3+2 5/4 cool jazz groove with syncopated chord comping and walking bassline.',
+    chordPattern: [
+      'CHORD_ACCENT', 'OFF', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD', 'OFF', 'CHORD', 'OFF', 'CHORD', 'OFF'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'WALKING', 'OFF', 'FIFTH', 'OFF', 'ROOT', 'OFF', 'WALKING', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'p1', name: 'Ride Cymbal 5/4', sound: MetronomeSound.HiHat, volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Snare Accent', sound: MetronomeSound.Snare, volume: 0.6, pattern: [0, 0, 0, 2, 0, 0, 2, 0, 0, 0] },
+      { id: 'p3', name: 'Kick', sound: MetronomeSound.Kick, volume: 0.8, pattern: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0] }
+    ]
+  },
+  {
+    id: 'country-waltz-34',
+    name: '3/4 Country / Folk Waltz',
+    genre: 'World',
+    timeSignature: '3/4',
+    subdivisionsPerBeat: 2,
+    defaultBpm: 92,
+    hasEarlyPush: false,
+    description: 'Warm acoustic boom-chick country waltz with bass on beat 1 and acoustic strum on beats 2 and 3.',
+    chordPattern: [
+      'OFF', 'OFF', 'CHORD', 'OFF', 'CHORD', 'OFF'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'OFF', 'OFF', 'FIFTH', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'p1', name: 'Brushed Hi-Hat', sound: MetronomeSound.HiHat, volume: 0.65, pattern: [1, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Snare Tap', sound: MetronomeSound.Snare, volume: 0.5, pattern: [0, 0, 1, 0, 1, 0] },
+      { id: 'p3', name: 'Kick (Beat 1)', sound: MetronomeSound.Kick, volume: 0.85, pattern: [2, 0, 0, 0, 0, 0] }
+    ]
   }
 ];
 
