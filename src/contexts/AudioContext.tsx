@@ -1031,63 +1031,122 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     switch (instrument) {
       case InstrumentType.Piano: {
-        // --- Acoustic Grand Piano ---
-        // Soft Felt Hammer Tap (very subtle transient, no metallic click)
-        const hammerOsc = ctx.createOscillator();
-        const hammerGain = ctx.createGain();
-        hammerOsc.type = 'sine';
-        hammerOsc.frequency.setValueAtTime(380, now);
-        hammerGain.gain.setValueAtTime(0.012, now);
-        hammerGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.008);
-        hammerOsc.connect(hammerGain);
-        hammerGain.connect(gain);
-        hammerOsc.start(now);
-        hammerOsc.stop(now + 0.010);
+        // --- Acoustic Concert Grand Piano ---
+        // 1. Felt Hammer Attack Transient (Percussive Thump & Felt Impact)
+        const hammerBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.012), ctx.sampleRate);
+        const hammerData = hammerBuffer.getChannelData(0);
+        for (let i = 0; i < hammerData.length; i++) {
+          hammerData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (hammerData.length * 0.25));
+        }
+        const hammerSource = ctx.createBufferSource();
+        hammerSource.buffer = hammerBuffer;
 
-        // Soundboard Body Resonator & Acoustic Warmth Filter
-        const soundboardFilter = ctx.createBiquadFilter();
-        soundboardFilter.type = 'peaking';
-        soundboardFilter.frequency.setValueAtTime(250, now);
-        soundboardFilter.Q.setValueAtTime(1.0, now);
-        soundboardFilter.gain.setValueAtTime(2.0, now);
+        const hammerFilter = ctx.createBiquadFilter();
+        hammerFilter.type = 'bandpass';
+        hammerFilter.frequency.setValueAtTime(1600, now);
+        hammerFilter.Q.setValueAtTime(1.8, now);
+
+        const hammerGain = ctx.createGain();
+        hammerGain.gain.setValueAtTime(0.025, now);
+
+        hammerSource.connect(hammerFilter);
+        hammerFilter.connect(hammerGain);
+        hammerGain.connect(gain);
+        hammerSource.start(now);
+
+        // Low frequency wooden body thump
+        const thumpOsc = ctx.createOscillator();
+        const thumpGain = ctx.createGain();
+        thumpOsc.type = 'sine';
+        thumpOsc.frequency.setValueAtTime(110, now);
+        thumpGain.gain.setValueAtTime(0.02, now);
+        thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.018);
+        thumpOsc.connect(thumpGain);
+        thumpGain.connect(gain);
+        thumpOsc.start(now);
+        thumpOsc.stop(now + 0.02);
+
+        // 2. Soundboard Body Resonators & Dynamic Lowpass Filter
+        const soundboardFilter1 = ctx.createBiquadFilter();
+        soundboardFilter1.type = 'peaking';
+        soundboardFilter1.frequency.setValueAtTime(280, now);
+        soundboardFilter1.Q.setValueAtTime(1.2, now);
+        soundboardFilter1.gain.setValueAtTime(3.5, now);
+
+        const soundboardFilter2 = ctx.createBiquadFilter();
+        soundboardFilter2.type = 'peaking';
+        soundboardFilter2.frequency.setValueAtTime(950, now);
+        soundboardFilter2.Q.setValueAtTime(0.9, now);
+        soundboardFilter2.gain.setValueAtTime(2.0, now);
 
         const lpFilter = ctx.createBiquadFilter();
         lpFilter.type = 'lowpass';
-        // Warm frequency-dependent lowpass cutoff
-        lpFilter.frequency.setValueAtTime(Math.min(2600, Math.max(1200, freq * 3.2)), now);
+        // Dynamic cutoff: Bright initial strike decaying to warm fundamental sustain
+        const initialCutoff = Math.min(8500, Math.max(2400, freq * 5.5));
+        const sustainCutoff = Math.min(3000, Math.max(950, freq * 2.2));
+        lpFilter.frequency.setValueAtTime(initialCutoff, now);
+        lpFilter.frequency.exponentialRampToValueAtTime(sustainCutoff, now + 0.16);
 
-        soundboardFilter.connect(lpFilter);
+        soundboardFilter1.connect(soundboardFilter2);
+        soundboardFilter2.connect(lpFilter);
         lpFilter.connect(gain);
 
-        // Fundamental string (Triangle wave produces rich warm acoustic harmonics without harshness)
-        osc.type = 'triangle';
+        // 3. Realistic Piano Fourier Harmonic PeriodicWave
+        const realHarmonics = new Float32Array([0, 1.0, 0.62, 0.42, 0.28, 0.16, 0.09, 0.04, 0.02, 0.01]);
+        const imagHarmonics = new Float32Array(realHarmonics.length);
+        const pianoWave = ctx.createPeriodicWave(realHarmonics, imagHarmonics);
+
+        // 4. 3-String Chorused Unison (Center, -1.5 cents, +1.5 cents for natural piano depth)
+        const mainGain = ctx.createGain();
+        mainGain.gain.setValueAtTime(0.0001, now);
+        mainGain.gain.linearRampToValueAtTime(0.12, now + 0.0025); // Fast responsive attack
+        mainGain.gain.exponentialRampToValueAtTime(0.065, now + 0.14);  // Initial hammer drop
+        mainGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.1); // Natural sustain decay
+
+        // Primary string
+        osc.setPeriodicWave(pianoWave);
         osc.frequency.setValueAtTime(freq, now);
-        
-        const fundamentalGain = ctx.createGain();
-        fundamentalGain.gain.setValueAtTime(0.0001, now);
-        fundamentalGain.gain.linearRampToValueAtTime(0.11, now + 0.003); // Warm gentle attack
-        fundamentalGain.gain.exponentialRampToValueAtTime(0.05, now + 0.08); // Initial decay
-        fundamentalGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-        osc.connect(fundamentalGain);
-        fundamentalGain.connect(soundboardFilter);
+        osc.connect(mainGain);
 
-        // Natural String Overtones (Soft sine harmonics for realistic piano timbre)
-        const partialRatios = [2.001, 3.003, 4.006];
-        const partialAmps = [0.02, 0.008, 0.003];
-        const partialDecays = [0.7, 0.4, 0.25];
+        // Detuned unison string 2
+        const uOsc1 = ctx.createOscillator();
+        uOsc1.setPeriodicWave(pianoWave);
+        uOsc1.frequency.setValueAtTime(freq, now);
+        uOsc1.detune.setValueAtTime(-1.5, now);
+        uOsc1.connect(mainGain);
+        uOsc1.start(now);
+        uOsc1.stop(now + duration);
 
-        partialRatios.forEach((ratio, i) => {
+        // Detuned unison string 3
+        const uOsc2 = ctx.createOscillator();
+        uOsc2.setPeriodicWave(pianoWave);
+        uOsc2.frequency.setValueAtTime(freq, now);
+        uOsc2.detune.setValueAtTime(1.5, now);
+        uOsc2.connect(mainGain);
+        uOsc2.start(now);
+        uOsc2.stop(now + duration);
+
+        mainGain.connect(soundboardFilter1);
+
+        // 5. Inharmonic Stiffness Partials (Crystalline acoustic ring)
+        const inharmonicPartials = [
+          { ratio: 2.002, amp: 0.025, decay: 0.55 },
+          { ratio: 3.006, amp: 0.012, decay: 0.35 },
+          { ratio: 4.012, amp: 0.005, decay: 0.20 },
+        ];
+
+        inharmonicPartials.forEach(p => {
           const pOsc = ctx.createOscillator();
           const pGain = ctx.createGain();
           pOsc.type = 'sine';
-          pOsc.frequency.setValueAtTime(freq * ratio, now);
-          
+          pOsc.frequency.setValueAtTime(freq * p.ratio, now);
+
           pGain.gain.setValueAtTime(0.0001, now);
-          pGain.gain.linearRampToValueAtTime(partialAmps[i], now + 0.004);
-          pGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * partialDecays[i]);
-          
+          pGain.gain.linearRampToValueAtTime(p.amp, now + 0.003);
+          pGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * p.decay);
+
           pOsc.connect(pGain);
-          pGain.connect(soundboardFilter);
+          pGain.connect(soundboardFilter1);
           pOsc.start(now);
           pOsc.stop(now + duration);
         });
@@ -1461,7 +1520,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const humanVelocity = 0.92 + (Math.random() * 0.16); // 92% to 108%
       volumeGain.gain.setValueAtTime(volume * humanVelocity, noteStartTime);
 
-      osc.connect(voiceGain);
       voiceGain.connect(volumeGain);
       volumeGain.connect(outputTarget);
 
@@ -1489,7 +1547,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Apply volume scaling via a dedicated gain node
     volumeGain.gain.setValueAtTime(volume, now);
     
-    osc.connect(voiceGain);
     voiceGain.connect(volumeGain);
     volumeGain.connect(outputTarget);
     
