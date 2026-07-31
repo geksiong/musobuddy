@@ -358,6 +358,11 @@ export const CHORD_FORMULAS: Record<string, { label: string; intervals: number[]
   'm11': { label: 'Minor 11th', intervals: [0, 3, 7, 10, 14, 17], essentialIndices: [0, 1, 3, 5] },
   '13': { label: '13th', intervals: [0, 4, 7, 10, 14, 17, 21], essentialIndices: [0, 1, 3, 6] },
   '7#9': { label: '7#9 (Hendrix)', intervals: [0, 4, 7, 10, 15], essentialIndices: [0, 1, 3, 4] },
+  '7b9': { label: '7♭9 Dominant', intervals: [0, 4, 7, 10, 13], essentialIndices: [0, 1, 3, 4] },
+  '7b13': { label: '7♭13 Dominant', intervals: [0, 4, 7, 10, 20], essentialIndices: [0, 1, 3, 4] },
+  'maj7#11': { label: 'Maj7♯11 (Flamenco)', intervals: [0, 4, 7, 11, 18], essentialIndices: [0, 1, 3, 4] },
+  'madd9': { label: 'Minor Add 9th', intervals: [0, 3, 7, 14], essentialIndices: [0, 1, 3] },
+  'm69': { label: 'Minor 6/9', intervals: [0, 3, 7, 9, 14], essentialIndices: [0, 1, 3, 4] },
   'mmaj7': { label: 'Minor Major 7th', intervals: [0, 3, 7, 11], essentialIndices: [0, 1, 3] },
 };
 
@@ -390,7 +395,14 @@ export function normalizeSuffix(suffix: string): string {
   if (suffix === 'min9') return 'm9';
   if (suffix === 'min11') return 'm11';
   if (suffix === 'min13') return 'm13';
-  return suffix;
+
+  // Flamenco unicode & alternate suffix normalization
+  const norm = suffix.replace(/♭/g, 'b').replace(/♯/g, '#');
+  if (norm === '7b9' || norm === '7♭9') return '7b9';
+  if (norm === '7b13' || norm === '7♭13') return '7b13';
+  if (norm === 'maj7#11' || norm === 'maj7♯11') return 'maj7#11';
+
+  return norm;
 }
 
 export interface ParsedChord {

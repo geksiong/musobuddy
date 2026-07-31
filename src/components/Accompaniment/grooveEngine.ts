@@ -29,7 +29,7 @@ export interface PercussionLayer {
   pattern: number[]; // 0: off, 1: normal, 2: accent for each step
 }
 
-export type GrooveGenre = 'Rock' | 'Jazz' | 'Latin' | 'Funk' | 'Pop' | 'World';
+export type GrooveGenre = 'Rock' | 'Jazz' | 'Latin' | 'Funk' | 'Pop' | 'Flamenco' | 'World';
 
 export interface GroovePatternPreset {
   id: string;
@@ -93,6 +93,110 @@ export function getBassTriggerLabel(trigger: BassTriggerType): { label: string; 
 
 // Default Presets across Latin, Jazz, Rock, Funk, Pop, World
 export const GROOVE_PRESETS: GroovePatternPreset[] = [
+  // --- FLAMENCO ---
+  {
+    id: 'flamenco-tangos-rasgueado',
+    name: 'Tangos Flamencos (Contratiempo)',
+    genre: 'Flamenco',
+    timeSignature: '4/4',
+    subdivisionsPerBeat: 4, // 16th notes (16 steps per measure)
+    defaultBpm: 118,
+    hasEarlyPush: true,
+    description: 'Authentic 4/4 Tangos Flamencos with 16th-note contratiempo rasgueado syncopation, palmas sordas, and cajón accents.',
+    chordPattern: [
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_ACCENT',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'OFF', 'OFF',
+      'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF',
+      'ROOT_ACCENT', 'OFF', 'OFF', 'OFF',
+      'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'palmas', name: 'Palmas Sordas', sound: MetronomeSound.Clap, volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'cajon_slap', name: 'Cajón Agudo', sound: MetronomeSound.Woodblock, volume: 0.7, pattern: [0, 2, 0, 1, 2, 0, 1, 0, 0, 2, 0, 1, 2, 0, 1, 0] },
+      { id: 'cajon_bass', name: 'Cajón Grave', sound: MetronomeSound.Kick, volume: 0.85, pattern: [2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0] }
+    ]
+  },
+  {
+    id: 'flamenco-rumba-ventilador',
+    name: 'Rumba Flamenca (Ventilador)',
+    genre: 'Flamenco',
+    timeSignature: '4/4',
+    subdivisionsPerBeat: 4, // 16th notes
+    defaultBpm: 134,
+    hasEarlyPush: true,
+    description: 'High-energy Rumba Flamenca with iconic "ventilador" strumming, golpe slap accents, and driving cajón rumbero.',
+    chordPattern: [
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_ACCENT',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'ROOT', 'OFF',
+      'OFF', 'OFF', 'PUSH_NEXT_FIFTH', 'OFF',
+      'ROOT_ACCENT', 'OFF', 'ROOT', 'OFF',
+      'OFF', 'OFF', 'PUSH_NEXT_ROOT', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'palmas_clear', name: 'Palmas Claras', sound: MetronomeSound.Clap, volume: 0.75, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'cajon_snare', name: 'Cajón Slap', sound: MetronomeSound.Snare, volume: 0.7, pattern: [0, 0, 2, 0, 2, 0, 0, 1, 0, 0, 2, 0, 2, 0, 0, 1] },
+      { id: 'cajon_bass', name: 'Cajón Bass', sound: MetronomeSound.Kick, volume: 0.85, pattern: [2, 0, 0, 1, 0, 0, 2, 0, 2, 0, 0, 1, 0, 0, 2, 0] }
+    ]
+  },
+  {
+    id: 'flamenco-bulerias-compas',
+    name: 'Bulerías Remate (4/4 Strum)',
+    genre: 'Flamenco',
+    timeSignature: '4/4',
+    subdivisionsPerBeat: 4,
+    defaultBpm: 180,
+    hasEarlyPush: true,
+    description: 'Driving 4/4 Bulerías remate rhythm with sharp rasgueado accents and syncopated pushes.',
+    chordPattern: [
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_ACCENT',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_ACCENT',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'OFF', 'PUSH_NEXT_ROOT',
+      'ROOT', 'OFF', 'OFF', 'OFF',
+      'ROOT_ACCENT', 'OFF', 'OFF', 'PUSH_NEXT_ROOT',
+      'ROOT', 'OFF', 'OFF', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'palmas', name: 'Palmas', sound: MetronomeSound.Clap, volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'cajon_tac', name: 'Cajón Tacón', sound: MetronomeSound.Woodblock, volume: 0.75, pattern: [2, 0, 1, 2, 0, 2, 1, 0, 2, 0, 1, 2, 0, 2, 1, 0] },
+      { id: 'cajon_bass', name: 'Cajón Bass', sound: MetronomeSound.Kick, volume: 0.85, pattern: [2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0] }
+    ]
+  },
+  {
+    id: 'flamenco-12beat-compas',
+    name: 'Soleá / Bulerías / Alegrías (12-Beat Compás in 3/4)',
+    genre: 'Flamenco',
+    timeSignature: '3/4',
+    subdivisionsPerBeat: 2,
+    defaultBpm: 145,
+    hasEarlyPush: true,
+    description: 'Traditional 12-beat Flamenco compás in 3/4 (4 bars of 3/4 = 12 beats). Highlights accents on beats 3, 6, 8, 10, 12.',
+    chordPattern: [
+      'CHORD', 'OFF', 'CHORD', 'OFF', 'CHORD_ACCENT', 'OFF'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'OFF', 'OFF', 'ROOT', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'palmas', name: 'Palmas Sordas', sound: MetronomeSound.Clap, volume: 0.8, pattern: [1, 1, 1, 1, 2, 1] },
+      { id: 'cajon_slap', name: 'Cajón Slap', sound: MetronomeSound.Woodblock, volume: 0.75, pattern: [0, 1, 0, 1, 2, 0] },
+      { id: 'cajon_bass', name: 'Cajón Bass', sound: MetronomeSound.Kick, volume: 0.85, pattern: [2, 0, 0, 0, 1, 0] }
+    ]
+  },
+
   // --- LATIN ---
   {
     id: 'bossa-nova',

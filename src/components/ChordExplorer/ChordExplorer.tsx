@@ -67,8 +67,9 @@ interface InstrumentDB {
 
 const ALL_KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
 const ALL_SUFFIXES = [
-  'major', 'minor', '7', 'maj7', 'min7', 'sus2', 'sus4', 'add9', 
-  'dim', 'dim7', 'm7b5', 'aug', '6', 'm6', '69', '9', 'm9', '11', 'm11', '13', '7#9', 'mmaj7'
+  'major', 'minor', '7', 'maj7', 'min7', 'sus2', 'sus4', 'add9', 'madd9',
+  'dim', 'dim7', 'm7b5', 'aug', '6', 'm6', '69', 'm69', '9', 'm9', '11', 'm11', '13',
+  '7#9', '7b9', '7b13', 'maj7#11', 'mmaj7'
 ];
 
 export type DotDisplayMode = 'intervals' | 'fingers' | 'notes';

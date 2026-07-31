@@ -51,13 +51,17 @@ export default function GrooveEnginePanel() {
   const [newPresetGenre, setNewPresetGenre] = useState('Latin');
   const [newPresetDesc, setNewPresetDesc] = useState('');
 
-  const genres = ['ALL', 'Latin', 'Jazz', 'Rock / Pop', 'Funk / Soul', 'World / Other', 'CUSTOM'];
+  const genres = ['ALL', 'Flamenco', 'Latin', 'Jazz', 'Rock / Pop', 'Funk / Soul', 'World / Other', 'CUSTOM'];
 
   const allPresets = [...GROOVE_PRESETS, ...customGroovePresets];
 
   const filteredPresets = allPresets.filter(preset => {
     if (selectedGenre === 'ALL') return true;
     if (selectedGenre === 'CUSTOM') return customGroovePresets.some(c => c.id === preset.id);
+    if (selectedGenre === 'Flamenco') return preset.genre === 'Flamenco';
+    if (selectedGenre === 'Rock / Pop') return preset.genre === 'Rock' || preset.genre === 'Pop';
+    if (selectedGenre === 'Funk / Soul') return preset.genre === 'Funk';
+    if (selectedGenre === 'World / Other') return preset.genre === 'World';
     return preset.genre === selectedGenre;
   });
 

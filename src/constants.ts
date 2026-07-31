@@ -17,6 +17,7 @@ export const CHORD_INTERVALS: Record<string, number[]> = {
   'dim': [0, 3, 6],
   'dim7': [0, 3, 6, 9],
   'm7b5': [0, 3, 6, 10],
+  '6': [0, 4, 7, 9],
   '69': [0, 4, 7, 9, 14],
   '9': [0, 4, 7, 10, 14],
   '11': [0, 4, 7, 10, 14, 17],
@@ -33,6 +34,9 @@ export const CHORD_INTERVALS: Record<string, number[]> = {
   'mmaj7b5': [0, 3, 6, 11],
   'mmaj9': [0, 3, 7, 11, 14],
   '7#9': [0, 4, 7, 10, 15],
+  '7b9': [0, 4, 7, 10, 13],
+  '7b13': [0, 4, 7, 10, 20],
+  'maj7#11': [0, 4, 7, 11, 18],
 };
 
 export const ROOT_OFFSETS: Record<string, number> = {
@@ -58,6 +62,12 @@ export function getIntervalsForChord(chordName: string): number[] {
   if (type === 'min7') type = 'm7';
   if (type === 'major7') type = 'maj7';
   if (type === 'mmajor7') type = 'mmaj7';
+  
+  // Normalize unicode flats/sharps for Flamenco voicings
+  type = type.replace(/♭/g, 'b').replace(/♯/g, '#');
+  if (type === '7♭9') type = '7b9';
+  if (type === '7♭13') type = '7b13';
+  if (type === 'maj7♯11') type = 'maj7#11';
 
   const intervals = CHORD_INTERVALS[type] || CHORD_INTERVALS['major'];
 
