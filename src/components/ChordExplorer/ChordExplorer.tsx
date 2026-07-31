@@ -733,166 +733,164 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
     <div className="flex flex-col gap-5 w-full h-full p-4 md:p-6 overflow-y-auto">
       {/* Header & Controls */}
       <div className="flex flex-col gap-4">
-        {/* Row 1: Instrument Selector */}
-        <div className="flex flex-col gap-1.5 w-full">
-          <div className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-            Instrument
+        {/* Row 1: Instrument & Chord Search Parameters Dropdowns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Instrument Selector Dropdown */}
+          <div className="flex flex-col gap-1">
+            <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+              Instrument
+            </label>
+            <div className="relative">
+              <select 
+                value={instrument}
+                onChange={(e) => { 
+                  const instKey = e.target.value as InstrumentName;
+                  const config = INSTRUMENT_CONFIGS[instKey];
+                  setInstrument(instKey); 
+                  setTuningKey(config.defaultTuning || 'standard');
+                  setPositionIndex(0); 
+                  e.target.blur();
+                }}
+                className={cn(
+                  "w-full border rounded-xl pl-3 pr-8 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
+                  resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                )}
+              >
+                {(Object.keys(INSTRUMENT_CONFIGS) as InstrumentName[]).map(instKey => {
+                  const config = INSTRUMENT_CONFIGS[instKey];
+                  return (
+                    <option key={instKey} value={instKey} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                      {config.displayName}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
+            </div>
           </div>
-          <div className={cn(
-            "flex p-1.5 rounded-xl border gap-1.5 transition-colors overflow-x-auto w-full no-scrollbar",
-            resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
-          )}>
-            {(Object.keys(INSTRUMENT_CONFIGS) as InstrumentName[]).map(instKey => {
-              const config = INSTRUMENT_CONFIGS[instKey];
-              return (
-                <button
-                  key={instKey}
-                  onClick={() => { 
-                    setInstrument(instKey); 
-                    setTuningKey(config.defaultTuning || 'standard');
-                    setPositionIndex(0); 
-                  }}
-                  className={cn(
-                    "px-3.5 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0",
-                    instrument === instKey 
-                      ? "bg-emerald-500 text-white shadow-lg" 
-                      : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white/70" : "text-slate-500 hover:text-slate-900")
-                  )}
-                >
-                  {config.displayName}
-                </button>
-              );
-            })}
+
+          {/* Search Engine Mode Dropdown */}
+          <div className="flex flex-col gap-1">
+            <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+              Engine Mode
+            </label>
+            <div className="relative">
+              <select 
+                value={engineMode}
+                onChange={(e) => { 
+                  setEngineMode(e.target.value as EngineMode); 
+                  setPositionIndex(0); 
+                  e.target.blur();
+                }}
+                className={cn(
+                  "w-full border rounded-xl pl-3 pr-8 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
+                  resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                )}
+              >
+                <option value="algo" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                  Algorithmic Engine (Combinatorial)
+                </option>
+                <option value="hybrid" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                  Hybrid Mode (Algorithm + DB)
+                </option>
+                <option value="db" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                  Static Database Lookup
+                </option>
+              </select>
+              <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
+            </div>
           </div>
         </div>
 
-        {/* Row 2: Engine Mode & Quick Settings */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+        {/* Chord Search Parameters Header & Selectors */}
+        <div className="flex flex-col gap-1.5">
           <div className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
             Chord Search Parameters
           </div>
-          {/* Engine Mode Pills */}
-          <div className={cn(
-            "flex p-1 rounded-xl border gap-1 transition-colors items-center",
-            resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
-          )}>
-            <button
-              onClick={() => setEngineMode('algo')}
-              title="Algorithmic Combinatorial Voicing Search"
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all",
-                engineMode === 'algo'
-                  ? "bg-emerald-500 text-white shadow-md"
-                  : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white/70" : "text-slate-400 hover:text-slate-900")
-              )}
-            >
-              <Cpu className="w-3 h-3" />
-              Algo Engine
-            </button>
-            <button
-              onClick={() => setEngineMode('hybrid')}
-              title="Hybrid Mode (Algorithm + Static Database)"
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all",
-                engineMode === 'hybrid'
-                  ? "bg-emerald-500 text-white shadow-md"
-                  : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white/70" : "text-slate-400 hover:text-slate-900")
-              )}
-            >
-              <Sparkles className="w-3 h-3 text-amber-300" />
-              Hybrid
-            </button>
-            <button
-              onClick={() => setEngineMode('db')}
-              title="Static Database Lookup"
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all",
-                engineMode === 'db'
-                  ? "bg-emerald-500 text-white shadow-md"
-                  : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white/70" : "text-slate-400 hover:text-slate-900")
-              )}
-            >
-              <Database className="w-3 h-3" />
-              DB
-            </button>
-          </div>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {/* Key / Root Dropdown */}
+            <div className="flex flex-col gap-1">
+              <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                Key / Root
+              </label>
+              <div className="relative">
+                <select 
+                  value={selectedKey}
+                  onChange={(e) => { 
+                    setSelectedKey(e.target.value); 
+                    setPositionIndex(0); 
+                    e.target.blur();
+                  }}
+                  className={cn(
+                    "w-full border rounded-xl pl-3 pr-8 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
+                    resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                  )}
+                >
+                  {ALL_KEYS.map(k => (
+                    <option key={k} value={k} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                      {formatChordName(k)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
+              </div>
+            </div>
 
-        {/* Key, Suffix, & Tuning Selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {/* Key Dropdown */}
-          <div className="flex flex-col gap-1">
-            <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-              Key / Root
-            </label>
-            <select 
-              value={selectedKey}
-              onChange={(e) => { 
-                setSelectedKey(e.target.value); 
-                setPositionIndex(0); 
-                e.target.blur();
-              }}
-              className={cn(
-                "w-full border rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
-                resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
-              )}
-            >
-              {ALL_KEYS.map(k => (
-                <option key={k} value={k} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                  {formatChordName(k)}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* Suffix / Quality Dropdown */}
+            <div className="flex flex-col gap-1">
+              <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                Chord Quality
+              </label>
+              <div className="relative">
+                <select 
+                  value={selectedSuffix}
+                  onChange={(e) => { 
+                    setSelectedSuffix(e.target.value); 
+                    setPositionIndex(0); 
+                    e.target.blur();
+                  }}
+                  className={cn(
+                    "w-full border rounded-xl pl-3 pr-8 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
+                    resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                  )}
+                >
+                  {ALL_SUFFIXES.map(s => (
+                    <option key={s} value={s} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                      {formatChordName(s)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
+              </div>
+            </div>
 
-          {/* Suffix Dropdown */}
-          <div className="flex flex-col gap-1">
-            <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-              Chord Quality
-            </label>
-            <select 
-              value={selectedSuffix}
-              onChange={(e) => { 
-                setSelectedSuffix(e.target.value); 
-                setPositionIndex(0); 
-                e.target.blur();
-              }}
-              className={cn(
-                "w-full border rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
-                resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
-              )}
-            >
-              {ALL_SUFFIXES.map(s => (
-                <option key={s} value={s} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                  {formatChordName(s)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tuning Dropdown */}
-          <div className="flex flex-col gap-1">
-            <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-              Tuning
-            </label>
-            <select 
-              value={tuningKey}
-              onChange={(e) => { 
-                setTuningKey(e.target.value); 
-                setPositionIndex(0); 
-                e.target.blur();
-              }}
-              className={cn(
-                "w-full border rounded-xl px-3 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
-                resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
-              )}
-            >
-              {Object.entries(instConfig.tunings).map(([tKey, tInfo]) => (
-                <option key={tKey} value={tKey} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                  {(tInfo as { name: string }).name}
-                </option>
-              ))}
-            </select>
+            {/* Tuning Dropdown */}
+            <div className="flex flex-col gap-1">
+              <label className={cn("text-[8px] font-black uppercase tracking-widest pl-1", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                Tuning
+              </label>
+              <div className="relative">
+                <select 
+                  value={tuningKey}
+                  onChange={(e) => { 
+                    setTuningKey(e.target.value); 
+                    setPositionIndex(0); 
+                    e.target.blur();
+                  }}
+                  className={cn(
+                    "w-full border rounded-xl pl-3 pr-8 py-2 text-[10px] font-bold outline-none focus:border-emerald-500 appearance-none cursor-pointer transition-colors",
+                    resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-black/10 text-slate-900"
+                  )}
+                >
+                  {Object.entries(instConfig.tunings).map(([tKey, tInfo]) => (
+                    <option key={tKey} value={tKey} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                      {(tInfo as { name: string }).name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
