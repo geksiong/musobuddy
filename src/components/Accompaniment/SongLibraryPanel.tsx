@@ -312,7 +312,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
       </div>
 
       {/* Songs Scrollable List */}
-      <div className="flex-1 overflow-y-auto pt-3 pr-1 flex flex-col gap-3 min-h-0">
+      <div className="flex-1 overflow-y-auto pt-2 pr-1 flex flex-col gap-2.5 min-h-0 max-h-[540px] custom-scrollbar">
         {filteredSongs.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center gap-2 text-slate-400 my-auto">
             <Music className="w-8 h-8 opacity-30" />
@@ -334,7 +334,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
               <div
                 key={song.id}
                 className={cn(
-                  "group p-3.5 rounded-2xl border transition-all flex flex-col gap-2.5 relative overflow-hidden",
+                  "group p-3 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden shrink-0",
                   resolvedTheme === 'dark'
                     ? "bg-white/[0.03] border-white/10 hover:border-emerald-500/40 hover:bg-white/[0.06]"
                     : "bg-white border-slate-200 hover:border-emerald-500 hover:shadow-md"

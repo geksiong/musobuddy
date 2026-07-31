@@ -243,7 +243,7 @@ export default function AccompanimentView() {
                   );
                 })}
               </div>
-              <span className={cn("text-[9px] font-mono font-bold ml-1.5", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+              <span className={cn("text-[9px] font-mono font-bold ml-1.5 min-w-[70px] text-right inline-block", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
                 {isPlaying ? `Beat ${(currentIndex % masterLength) + 1}/${masterLength}` : `${masterLength} Beats`}
               </span>
             </div>
@@ -261,7 +261,7 @@ export default function AccompanimentView() {
                 setIsPlaying(!isPlaying);
               }}
               className={cn(
-                "px-4 py-2 rounded-lg font-black uppercase tracking-wider text-[10px] flex items-center gap-2 transition-all shadow-md active:scale-95 shrink-0",
+                "px-4 py-2 rounded-lg font-black uppercase tracking-wider text-[10px] flex items-center justify-center min-w-[84px] gap-2 transition-all shadow-md active:scale-95 shrink-0",
                 isPlaying 
                   ? "bg-red-500 text-white shadow-red-500/20" 
                   : (progression.length > 0 ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-600/20" : (resolvedTheme === 'dark' ? "bg-white/10 text-white/20 cursor-not-allowed" : "bg-slate-200 text-slate-400 cursor-not-allowed"))
@@ -389,7 +389,7 @@ export default function AccompanimentView() {
                 onChange={(e) => setAccompanimentVolume(parseFloat(e.target.value))}
                 className="w-16 accent-emerald-500 h-1 rounded-lg appearance-none bg-slate-200 dark:bg-white/20 cursor-pointer"
               />
-              <span className="text-[9px] font-mono font-bold text-emerald-500 w-6">
+              <span className="text-[9px] font-mono font-bold text-emerald-500 w-[36px] text-right inline-block">
                 {Math.round(accompanimentVolume * 100)}%
               </span>
             </div>
@@ -680,9 +680,9 @@ export default function AccompanimentView() {
                               }
                             }}
                             className={cn(
-                              "relative group/cell h-24 rounded-xl flex flex-col justify-between p-2 transition-all cursor-pointer overflow-hidden",
+                              "relative group/cell h-24 rounded-xl flex flex-col justify-between p-2 transition-colors cursor-pointer overflow-hidden",
                               isCellPlaying
-                                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.02] z-10"
+                                ? "bg-emerald-500 text-white ring-2 ring-emerald-300 shadow-lg shadow-emerald-500/30 z-10 font-bold"
                                 : isSelected
                                   ? cn(isExplicit ? chordTypeInfo.color : (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-slate-100 text-slate-900"), "ring-2 ring-emerald-500 shadow-md z-10")
                                   : isExplicit
@@ -842,7 +842,7 @@ export default function AccompanimentView() {
             </div>
 
             {/* Active Chord Badge */}
-            <div className="text-[9px] font-black text-emerald-500 px-2.5 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-1 shrink-0">
+            <div className="text-[9px] font-mono font-black text-emerald-500 px-2.5 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-1 shrink-0 min-w-[56px] text-center inline-block">
               {formatChordName(activeExplorerChord)}
             </div>
           </div>

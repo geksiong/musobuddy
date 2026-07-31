@@ -257,7 +257,7 @@ export default function GrooveEnginePanel() {
                       key={stepIdx}
                       className={cn(
                         "text-center py-0.5 rounded transition-colors font-mono",
-                        isCurrentSubStep ? "bg-emerald-500 text-white font-black scale-105" : "opacity-70"
+                        isCurrentSubStep ? "bg-emerald-500 text-white font-black" : "opacity-70"
                       )}
                     >
                       {subBeatLetter}
@@ -285,9 +285,9 @@ export default function GrooveEnginePanel() {
                       key={stepIdx}
                       onClick={() => handleCycleChordStep(stepIdx)}
                       className={cn(
-                        "h-10 rounded-lg text-[9px] font-black font-mono transition-all flex flex-col items-center justify-center border shadow-xs leading-none p-0.5",
+                        "h-10 rounded-lg text-[9px] font-black font-mono transition-colors flex flex-col items-center justify-center border shadow-xs leading-none p-0.5",
                         meta.color,
-                        isCurrentSubStep ? "ring-2 ring-emerald-400 scale-[1.03] z-10" : "hover:brightness-110"
+                        isCurrentSubStep ? "ring-2 ring-emerald-400 z-10" : "hover:brightness-110"
                       )}
                       title={`${meta.desc} (Click to change)`}
                     >
@@ -316,9 +316,9 @@ export default function GrooveEnginePanel() {
                       key={stepIdx}
                       onClick={() => handleCycleBassStep(stepIdx)}
                       className={cn(
-                        "h-10 rounded-lg text-[9px] font-black font-mono transition-all flex flex-col items-center justify-center border shadow-xs leading-none p-0.5",
+                        "h-10 rounded-lg text-[9px] font-black font-mono transition-colors flex flex-col items-center justify-center border shadow-xs leading-none p-0.5",
                         meta.color,
-                        isCurrentSubStep ? "ring-2 ring-blue-400 scale-[1.03] z-10" : "hover:brightness-110"
+                        isCurrentSubStep ? "ring-2 ring-blue-400 z-10" : "hover:brightness-110"
                       )}
                       title={`${meta.desc} (Click to change)`}
                     >
@@ -385,13 +385,13 @@ export default function GrooveEnginePanel() {
                         key={stepIdx}
                         onClick={() => handleCyclePercussionStep(pLayer.id, stepIdx)}
                         className={cn(
-                          "h-8 rounded-lg transition-all flex items-center justify-center border font-mono text-[9px] font-extrabold",
+                          "h-8 rounded-lg transition-colors flex items-center justify-center border font-mono text-[9px] font-extrabold",
                           isAccent
                             ? "bg-rose-500 border-rose-400 text-white shadow-xs"
                             : isHit
                               ? "bg-amber-500 border-amber-400 text-white shadow-xs"
                               : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-transparent hover:border-slate-300",
-                          isCurrentSubStep ? "ring-2 ring-rose-400 scale-105 z-10" : ""
+                          isCurrentSubStep ? "ring-2 ring-rose-400 z-10" : ""
                         )}
                         title={isAccent ? 'Accented Hit' : isHit ? 'Normal Hit' : 'Click to activate hit'}
                       >
