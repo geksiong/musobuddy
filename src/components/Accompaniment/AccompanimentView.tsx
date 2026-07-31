@@ -16,6 +16,7 @@ import { useAudio } from '../../contexts/AudioContext.tsx';
 import { useAccompaniment, getEffectiveChord } from '../../contexts/AccompanimentContext.tsx';
 import { InstrumentType } from '../../types.ts';
 import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
+import GrooveEnginePanel from './GrooveEnginePanel.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
   CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, ARPEGGIO_RATES,
@@ -390,6 +391,11 @@ export default function AccompanimentView() {
                 {Math.round(accompanimentVolume * 100)}%
               </span>
             </div>
+          </div>
+
+          {/* Groove & Syncopation Engine Panel */}
+          <div className="mb-4">
+            <GrooveEnginePanel />
           </div>
 
           {/* Transposition & Preset Toolbar */}

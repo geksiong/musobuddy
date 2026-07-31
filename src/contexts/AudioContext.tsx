@@ -46,6 +46,7 @@ interface AudioContextType {
   // Chord Player
   playChord: (chord: string, instrument?: InstrumentType, volume?: number) => void;
   playNote: (noteIndex: number, duration?: number, instrument?: InstrumentType, volume?: number) => void;
+  playPercussion: (sound: MetronomeSound, isAccent?: boolean, volume?: number) => void;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
@@ -1495,6 +1496,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     osc.stop(now + duration);
   };
 
+  const playPercussion = useCallback((sound: MetronomeSound, isAccent: boolean = false, volume: number = 0.8) => {
+    const ctx = initAudio();
+    if (!ctx) return;
+    playClick(ctx.currentTime, sound, volume, isAccent);
+  }, []);
+
   const value = {
     isMetronomePlaying, metronomeBpm, setMetronomeBpm, startMetronome, stopMetronome, metronomePattern, setMetronomePattern, currentBeat, metronomeVolume, setMetronomeVolume,
     isAccompanimentPlaying, setIsAccompanimentPlaying,
@@ -1507,7 +1514,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     stopAllDrones,
     playingRefNote, playRefNote, stopRefNote,
     playChord,
-    playNote
+    playNote,
+    playPercussion
   };
 
   return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;
