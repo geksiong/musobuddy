@@ -13,6 +13,7 @@ import {
   BassTriggerType,
   GroovePatternPreset
 } from './grooveEngine.ts';
+import { MetronomeSound } from '../Metronome/types.ts';
 
 const CHORD_TRIGGER_LABELS: { type: ChordTriggerType; label: string; color: string; desc: string }[] = [
   { type: 'OFF', label: 'OFF', color: 'bg-slate-200/50 dark:bg-white/5 text-slate-400', desc: 'Silent step' },
@@ -340,7 +341,22 @@ export default function GrooveEnginePanel() {
                       <span className="text-[9px] font-extrabold capitalize text-slate-700 dark:text-slate-200 truncate">
                         {pLayer.name}
                       </span>
-                      <span className="text-[7px] text-slate-400 uppercase font-mono">{pLayer.sound}</span>
+                      <select
+                        value={pLayer.sound}
+                        onChange={(e) => updatePercussionLayerProps(pLayer.id, { sound: e.target.value as MetronomeSound })}
+                        className="text-[7px] text-slate-400 font-mono uppercase bg-transparent hover:text-emerald-500 cursor-pointer outline-none font-bold"
+                        title="Change sound instrument"
+                      >
+                        <option value={MetronomeSound.Woodblock} className="bg-slate-900 text-white">Woodblock</option>
+                        <option value={MetronomeSound.Cowbell} className="bg-slate-900 text-white">Cowbell</option>
+                        <option value={MetronomeSound.Kick} className="bg-slate-900 text-white">Kick</option>
+                        <option value={MetronomeSound.Snare} className="bg-slate-900 text-white">Snare</option>
+                        <option value={MetronomeSound.HiHat} className="bg-slate-900 text-white">HiHat</option>
+                        <option value={MetronomeSound.Clap} className="bg-slate-900 text-white">Clap</option>
+                        <option value={MetronomeSound.Bass} className="bg-slate-900 text-white">Bass Drum</option>
+                        <option value={MetronomeSound.Bodhran} className="bg-slate-900 text-white">Bodhrán</option>
+                        <option value={MetronomeSound.ClockTick} className="bg-slate-900 text-white">Clock Tick</option>
+                      </select>
                     </div>
 
                     <button

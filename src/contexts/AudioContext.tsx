@@ -132,7 +132,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const startVol = Math.max(0.0001, volume * amplitude);
     const masterGain = ctx.createGain();
 
-    masterGain.connect(ctx.destination);
+    const outputTarget = compressorRef.current || ctx.destination;
+    masterGain.connect(outputTarget);
 
     // Keep duration uniform for a sound type so decay is clean
     let clickDuration = 0.08;
@@ -1496,10 +1497,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     osc.stop(now + duration);
   };
 
-  const playPercussion = useCallback((sound: MetronomeSound, isAccent: boolean = false, volume: number = 0.8) => {
+  const playPercussion = useCallback((sound: MetronomeSound, isAccent: boolean = false, volume: number = 0.8, time?: number) => {
     const ctx = initAudio();
     if (!ctx) return;
-    playClick(ctx.currentTime, sound, volume, isAccent);
+    playClick(time ?? ctx.currentTime, sound, volume, isAccent);
   }, []);
 
   const value = {
