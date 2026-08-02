@@ -414,6 +414,57 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
 
   // --- FUNK ---
   {
+    id: 'city-pop-funk-16th',
+    name: 'Japanese City Pop 80s Groove',
+    genre: 'Funk',
+    timeSignature: '4/4',
+    subdivisionsPerBeat: 4,
+    defaultBpm: 112,
+    hasEarlyPush: true,
+    description: 'Bouncy 80s Japanese City Pop rhythm with crisp 16th guitar muted chugs, synth slap bass, and driving disco hi-hats.',
+    chordPattern: [
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
+      'OFF', 'CHORD', 'OFF', 'CHORD',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_ACCENT',
+      'OFF', 'CHORD', 'OFF', 'CHORD'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'OFF', 'ROOT', 'OFF',
+      'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF',
+      'ROOT_ACCENT', 'OFF', 'ROOT', 'OFF',
+      'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF'
+    ],
+    percussionLayers: [
+      { id: 'p1', name: 'Disco 16th Hi-Hat', sound: MetronomeSound.HiHat, volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Snare Slap (2 & 4)', sound: MetronomeSound.Snare, volume: 0.85, pattern: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0] },
+      { id: 'p3', name: 'Four-on-the-Floor Kick', sound: MetronomeSound.Kick, volume: 0.95, pattern: [2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0] }
+    ]
+  },
+  {
+    id: 'blues-128-shuffle',
+    name: '12-Bar Blues Shuffle',
+    genre: 'Rock',
+    timeSignature: '4/4',
+    subdivisionsPerBeat: 2,
+    defaultBpm: 108,
+    swingRatio: 0.667,
+    hasEarlyPush: true,
+    description: 'Authentic 12-bar blues shuffle rhythm with triplet swing feel, walking bassline, and backbeat snare.',
+    chordPattern: [
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
+      'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF'
+    ],
+    bassPattern: [
+      'ROOT_ACCENT', 'WALKING', 'FIFTH', 'WALKING',
+      'ROOT', 'WALKING', 'FIFTH', 'WALKING'
+    ],
+    percussionLayers: [
+      { id: 'p1', name: 'Shuffle Hi-Hat', sound: MetronomeSound.HiHat, volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Backbeat Snare', sound: MetronomeSound.Snare, volume: 0.85, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
+      { id: 'p3', name: 'Blues Kick', sound: MetronomeSound.Kick, volume: 0.9, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
+    ]
+  },
+  {
     id: 'funk-16th-soul-push',
     name: '16th Soul / Funk Push',
     genre: 'Funk',

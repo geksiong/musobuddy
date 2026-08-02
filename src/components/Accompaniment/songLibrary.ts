@@ -582,5 +582,330 @@ export const POPULAR_STANDARDS: Song[] = [
       'Fmaj7', '', 'B7', '', 'E7', '', '', '', 'Dm7', '', 'G7', '', 'Cmaj7', '', 'Fmaj7', '',
       'Bm7b5', '', 'E7', '', 'Am7', '', '', ''
     ]
+  },
+
+  // --- 3/4 TIME SIGNATURE WALTZES ---
+  {
+    id: 'song-piano-man',
+    title: 'Piano Man',
+    artist: 'Billy Joel',
+    genre: 'Pop',
+    key: 'C Major',
+    bpm: 170,
+    timeSignature: '3/4',
+    grooveId: 'country-waltz-34',
+    description: 'Classic 3/4 piano ballad standard with descending bassline and signature 3-beat waltz meter.',
+    tags: ['3/4 Waltz', 'Piano Ballad', 'Billy Joel', 'Descending Bass'],
+    sectionLabels: {
+      0: "Verse 1 (It's 9 O'clock on a Saturday)",
+      8: 'Chorus (Sing Us a Song You\'re the Piano Man)'
+    },
+    chordsPerBeat: [
+      // Verse (8 bars in 3/4 = 24 slots)
+      'C', '', '',  'G/B', '', '',  'Am', '', '',  'C/G', '', '',
+      'F', '', '',  'C/E', '', '',  'D7', '', '',  'G', '', '',
+      // Chorus (8 bars in 3/4 = 24 slots)
+      'Am', '', '',  'Am/G', '', '',  'F', '', '',  'C', '', '',
+      'F', '', '',  'C/E', '', '',  'G7', '', '',  'C', '', ''
+    ]
+  },
+  {
+    id: 'song-someday-my-prince-will-come',
+    title: 'Someday My Prince Will Come',
+    artist: 'Miles Davis / Frank Churchill',
+    genre: 'Jazz',
+    key: 'Bb Major',
+    bpm: 132,
+    timeSignature: '3/4',
+    grooveId: 'jazz-waltz-34',
+    description: 'Famous 32-bar 3/4 jazz waltz standard recorded by Miles Davis, Bill Evans, and Disney.',
+    tags: ['Jazz Waltz', '3/4 Standard', 'Miles Davis', 'Bill Evans'],
+    sectionLabels: {
+      0: 'A1 Section (Bbmaj7 - D7)',
+      8: 'B Section (Dm7 - C#dim7)',
+      16: 'A2 Section (Bbmaj7 - D7)',
+      24: 'C Section / Turnaround'
+    },
+    chordsPerBeat: [
+      // A1 (8 bars in 3/4 = 24 slots)
+      'Bbmaj7', '', '',  'D7', '', '',  'Ebmaj7', '', '',  'G7', '', '',
+      'Cm7', '', '',  'G7', '', '',  'Cm7', '', '',  'F7', '', '',
+      // B (8 bars in 3/4 = 24 slots)
+      'Dm7', '', '',  'C#dim7', '', '',  'Cm7', '', '',  'F7', '', '',
+      'Dm7', '', '',  'G7', '', '',  'Cm7', '', '',  'F7', '', '',
+      // A2 (8 bars in 3/4 = 24 slots)
+      'Bbmaj7', '', '',  'D7', '', '',  'Ebmaj7', '', '',  'G7', '', '',
+      'Cm7', '', '',  'G7', '', '',  'Cm7', '', '',  'F7', '', '',
+      // C (8 bars in 3/4 = 24 slots)
+      'Fm7', '', '',  'Bb7', '', '',  'Ebmaj7', '', '',  'Edim7', '', '',
+      'Bb/F', '', '',  'G7', '', '',  'Cm7', '', '',  'F7', '', ''
+    ]
+  },
+
+  // --- 5/4 TIME SIGNATURE STANDARDS ---
+  {
+    id: 'song-take-five',
+    title: 'Take Five',
+    artist: 'Dave Brubeck Quartet',
+    genre: 'Jazz',
+    key: 'Eb Minor',
+    bpm: 174,
+    timeSignature: '5/4',
+    grooveId: '54-cool-jazz',
+    description: 'The definitive 5/4 asymmetric jazz masterpiece written by Paul Desmond. Features a driving 3+2 vamp and modulating bridge.',
+    tags: ['5/4 Time', 'Cool Jazz', 'Dave Brubeck', 'Asymmetric Meter'],
+    sectionLabels: {
+      0: 'A Section (Ebm / Bbm7 Vamp)',
+      8: 'B Section Bridge (Cbmaj7 to Abm7)',
+      16: 'A Section Return'
+    },
+    chordsPerBeat: [
+      // A Section Vamp (8 bars in 5/4 = 40 slots)
+      'Ebm', '', '', 'Bbm7', '',  'Ebm', '', '', 'Bbm7', '',
+      'Ebm', '', '', 'Bbm7', '',  'Ebm', '', '', 'Bbm7', '',
+      'Ebm', '', '', 'Bbm7', '',  'Ebm', '', '', 'Bbm7', '',
+      'Ebm', '', '', 'Bbm7', '',  'Ebm', '', '', 'Bbm7', '',
+      // B Section Bridge (8 bars in 5/4 = 40 slots)
+      'Cbmaj7', '', '', '', '',  'Abm7', '', '', 'Db7', '',
+      'Gbmaj7', '', '', '', '',  'Ebm7', '', '', '', '',
+      'Abm7', '', '', 'Db7', '',  'Gbmaj7', '', '', '', '',
+      'Fm7b5', '', '', 'Bb7b9', '',  'Ebm', '', '', 'Bbm7', '',
+      // A Section Return (4 bars in 5/4 = 20 slots)
+      'Ebm', '', '', 'Bbm7', '',  'Ebm', '', '', 'Bbm7', '',
+      'Ebm', '', '', 'Bbm7', '',  'Ebm', '', '', 'Bbm7', ''
+    ]
+  },
+  {
+    id: 'song-mission-impossible',
+    title: 'Mission: Impossible Theme',
+    artist: 'Lalo Schifrin',
+    genre: 'Rock',
+    key: 'G Minor',
+    bpm: 168,
+    timeSignature: '5/4',
+    grooveId: '54-cool-jazz',
+    description: 'Iconic 5/4 syncopated action theme in 3+2 rhythm with chromatic bass stabs.',
+    tags: ['5/4 Time', 'Film Theme', 'Lalo Schifrin', 'Action Groove'],
+    sectionLabels: {
+      0: 'Main 5/4 Riff Vamp',
+      8: 'Bridge Modulation (Eb7 - D7)'
+    },
+    chordsPerBeat: [
+      // Main Riff Vamp (8 bars in 5/4 = 40 slots)
+      'Gm', '', '', 'C7', '',  'Gm', '', '', 'Db7', '',
+      'Gm', '', '', 'C7', '',  'Gm', '', '', 'Db7', '',
+      'Gm', '', '', 'C7', '',  'Gm', '', '', 'Db7', '',
+      'Gm', '', '', 'C7', '',  'Gm', '', '', 'Db7', '',
+      // Bridge Modulation (4 bars in 5/4 = 20 slots)
+      'Eb7', '', '', '', '',  'D7', '', '', '', '',
+      'Gm', '', '', 'C7', '',  'Gm', '', '', 'Db7', ''
+    ]
+  },
+
+  // --- BLUES STANDARDS ---
+  {
+    id: 'song-thrill-is-gone',
+    title: 'The Thrill Is Gone',
+    artist: 'B.B. King',
+    genre: 'Blues',
+    key: 'B Minor',
+    bpm: 90,
+    timeSignature: '4/4',
+    grooveId: 'blues-128-shuffle',
+    description: '12-bar minor blues classic featuring B.B. King\'s soulful minor key progression with Gmaj7 to F#7alt turnaround.',
+    tags: ['Minor Blues', '12-Bar Blues', 'B.B. King', 'Blues Standard'],
+    sectionLabels: {
+      0: '12-Bar Minor Blues Form',
+      8: 'Turnaround (Gmaj7 to F#7alt)'
+    },
+    chordsPerBeat: [
+      'Bm7', '', '', '',  'Bm7', '', '', '',  'Bm7', '', '', '',  'Bm7', '', '', '',
+      'Em7', '', '', '',  'Em7', '', '', '',  'Bm7', '', '', '',  'Bm7', '', '', '',
+      'Gmaj7', '', '', '',  'F#7alt', '', '', '',  'Bm7', '', '', '',  'F#7alt', '', '', ''
+    ]
+  },
+  {
+    id: 'song-stormy-monday',
+    title: 'Stormy Monday',
+    artist: 'T-Bone Walker / Allman Brothers',
+    genre: 'Blues',
+    key: 'G Major',
+    bpm: 62,
+    timeSignature: '4/4',
+    grooveId: 'blues-128-shuffle',
+    description: 'Slow 12-bar blues standard with jazz-infused minor passing chords (Bm7–Bbm7–Am7–Cm7).',
+    tags: ['Slow Blues', 'Jazz Blues', '12-Bar Blues', 'T-Bone Walker'],
+    sectionLabels: {
+      0: '12-Bar Form (G7 - C7)',
+      4: 'Descending Minor Passing Sequence',
+      8: 'Turnaround'
+    },
+    chordsPerBeat: [
+      'G7', '', '', '',  'C7', '', '', '',  'G7', '', '', '',  'G7', '', '', '',
+      'C7', '', '', '',  'C7', '', '', '',  'Bm7', '', '', '',  'Bbm7', '', '', '',
+      'Am7', '', '', '',  'Cm7', '', '', '',  'G7', '', 'C7', '',  'G7', '', 'D7', ''
+    ]
+  },
+  {
+    id: 'song-sweet-home-chicago',
+    title: 'Sweet Home Chicago',
+    artist: 'Robert Johnson / Blues Brothers',
+    genre: 'Blues',
+    key: 'E Major',
+    bpm: 122,
+    timeSignature: '4/4',
+    grooveId: 'blues-128-shuffle',
+    description: 'Quintessential 12-bar quick-change dominant blues shuffle form.',
+    tags: ['12-Bar Blues', 'Quick-Change', 'Delta Blues', 'Shuffle'],
+    sectionLabels: {
+      0: '12-Bar Quick Change (E7 - A7)',
+      8: 'V-IV-I Turnaround (B7 - A7 - E7)'
+    },
+    chordsPerBeat: [
+      'E7', '', '', '',  'A7', '', '', '',  'E7', '', '', '',  'E7', '', '', '',
+      'A7', '', '', '',  'A7', '', '', '',  'E7', '', '', '',  'E7', '', '', '',
+      'B7', '', '', '',  'A7', '', '', '',  'E7', '', 'A7', '',  'E7', '', 'B7', ''
+    ]
+  },
+
+  // --- FUNK CLASSICS ---
+  {
+    id: 'song-chameleon',
+    title: 'Chameleon',
+    artist: 'Herbie Hancock',
+    genre: 'Funk',
+    key: 'Bb Minor',
+    bpm: 112,
+    timeSignature: '4/4',
+    grooveId: 'funk-16th-soul-push',
+    description: 'Herbie Hancock\'s landmark Headhunters funk anthem driven by a syncopated synth bass vamp.',
+    tags: ['Funk Landmark', 'Herbie Hancock', 'Synth Funk', 'Headhunters'],
+    sectionLabels: {
+      0: 'Main 8-Bar Funk Vamp (Bbm7 - Eb7)',
+      6: 'Turnaround (Ab7 - G7)'
+    },
+    chordsPerBeat: [
+      'Bbm7', '', '', '',  'Eb7', '', '', '',  'Bbm7', '', '', '',  'Eb7', '', '', '',
+      'Bbm7', '', '', '',  'Eb7', '', '', '',  'Ab7', '', '', '',  'G7', '', '', ''
+    ]
+  },
+  {
+    id: 'song-superstition',
+    title: 'Superstition',
+    artist: 'Stevie Wonder',
+    genre: 'Funk',
+    key: 'Eb Minor',
+    bpm: 100,
+    timeSignature: '4/4',
+    grooveId: 'funk-16th-soul-push',
+    description: 'Stevie Wonder\'s timeless clavinet-driven funk hit with chromatic horn turnaround.',
+    tags: ['Funk Hit', 'Stevie Wonder', 'Clavinet Funk', 'Climax Turnaround'],
+    sectionLabels: {
+      0: 'Main Clavinet Vamp (Ebm7)',
+      4: 'Horn Break & Turnaround (Bb7 - A7 - Ab7)'
+    },
+    chordsPerBeat: [
+      'Ebm7', '', '', '',  'Ebm7', '', '', '',  'Ebm7', '', '', '',  'Ebm7', '', '', '',
+      'Bb7', '', '', '',  'A7', '', 'Ab7', '',  'Ebm7', '', '', '',  'Ebm7', '', '', '',
+      'Bb7', '', '', '',  'A7', '', 'Ab7', '',  'Ebm7', '', '', '',  'Bb7', '', '', ''
+    ]
+  },
+
+  // --- JAPANESE CITY POP ---
+  {
+    id: 'song-plastic-love',
+    title: 'Plastic Love (プラスティック・ラブ)',
+    artist: 'Mariya Takeuchi (竹内まりや)',
+    genre: 'J-Pop / Anime',
+    key: 'F# Minor',
+    bpm: 112,
+    timeSignature: '4/4',
+    grooveId: 'city-pop-funk-16th',
+    description: 'The iconic Japanese City Pop masterpiece composed by Mariya Takeuchi and arranged by Tatsuro Yamashita.',
+    tags: ['City Pop', 'Mariya Takeuchi', 'Tatsuro Yamashita', '80s J-Pop'],
+    sectionLabels: {
+      0: 'Verse 1 (F#m7 - B9 - EMaj7 - C#7b9)',
+      8: 'Chorus (DMaj7 - C#m7 - Bm7 - E7)'
+    },
+    chordsPerBeat: [
+      // Verse (8 bars)
+      'F#m7', '', '', '',  'B9', '', '', '',  'Emaj7', '', '', '',  'C#7b9', '', '', '',
+      'F#m7', '', '', '',  'B9', '', '', '',  'Emaj7', '', '', '',  'C#7b9', '', '', '',
+      // Chorus (8 bars)
+      'Dmaj7', '', '', '',  'C#m7', '', '', '',  'Bm7', '', '', '',  'E7', '', '', '',
+      'Amaj7', '', '', '',  'Amaj7', '', '', '',  'G#m7b5', '', '', '',  'C#7', '', '', ''
+    ]
+  },
+  {
+    id: 'song-stay-with-me',
+    title: 'Stay With Me (真夜中のドア)',
+    artist: 'Miki Matsubara (松原みき)',
+    genre: 'J-Pop / Anime',
+    key: 'C# Minor',
+    bpm: 108,
+    timeSignature: '4/4',
+    grooveId: 'city-pop-funk-16th',
+    description: 'Global 80s Japanese City Pop anthem featuring lush maj7/min7 chord voicings and funky brass.',
+    tags: ['City Pop', 'Miki Matsubara', '80s Classic', 'Shinjuku Disco'],
+    sectionLabels: {
+      0: 'Chorus (Stay With Me... Fmaj7 - Em7)',
+      8: 'Verse (Tooi Kiretsu wo... Fmaj7 - G/F)'
+    },
+    chordsPerBeat: [
+      // Chorus (8 bars)
+      'Fmaj7', '', '', '',  'Em7', '', '', '',  'Dm7', '', '', '',  'Cmaj7', '', '', '',
+      'Fmaj7', '', '', '',  'Em7', '', '', '',  'Dm7', '', 'G7', '',  'Cmaj7', '', '', '',
+      // Verse (8 bars)
+      'Fmaj7', '', '', '',  'G/F', '', '', '',  'Em7', '', '', '',  'Am7', '', '', '',
+      'Dm7', '', '', '',  'G7', '', '', '',  'Cmaj7', '', '', '',  'C7', '', '', ''
+    ]
+  },
+  {
+    id: 'song-flyday-chinatown',
+    title: 'Flyday Chinatown (フライディ・チャイナタウン)',
+    artist: 'Yasuha (泰葉)',
+    genre: 'J-Pop / Anime',
+    key: 'A Minor',
+    bpm: 126,
+    timeSignature: '4/4',
+    grooveId: 'city-pop-funk-16th',
+    description: 'High-octane 1981 City Pop / Disco hit by Yasuha with sharp minor key syncopation and brass riffs.',
+    tags: ['City Pop', 'Yasuha', '80s Disco', 'Chinatown Funk'],
+    sectionLabels: {
+      0: 'Intro / Verse (Am7 - Dm7 - G7 - Cmaj7)',
+      8: 'Chorus (Flyday Chinatown! Dm7 - G7)'
+    },
+    chordsPerBeat: [
+      // Verse (8 bars)
+      'Am7', '', '', '',  'Dm7', '', '', '',  'G7', '', '', '',  'Cmaj7', '', 'E7', '',
+      'Am7', '', '', '',  'Dm7', '', '', '',  'Fmaj7', '', 'E7', '',  'Am7', '', '', '',
+      // Chorus (8 bars)
+      'Dm7', '', '', '',  'G7', '', '', '',  'Cmaj7', '', '', '',  'Fmaj7', '', '', '',
+      'Bm7b5', '', '', '',  'E7', '', '', '',  'Am7', '', '', '',  'A7', '', '', ''
+    ]
+  },
+  {
+    id: 'song-sparkle',
+    title: 'Sparkle',
+    artist: 'Tatsuro Yamashita (山下達郎)',
+    genre: 'J-Pop / Anime',
+    key: 'F Major',
+    bpm: 118,
+    timeSignature: '4/4',
+    grooveId: 'city-pop-funk-16th',
+    description: 'Tatsuro Yamashita\'s legendary opening track from For You with pristine electric guitar cutting rhythm.',
+    tags: ['City Pop', 'Tatsuro Yamashita', 'Funk Guitar', 'For You'],
+    sectionLabels: {
+      0: 'Verse (Fmaj7 - Em7 - Dm7 - Cmaj7)',
+      8: 'Bridge (Bbmaj7 - Am7 - Gm7 - C7)'
+    },
+    chordsPerBeat: [
+      // Verse (8 bars)
+      'Fmaj7', '', '', '',  'Em7', '', '', '',  'Dm7', '', '', '',  'Cmaj7', '', '', '',
+      'Fmaj7', '', '', '',  'Em7', '', '', '',  'Dm7', '', 'G7', '',  'Cmaj7', '', '', '',
+      // Bridge (8 bars)
+      'Bbmaj7', '', '', '',  'Am7', '', '', '',  'Gm7', '', '', '',  'C7', '', '', '',
+      'Fmaj7', '', '', '',  'Am7', '', '', '',  'Dm7', '', 'G7', '',  'Cmaj7', '', '', ''
+    ]
   }
 ];
