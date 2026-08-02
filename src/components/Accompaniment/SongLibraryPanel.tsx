@@ -44,6 +44,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
   const [selectedTimeSigFilter, setSelectedTimeSigFilter] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('detailed');
+  const [accidentalMode, setAccidentalMode] = useState<'sharp' | 'flat'>('sharp');
   const [loadedNotification, setLoadedNotification] = useState<string | null>(null);
 
   // Transpose shift preview state for selected song
@@ -63,7 +64,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
   const getTransposedSongChords = (song: Song): string[] => {
     const shift = songTranspose[song.id] || 0;
     if (shift === 0) return song.chordsPerBeat;
-    return song.chordsPerBeat.map(chord => chord ? transposeChord(chord, shift, 'sharp') : '');
+    return song.chordsPerBeat.map(chord => chord ? transposeChord(chord, shift, accidentalMode, song.key) : '');
   };
 
   const handleShiftSongKey = (songId: string, semitones: number, e: React.MouseEvent) => {
@@ -294,24 +295,57 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
           ))}
         </div>
 
-        {/* Time Signature Filter & View Mode Toggle */}
+        {/* Time Signature Filter, Accidentals & View Mode Toggle */}
         <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 px-1 pt-1 flex-wrap gap-2">
-          <div className="flex items-center gap-1">
-            <span className="mr-1">Time Sig:</span>
-            {['ALL', '4/4', '3/4', '6/8', '5/4'].map(ts => (
-              <button
-                key={ts}
-                onClick={() => setSelectedTimeSigFilter(ts)}
-                className={cn(
-                  "px-2 py-0.5 rounded-md text-[8px] font-mono transition-all border cursor-pointer",
-                  selectedTimeSigFilter === ts
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold"
-                    : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200")
-                )}
-              >
-                {ts}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Accidentals Toggle */}
+            <div className="flex items-center gap-1">
+              <span className="mr-0.5">Accidentals:</span>
+              <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
+                <button
+                  onClick={() => setAccidentalMode('sharp')}
+                  className={cn(
+                    "px-2 py-0.5 rounded-md text-[8px] font-mono font-bold transition-all cursor-pointer",
+                    accidentalMode === 'sharp'
+                      ? "bg-emerald-500 text-slate-950 font-black shadow-2xs"
+                      : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                  )}
+                  title="Use Sharps (♯) for transposed root notes"
+                >
+                  ♯ Sharps
+                </button>
+                <button
+                  onClick={() => setAccidentalMode('flat')}
+                  className={cn(
+                    "px-2 py-0.5 rounded-md text-[8px] font-mono font-bold transition-all cursor-pointer",
+                    accidentalMode === 'flat'
+                      ? "bg-emerald-500 text-slate-950 font-black shadow-2xs"
+                      : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                  )}
+                  title="Use Flats (♭) for transposed root notes"
+                >
+                  ♭ Flats
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="mr-1">Time Sig:</span>
+              {['ALL', '4/4', '3/4', '6/8', '5/4'].map(ts => (
+                <button
+                  key={ts}
+                  onClick={() => setSelectedTimeSigFilter(ts)}
+                  className={cn(
+                    "px-2 py-0.5 rounded-md text-[8px] font-mono transition-all border cursor-pointer",
+                    selectedTimeSigFilter === ts
+                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold"
+                      : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200")
+                  )}
+                >
+                  {ts}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* View Mode Toggle */}

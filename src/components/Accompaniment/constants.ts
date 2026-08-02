@@ -21,31 +21,191 @@ export const ROOT_OFFSETS_MAP: Record<string, number> = {
   'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
 };
 
+const LETTER_INDEX_MAP: Record<string, number> = {
+  'C': 0, 'D': 1, 'E': 2, 'F': 3, 'G': 4, 'A': 5, 'B': 6
+};
+
+const LETTER_CHARS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const BASE_PITCHES = [0, 2, 4, 5, 7, 9, 11]; // C=0, D=2, E=4, F=5, G=7, A=9, B=11
+
+// Sharp key centers for pitch classes 0..11 (letterIndex, pitchClass)
+const SHARP_KEY_CENTERS = [
+  { letter: 0, pitch: 0 },  // 0: C
+  { letter: 0, pitch: 1 },  // 1: C#
+  { letter: 1, pitch: 2 },  // 2: D
+  { letter: 1, pitch: 3 },  // 3: D#
+  { letter: 2, pitch: 4 },  // 4: E
+  { letter: 3, pitch: 5 },  // 5: F
+  { letter: 3, pitch: 6 },  // 6: F#
+  { letter: 4, pitch: 7 },  // 7: G
+  { letter: 4, pitch: 8 },  // 8: G#
+  { letter: 5, pitch: 9 },  // 9: A
+  { letter: 5, pitch: 10 }, // 10: A#
+  { letter: 6, pitch: 11 }, // 11: B
+];
+
+// Flat key centers for pitch classes 0..11 (letterIndex, pitchClass)
+const FLAT_KEY_CENTERS = [
+  { letter: 0, pitch: 0 },  // 0: C
+  { letter: 1, pitch: 1 },  // 1: Db
+  { letter: 1, pitch: 2 },  // 2: D
+  { letter: 2, pitch: 3 },  // 3: Eb
+  { letter: 2, pitch: 4 },  // 4: E
+  { letter: 3, pitch: 5 },  // 5: F
+  { letter: 4, pitch: 6 },  // 6: Gb
+  { letter: 4, pitch: 7 },  // 7: G
+  { letter: 5, pitch: 8 },  // 8: Ab
+  { letter: 5, pitch: 9 },  // 9: A
+  { letter: 6, pitch: 10 }, // 10: Bb
+  { letter: 6, pitch: 11 }, // 11: B
+];
+
+export interface ParsedNote {
+  letterChar: string;
+  letter: number; // 0..6
+  accidental: number; // semitones (-2, -1, 0, +1, +2)
+  pitchClass: number; // 0..11
+}
+
+export function parseNote(noteStr: string): ParsedNote | null {
+  if (!noteStr) return null;
+  const match = noteStr.match(/^([A-G])(##|𝄪|x|bb|𝄫|#|♯|b|♭|♮|n)?/i);
+  if (!match) return null;
+
+  const letterChar = match[1].toUpperCase();
+  const letter = LETTER_INDEX_MAP[letterChar];
+  if (letter === undefined) return null;
+
+  const accStr = match[2] || '';
+  let accidental = 0;
+  if (accStr === '##' || accStr === '𝄪' || accStr === 'x') accidental = 2;
+  else if (accStr === '#' || accStr === '♯') accidental = 1;
+  else if (accStr === 'bb' || accStr === '𝄫') accidental = -2;
+  else if (accStr === 'b' || accStr === '♭') accidental = -1;
+  else accidental = 0;
+
+  const basePitch = BASE_PITCHES[letter];
+  const pitchClass = (basePitch + accidental + 120) % 12;
+
+  return { letterChar, letter, accidental, pitchClass };
+}
+
+export function parseKeyContext(keyContext?: string): { rootLetter: number; rootPitchClass: number } {
+  if (!keyContext) return { rootLetter: 0, rootPitchClass: 0 }; // Default C Major
+  const cleanKey = keyContext.trim();
+  const parsed = parseNote(cleanKey);
+  if (!parsed) return { rootLetter: 0, rootPitchClass: 0 };
+
+  const isMinor = cleanKey.toLowerCase().includes('m') && !cleanKey.toLowerCase().includes('maj');
+  if (isMinor) {
+    // Relative major of minor key is +3 semitones up
+    const majorPitchClass = (parsed.pitchClass + 3) % 12;
+    // For letter: Am -> C (letter + 2), Em -> G (letter + 2), C#m -> E (letter + 2)
+    const majorLetter = (parsed.letter + 2) % 7;
+    return { rootLetter: majorLetter, rootPitchClass: majorPitchClass };
+  }
+
+  return { rootLetter: parsed.letter, rootPitchClass: parsed.pitchClass };
+}
+
+function transposeNoteInKey(
+  noteStr: string,
+  semitones: number,
+  origKeyContext?: string,
+  forceAccidental?: 'sharp' | 'flat'
+): string {
+  const parsed = parseNote(noteStr);
+  if (!parsed) return noteStr;
+
+  const origKey = parseKeyContext(origKeyContext);
+  const targetPitchClass = (origKey.rootPitchClass + semitones + 120) % 12;
+
+  // Determine accidental preference if not forced
+  let useFlats = forceAccidental === 'flat';
+  if (!forceAccidental) {
+    useFlats = noteStr.includes('b') || noteStr.includes('♭') || (origKeyContext ? origKeyContext.includes('b') : false);
+  }
+
+  const keyCenters = useFlats ? FLAT_KEY_CENTERS : SHARP_KEY_CENTERS;
+  const targetKeyCenter = keyCenters[targetPitchClass];
+
+  // Diatonic letter step difference between orig key and target key
+  const deltaL = (targetKeyCenter.letter - origKey.rootLetter + 7) % 7;
+
+  // Target note letter and pitch class
+  const targetLetter = (parsed.letter + deltaL) % 7;
+  const noteTargetPitch = (parsed.pitchClass + semitones + 120) % 12;
+
+  // Accidental offset needed for targetLetter to equal noteTargetPitch
+  const basePitch = BASE_PITCHES[targetLetter];
+  let accidental = (noteTargetPitch - basePitch) % 12;
+  if (accidental > 6) accidental -= 12;
+  if (accidental < -6) accidental += 12;
+
+  const letterChar = LETTER_CHARS[targetLetter];
+  let accStr = '';
+  if (accidental === 1) accStr = '#';
+  else if (accidental === 2) accStr = '##';
+  else if (accidental === -1) accStr = 'b';
+  else if (accidental === -2) accStr = 'bb';
+
+  return `${letterChar}${accStr}`;
+}
+
+export function transposeChord(
+  chordName: string,
+  semitones: number,
+  forceAccidental?: 'sharp' | 'flat',
+  keyContext?: string
+): string {
+  if (!chordName || chordName.trim() === '') return chordName;
+  if (semitones === 0) return chordName;
+
+  // Check for slash bass note
+  const slashIdx = chordName.indexOf('/');
+  let mainPart = chordName;
+  let bassPart = '';
+
+  if (slashIdx !== -1) {
+    mainPart = chordName.substring(0, slashIdx);
+    const afterSlash = chordName.substring(slashIdx + 1);
+    // Check if afterSlash starts with a note letter
+    if (/^[A-G](?:##|𝄪|x|bb|𝄫|#|♯|b|♭|♮|n)?/i.test(afterSlash)) {
+      const bassMatch = afterSlash.match(/^([A-G](?:##|𝄪|x|bb|𝄫|#|♯|b|♭|♮|n)?)(.*)$/i);
+      if (bassMatch) {
+        bassPart = bassMatch[1];
+        const extraSuffix = bassMatch[2];
+        if (extraSuffix) mainPart += '/' + extraSuffix;
+      }
+    } else {
+      mainPart = chordName; // e.g. 6/9
+    }
+  }
+
+  // Parse root note of mainPart
+  const rootMatch = mainPart.match(/^([A-G](?:##|𝄪|x|bb|𝄫|#|♯|b|♭|♮|n)?)(.*)$/i);
+  if (!rootMatch) return chordName;
+
+  const origRoot = rootMatch[1];
+  const suffix = rootMatch[2];
+
+  const transposedRoot = transposeNoteInKey(origRoot, semitones, keyContext, forceAccidental);
+  let transposedBass = '';
+  if (bassPart) {
+    transposedBass = transposeNoteInKey(bassPart, semitones, keyContext, forceAccidental);
+  }
+
+  return `${transposedRoot}${suffix}${transposedBass ? '/' + transposedBass : ''}`;
+}
+
 export function formatChordName(chordName: string): string {
   if (!chordName || chordName.trim() === '') return chordName;
   return chordName
+    .replace(/##|𝄪|x/g, '𝄪')
+    .replace(/bb|𝄫/g, '𝄫')
     .replace(/#/g, '♯')
     .replace(/([A-G])b/g, '$1♭')
     .replace(/b(\d+)/g, '♭$1');
-}
-
-export function transposeChord(chordName: string, semitones: number, forceAccidental?: 'sharp' | 'flat'): string {
-  if (!chordName || chordName.trim() === '') return chordName;
-
-  const match = chordName.match(/^([A-G][#b]?)(.*)$/);
-  if (!match) return chordName;
-
-  const [, root, suffix] = match;
-  const rootIndex = ROOT_OFFSETS_MAP[root];
-  if (rootIndex === undefined) return chordName;
-
-  const newIndex = (rootIndex + semitones % 12 + 12) % 12;
-
-  const useFlats = forceAccidental === 'flat' || (forceAccidental === undefined && chordName.includes('b'));
-  const targetScale = useFlats ? CHORD_ROOTS_FLAT : CHORD_ROOTS_SHARP;
-
-  const newRoot = targetScale[newIndex];
-  return `${newRoot}${suffix}`;
 }
 
 export function toggleEnharmonicSpelling(chordName: string): string {
