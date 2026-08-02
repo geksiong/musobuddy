@@ -60,7 +60,91 @@ export function deleteUserSong(id: string): Song[] {
 }
 
 export const POPULAR_STANDARDS: Song[] = [
-  // --- JAZZ STANDARDS ---
+  // --- JAZZ STANDARDS (MULTI-CHORD PER MEASURE & CLASSICS) ---
+  {
+    id: 'song-giant-steps',
+    title: 'Giant Steps',
+    artist: 'John Coltrane',
+    genre: 'Jazz',
+    key: 'B Major',
+    bpm: 180,
+    timeSignature: '4/4',
+    grooveId: 'jazz-charleston-swing',
+    description: 'John Coltrane\'s legendary harmonic milestone featuring rapid major-3rd key modulations with 2 chords per measure.',
+    tags: ['Jazz Standard', 'Coltrane Changes', '2 Chords / Bar', 'Bebop', 'Multi-Chord'],
+    chordsPerBeat: [
+      'Bmaj7', '', 'D7', '', 'Gmaj7', '', 'Bb7', '', 'Ebmaj7', '', 'F#7', '', 'Bmaj7', '', '', '',
+      'Fm7', '', 'Bb7', '', 'Ebmaj7', '', 'F#7', '', 'Bmaj7', '', 'D7', '', 'Gmaj7', '', 'Bb7', '',
+      'Ebmaj7', '', '', '', 'Am7', '', 'D7', '', 'Gmaj7', '', '', '', 'C#m7', '', 'F#7', '',
+      'Bmaj7', '', '', '', 'Fm7', '', 'Bb7', '', 'Ebmaj7', '', '', '', 'C#m7', '', 'F#7', ''
+    ]
+  },
+  {
+    id: 'song-i-got-rhythm',
+    title: 'Rhythm Changes (I Got Rhythm)',
+    artist: 'George Gershwin / Charlie Parker',
+    genre: 'Jazz',
+    key: 'Bb Major',
+    bpm: 180,
+    timeSignature: '4/4',
+    grooveId: 'jazz-charleston-swing',
+    description: 'The classic 32-bar Rhythm Changes foundation. Every measure of the A section contains 2 chords (I–VI–ii–V).',
+    tags: ['Jazz Standard', 'Rhythm Changes', '2 Chords / Bar', 'Gershwin', 'Bebop'],
+    chordsPerBeat: [
+      'Bbmaj7', '', 'G7', '', 'Cm7', '', 'F7', '', 'Dm7', '', 'G7', '', 'Cm7', '', 'F7', '',
+      'Fm7', '', 'Bb7', '', 'Eb7', '', 'Edim7', '', 'Bbmaj7', '', 'G7', '', 'Cm7', '', 'F7', ''
+    ]
+  },
+  {
+    id: 'song-satin-doll',
+    title: 'Satin Doll',
+    artist: 'Duke Ellington & Billy Strayhorn',
+    genre: 'Jazz',
+    key: 'C Major',
+    bpm: 120,
+    timeSignature: '4/4',
+    grooveId: 'jazz-charleston-swing',
+    description: 'Duke Ellington swing favorite famous for its sequential ii–V progressions changing chords twice per measure.',
+    tags: ['Jazz Standard', 'Duke Ellington', '2 Chords / Bar', 'ii-V Sequences', 'Swing'],
+    chordsPerBeat: [
+      'Dm7', '', 'G7', '', 'Dm7', '', 'G7', '', 'Em7', '', 'A7', '', 'Em7', '', 'A7', '',
+      'Am7', '', 'D7', '', 'Abm7', '', 'Db7', '', 'Cmaj7', '', 'Em7', '', 'A7', '', 'D7', ''
+    ]
+  },
+  {
+    id: 'song-miss-jones',
+    title: 'Have You Met Miss Jones?',
+    artist: 'Richard Rodgers / Frank Sinatra',
+    genre: 'Jazz',
+    key: 'F Major',
+    bpm: 138,
+    timeSignature: '4/4',
+    grooveId: 'jazz-charleston-swing',
+    description: 'Great American Songbook standard featuring a bridge that shifts key centers every 2 beats (2 chords per measure).',
+    tags: ['Jazz Standard', 'Great American Songbook', '2 Chords / Bar', 'Bridge Modulations'],
+    chordsPerBeat: [
+      'Fmaj7', '', '', '', 'D7', '', '', '', 'Gm7', '', '', '', 'C7', '', '', '',
+      'Bbmaj7', '', 'Abm7', '', 'Db7', '', 'Gbmaj7', '', 'Em7', '', 'A7', '', 'Dmaj7', '', 'Dm7', '',
+      'G7', '', 'Cmaj7', '', 'Gm7', '', 'C7', '', 'Fmaj7', '', 'D7', '', 'Gm7', '', 'C7', ''
+    ]
+  },
+  {
+    id: 'song-blues-for-alice',
+    title: 'Blues for Alice (Bird Blues)',
+    artist: 'Charlie Parker',
+    genre: 'Jazz',
+    key: 'F Major',
+    bpm: 150,
+    timeSignature: '4/4',
+    grooveId: 'jazz-charleston-swing',
+    description: 'Charlie Parker\'s iconic 12-bar "Bird Blues" with dense chromatic descending ii–V progressions packed 2 chords per bar.',
+    tags: ['Bird Blues', 'Bebop', 'Charlie Parker', '2 Chords / Bar', 'Chromatic ii-V'],
+    chordsPerBeat: [
+      'Fmaj7', '', '', '', 'Em7b5', '', 'A7b9', '', 'Dm7', '', 'G7', '', 'Cm7', '', 'F7', '',
+      'Bb7', '', 'Bm7', '', 'E7', '', 'Am7', '', 'D7', '', 'Abm7', '', 'Db7', '', 'Gm7', '',
+      'C7', '', '', '', 'Fmaj7', '', 'D7', '', 'Gm7', '', 'C7', ''
+    ]
+  },
   {
     id: 'song-autumn-leaves',
     title: 'Autumn Leaves',
@@ -244,6 +328,39 @@ export const POPULAR_STANDARDS: Song[] = [
     ]
   },
   {
+    id: 'song-sunny',
+    title: 'Sunny',
+    artist: 'Bobby Hebb / Boney M',
+    genre: 'R&B / Soul',
+    key: 'A Minor',
+    bpm: 118,
+    timeSignature: '4/4',
+    grooveId: 'funk-16th-soul-push',
+    description: 'Classic soulful minor groove with smooth 2-chords-per-measure turnarounds (Am7–C7 | Fmaj7–B7).',
+    tags: ['R&B', 'Soul Classic', '2 Chords / Bar', 'Minor Turnaround'],
+    chordsPerBeat: [
+      'Am7', '', 'C7', '', 'Fmaj7', '', 'B7', '', 'E7', '', '', '', 'Am7', '', 'C7', '',
+      'Fmaj7', '', 'B7', '', 'E7', '', '', '', 'Dm7', '', 'G7', '', 'Cmaj7', '', 'Fmaj7', '',
+      'Bm7b5', '', 'E7', '', 'Am7', '', '', ''
+    ]
+  },
+  {
+    id: 'song-christmas-song',
+    title: 'The Christmas Song (Chestnuts Roasting)',
+    artist: 'Mel Tormé / Nat King Cole',
+    genre: 'R&B / Soul',
+    key: 'C Major',
+    bpm: 72,
+    timeSignature: '4/4',
+    grooveId: 'pop-acoustic-push',
+    description: 'Universal pop/jazz ballad with lush step-wise diatonic passing chords moving 2 chords per measure.',
+    tags: ['Pop Ballad', 'Jazz Ballad', '2 Chords / Bar', 'Nat King Cole', 'Turnarounds'],
+    chordsPerBeat: [
+      'C', '', 'Dm7', '', 'Em7', '', 'Fmaj7', '', 'C', '', 'A7', '', 'Dm7', '', 'G7', '',
+      'C', '', 'Dm7', '', 'Em7', '', 'Fmaj7', '', 'C', '', 'G7', '', 'C', '', '', ''
+    ]
+  },
+  {
     id: 'song-aint-no-sunshine',
     title: 'Ain\'t No Sunshine',
     artist: 'Bill Withers',
@@ -291,6 +408,54 @@ export const POPULAR_STANDARDS: Song[] = [
     chordsPerBeat: [
       'Bm', '', '', '', 'F#7', '', '', '', 'A', '', '', '', 'E', '', '', '',
       'G', '', '', '', 'D', '', '', '', 'Em', '', '', '', 'F#7', '', '', ''
+    ]
+  },
+  {
+    id: 'song-layla',
+    title: 'Layla (Unplugged Chorus)',
+    artist: 'Eric Clapton / Derek and the Dominos',
+    genre: 'Rock',
+    key: 'D Minor',
+    bpm: 116,
+    timeSignature: '4/4',
+    grooveId: 'rock-driving-push',
+    description: 'Iconic rock anthem chorus featuring energetic 2-chords-per-measure shifts (Dm–Bb | C–Dm).',
+    tags: ['Classic Rock', 'Eric Clapton', '2 Chords / Bar', 'Guitar Anthem'],
+    chordsPerBeat: [
+      'Dm', '', 'Bb', '', 'C', '', 'Dm', '', 'Dm', '', 'Bb', '', 'C', '', 'A7', '',
+      'Dm', '', 'Bb', '', 'C', '', 'Dm', '', 'Dm', '', 'Bb', '', 'C', '', '', ''
+    ]
+  },
+  {
+    id: 'song-yesterday',
+    title: 'Yesterday',
+    artist: 'The Beatles',
+    genre: 'Pop',
+    key: 'F Major',
+    bpm: 90,
+    timeSignature: '4/4',
+    grooveId: 'pop-acoustic-push',
+    description: 'Paul McCartney\'s timeless acoustic masterpiece featuring quick secondary dominant movements with 2 chords per measure.',
+    tags: ['Pop Standard', 'The Beatles', '2 Chords / Bar', 'Acoustic Classic'],
+    chordsPerBeat: [
+      'F', '', '', '', 'Em7', '', 'A7', '', 'Dm', '', 'Bb', '', 'C', '', 'F', '',
+      'Dm', '', 'G7', '', 'Bb', '', 'F', '', 'F', '', '', ''
+    ]
+  },
+  {
+    id: 'song-tears-in-heaven',
+    title: 'Tears in Heaven',
+    artist: 'Eric Clapton',
+    genre: 'Pop',
+    key: 'A Major',
+    bpm: 80,
+    timeSignature: '4/4',
+    grooveId: 'pop-acoustic-push',
+    description: 'Heartfelt acoustic guitar ballad with gentle passing bass chords changing twice per measure (A–E | F#m–A | D–E7 | A).',
+    tags: ['Acoustic Ballad', 'Eric Clapton', '2 Chords / Bar', 'Passing Chords'],
+    chordsPerBeat: [
+      'A', '', 'E', '', 'F#m', '', 'A', '', 'D', '', 'E7', '', 'A', '', '', '',
+      'A', '', 'E', '', 'F#m', '', 'A', '', 'D', '', 'E7', '', 'A', '', '', ''
     ]
   },
   {
