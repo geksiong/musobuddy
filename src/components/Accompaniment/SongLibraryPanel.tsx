@@ -7,7 +7,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, Music, Play, Disc, Trash2, Plus, X, BookmarkPlus, 
-  Sparkles, Check, ChevronRight, Tag, Activity, ArrowLeftRight
+  Sparkles, Check, ChevronRight, Tag, Activity, ArrowLeftRight,
+  LayoutList, LayoutGrid
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
@@ -42,6 +43,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
   const [selectedTimeSigFilter, setSelectedTimeSigFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('detailed');
   const [loadedNotification, setLoadedNotification] = useState<string | null>(null);
 
   // Transpose shift preview state for selected song
@@ -292,16 +294,16 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
           ))}
         </div>
 
-        {/* Time Signature Filter */}
-        <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 px-1 pt-1">
-          <span>Time Signature:</span>
+        {/* Time Signature Filter & View Mode Toggle */}
+        <div className="flex items-center justify-between text-[9px] font-bold text-slate-400 px-1 pt-1 flex-wrap gap-2">
           <div className="flex items-center gap-1">
+            <span className="mr-1">Time Sig:</span>
             {['ALL', '4/4', '3/4', '6/8', '5/4'].map(ts => (
               <button
                 key={ts}
                 onClick={() => setSelectedTimeSigFilter(ts)}
                 className={cn(
-                  "px-2 py-0.5 rounded-md text-[8px] font-mono transition-all border",
+                  "px-2 py-0.5 rounded-md text-[8px] font-mono transition-all border cursor-pointer",
                   selectedTimeSigFilter === ts
                     ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold"
                     : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200")
@@ -310,6 +312,36 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
                 {ts}
               </button>
             ))}
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 shrink-0">
+            <button
+              onClick={() => setViewMode('detailed')}
+              className={cn(
+                "px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer",
+                viewMode === 'detailed'
+                  ? "bg-emerald-500 text-slate-950 shadow-2xs font-black"
+                  : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
+              )}
+              title="Detailed view with descriptions and full controls"
+            >
+              <LayoutList className="w-2.5 h-2.5" />
+              <span>Detailed</span>
+            </button>
+            <button
+              onClick={() => setViewMode('compact')}
+              className={cn(
+                "px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer",
+                viewMode === 'compact'
+                  ? "bg-emerald-500 text-slate-950 shadow-2xs font-black"
+                  : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
+              )}
+              title="Compact list view"
+            >
+              <LayoutGrid className="w-2.5 h-2.5" />
+              <span>Compact</span>
+            </button>
           </div>
         </div>
       </div>
@@ -332,6 +364,108 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
             const matchingGroove = GROOVE_PRESETS.find(g => g.id === song.grooveId);
             const beatsPerMeasure = song.timeSignature === '4/4' ? 4 : song.timeSignature === '3/4' ? 3 : song.timeSignature === '6/8' ? 6 : 5;
             const totalMeasures = Math.ceil(song.chordsPerBeat.length / beatsPerMeasure);
+
+            if (viewMode === 'compact') {
+              return (
+                <div
+                  key={song.id}
+                  className={cn(
+                    "group p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2.5 shrink-0 relative overflow-hidden",
+                    resolvedTheme === 'dark'
+                      ? "bg-white/[0.03] border-white/10 hover:border-emerald-500/40 hover:bg-white/[0.06]"
+                      : "bg-white border-slate-200 hover:border-emerald-500 hover:shadow-xs"
+                  )}
+                >
+                  {/* Left: Metadata & Clickable Chords */}
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="text-xs font-black tracking-tight group-hover:text-emerald-500 transition-colors">
+                        {song.title}
+                      </h3>
+                      <span className="text-[10px] text-slate-400 font-bold">
+                        • {song.artist}
+                      </span>
+                      {song.isCustom && (
+                        <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+                          ★ Custom
+                        </span>
+                      )}
+                      <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                        {song.key} {shift !== 0 ? `(${shift > 0 ? '+' : ''}${shift}st)` : ''}
+                      </span>
+                      <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                        ♩={song.bpm}
+                      </span>
+                      <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                        {song.timeSignature}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-mono text-slate-400 text-[8px] mr-0.5">Chords ({totalMeasures}b):</span>
+                      {uniqueExplicitChords.slice(0, 7).map((chord, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => playChord(chord, selectedInstrument, accompanimentVolume)}
+                          className="font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 text-[8px] hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                          title={`Click to play ${chord}`}
+                        >
+                          {formatChordName(chord)}
+                        </button>
+                      ))}
+                      {uniqueExplicitChords.length > 7 && (
+                        <span className="text-[8px] text-slate-400 font-mono">+{uniqueExplicitChords.length - 7}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Quick Controls & Load */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={(e) => handleShiftSongKey(song.id, -1, e)}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded text-[8px] font-mono border transition-all cursor-pointer",
+                          resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"
+                        )}
+                        title="Transpose -1st"
+                      >
+                        -1st
+                      </button>
+                      <button
+                        onClick={(e) => handleShiftSongKey(song.id, 1, e)}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded text-[8px] font-mono border transition-all cursor-pointer",
+                          resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"
+                        )}
+                        title="Transpose +1st"
+                      >
+                        +1st
+                      </button>
+                    </div>
+
+                    {song.isCustom && (
+                      <button
+                        onClick={(e) => handleDeleteUserSong(song.id, e)}
+                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
+                        title="Delete custom song"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleLoadSong(song)}
+                      className="px-2.5 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-xs active:scale-95 shrink-0 cursor-pointer"
+                    >
+                      <Play className="w-2.5 h-2.5 fill-current" />
+                      <span>Load</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div

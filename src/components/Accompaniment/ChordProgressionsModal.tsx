@@ -6,7 +6,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  X, Search, Music, Sparkles, Play, Plus, RefreshCw, Layers, ArrowLeftRight, Tag, Info, Disc, Check
+  X, Search, Music, Sparkles, Play, Plus, RefreshCw, Layers, ArrowLeftRight, Tag, Info, Disc, Check,
+  LayoutList, LayoutGrid
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
@@ -44,6 +45,8 @@ export default function ChordProgressionsModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
   const [selectedTimeSigFilter, setSelectedTimeSigFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('detailed');
+  const [accidentalMode, setAccidentalMode] = useState<'sharp' | 'flat'>('sharp');
 
   // Track active variation index per progression ID
   const [activeVariationMap, setActiveVariationMap] = useState<Record<string, number>>({});
@@ -82,8 +85,7 @@ export default function ChordProgressionsModal({
   const getTransposedVariationChords = (progression: DetailedProgression): string[] => {
     const variation = getActiveVariation(progression);
     const shift = transpositionMap[progression.id] || 0;
-    if (shift === 0) return variation.chordsPerBeat;
-    return variation.chordsPerBeat.map(chord => chord ? transposeChord(chord, shift, 'sharp') : '');
+    return variation.chordsPerBeat.map(chord => chord ? transposeChord(chord, shift, accidentalMode) : '');
   };
 
   const handlePreviewFirstChord = (progression: DetailedProgression) => {
@@ -236,23 +238,86 @@ export default function ChordProgressionsModal({
               ))}
             </div>
 
-            {/* Time Signature Filters */}
-            <div className="flex items-center gap-1 shrink-0 ml-auto">
-              <span className="text-[9px] font-bold text-slate-400 mr-1">Time Sig:</span>
-              {['ALL', '4/4', '3/4', '6/8', '5/4'].map(ts => (
+            {/* Root Accidental, Time Signature Filters & View Mode Toggle */}
+            <div className="flex items-center gap-2 shrink-0 ml-auto flex-wrap">
+              {/* Sharps / Flats Toggle */}
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] font-bold text-slate-400 mr-0.5">Accidentals:</span>
+                <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
+                  <button
+                    onClick={() => setAccidentalMode('sharp')}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[8px] font-mono font-bold transition-all cursor-pointer",
+                      accidentalMode === 'sharp'
+                        ? "bg-emerald-500 text-slate-950 font-black shadow-2xs"
+                        : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                    )}
+                    title="Use Sharps (♯) for transposed root notes"
+                  >
+                    ♯ Sharps
+                  </button>
+                  <button
+                    onClick={() => setAccidentalMode('flat')}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[8px] font-mono font-bold transition-all cursor-pointer",
+                      accidentalMode === 'flat'
+                        ? "bg-emerald-500 text-slate-950 font-black shadow-2xs"
+                        : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                    )}
+                    title="Use Flats (♭) for transposed root notes"
+                  >
+                    ♭ Flats
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] font-bold text-slate-400 mr-0.5">Time Sig:</span>
+                {['ALL', '4/4', '3/4', '6/8', '5/4'].map(ts => (
+                  <button
+                    key={ts}
+                    onClick={() => setSelectedTimeSigFilter(ts)}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[8px] font-mono transition-all border cursor-pointer",
+                      selectedTimeSigFilter === ts
+                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold"
+                        : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200")
+                    )}
+                  >
+                    {ts}
+                  </button>
+                ))}
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
                 <button
-                  key={ts}
-                  onClick={() => setSelectedTimeSigFilter(ts)}
+                  onClick={() => setViewMode('detailed')}
                   className={cn(
-                    "px-2 py-0.5 rounded-md text-[8px] font-mono transition-all border",
-                    selectedTimeSigFilter === ts
-                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold"
-                      : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/40 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200")
+                    "px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer",
+                    viewMode === 'detailed'
+                      ? "bg-emerald-500 text-slate-950 shadow-2xs font-black"
+                      : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
                   )}
+                  title="Detailed view with descriptions, popular songs, and variations"
                 >
-                  {ts}
+                  <LayoutList className="w-2.5 h-2.5" />
+                  <span>Detailed</span>
                 </button>
-              ))}
+                <button
+                  onClick={() => setViewMode('compact')}
+                  className={cn(
+                    "px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all cursor-pointer",
+                    viewMode === 'compact'
+                      ? "bg-emerald-500 text-slate-950 shadow-2xs font-black"
+                      : "text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                  )}
+                  title="Compact list view"
+                >
+                  <LayoutGrid className="w-2.5 h-2.5" />
+                  <span>Compact</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -274,6 +339,168 @@ export default function ChordProgressionsModal({
 
               const beatsPerMeasure = progression.timeSignature === '4/4' ? 4 : progression.timeSignature === '3/4' ? 3 : progression.timeSignature === '6/8' ? 6 : 5;
               const totalMeasures = Math.ceil(transposedChords.length / beatsPerMeasure);
+
+              if (viewMode === 'compact') {
+                return (
+                  <div
+                    key={progression.id}
+                    className={cn(
+                      "p-3 rounded-xl border flex flex-col gap-2 relative overflow-hidden shrink-0 transition-all",
+                      resolvedTheme === 'dark'
+                        ? "bg-white/[0.03] border-white/10 hover:border-emerald-500/40 hover:bg-white/[0.06]"
+                        : "bg-white border-slate-200 hover:border-emerald-500 hover:shadow-xs"
+                    )}
+                  >
+                    {/* Top Row: Title, Genre, Badges, Variations & Actions */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-xs font-black tracking-tight">
+                          {progression.name}
+                        </h3>
+                        <span className={cn(
+                          "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border",
+                          resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/70" : "bg-slate-100 border-slate-200 text-slate-600"
+                        )}>
+                          {progression.genre}
+                        </span>
+                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                          {progression.timeSignature}
+                        </span>
+                        {shift !== 0 && (
+                          <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            {shift > 0 ? `+${shift}` : shift}st
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right Action buttons */}
+                      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                        {hasExistingChords ? (
+                          <>
+                            <button
+                              onClick={() => handleLoad(progression, 'add')}
+                              className="px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 transition-all flex items-center gap-1 shadow-2xs shrink-0 cursor-pointer"
+                              title="Append to current progression"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                              <span>Add</span>
+                            </button>
+                            <button
+                              onClick={() => handleLoad(progression, 'replace')}
+                              className="px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-2xs shrink-0 cursor-pointer"
+                              title="Replace existing progression"
+                            >
+                              <RefreshCw className="w-2.5 h-2.5" />
+                              <span>Replace</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleLoad(progression, 'replace')}
+                            className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-2xs shrink-0 cursor-pointer"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Load</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Variations row if present */}
+                    {progression.variations && progression.variations.length > 1 && (
+                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Var:</span>
+                        {progression.variations.map((varItem, varIdx) => (
+                          <button
+                            key={varItem.id}
+                            onClick={() => handleSetVariation(progression.id, varIdx)}
+                            className={cn(
+                              "px-2 py-0.5 rounded-lg text-[8px] font-bold transition-all border whitespace-nowrap shrink-0 flex items-center gap-0.5 cursor-pointer",
+                              activeVarIdx === varIdx
+                                ? "bg-indigo-600 text-white border-indigo-500 font-black"
+                                : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200")
+                            )}
+                          >
+                            {activeVarIdx === varIdx && <Check className="w-2 h-2" />}
+                            <span>{varItem.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Clickable Chords & Transpose controls row */}
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/50 dark:border-white/5 flex-wrap">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="text-[8px] font-mono text-slate-400 mr-0.5">Chords ({totalMeasures}b):</span>
+                        {transposedChords.map((chord, cIdx) => {
+                          const isBarStart = cIdx % beatsPerMeasure === 0;
+                          const hasChord = chord.trim() !== '';
+
+                          return (
+                            <React.Fragment key={cIdx}>
+                              {isBarStart && cIdx > 0 && (
+                                <div className="h-4 w-px bg-slate-300 dark:bg-white/20 mx-0.5 shrink-0" />
+                              )}
+                              {hasChord ? (
+                                <button
+                                  type="button"
+                                  onClick={() => playChord(chord, selectedInstrument, accompanimentVolume)}
+                                  className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 font-mono font-bold text-[9px] hover:bg-emerald-500/30 transition-all cursor-pointer"
+                                  title={`Click to play ${chord}`}
+                                >
+                                  {formatChordName(chord)}
+                                </button>
+                              ) : (
+                                <span className="px-1 text-[8px] text-slate-400 font-mono opacity-30">—</span>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+
+                      {/* Transpose Controls */}
+                      <div className="flex items-center gap-0.5 shrink-0 ml-auto">
+                        <button
+                          onClick={() => handleShiftKey(progression.id, -1)}
+                          className={cn(
+                            "px-1.5 py-0.5 rounded text-[8px] font-mono border transition-all cursor-pointer",
+                            resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"
+                          )}
+                          title="Transpose -1st"
+                        >
+                          -1st
+                        </button>
+                        <button
+                          onClick={() => handleShiftKey(progression.id, 1)}
+                          className={cn(
+                            "px-1.5 py-0.5 rounded text-[8px] font-mono border transition-all cursor-pointer",
+                            resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700"
+                          )}
+                          title="Transpose +1st"
+                        >
+                          +1st
+                        </button>
+                        {shift !== 0 && (
+                          <button
+                            onClick={() => handleResetKey(progression.id)}
+                            className="text-[8px] font-mono text-emerald-500 hover:underline px-1 cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handlePreviewFirstChord(progression)}
+                          className="ml-1 text-[8px] font-bold text-sky-400 hover:text-sky-300 flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 cursor-pointer"
+                          title="Play first chord"
+                        >
+                          <Play className="w-2 h-2 fill-current" />
+                          <span>Sound</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div

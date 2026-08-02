@@ -75,10 +75,8 @@ export default function AccompanimentView() {
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
-  const [activeRightTab, setActiveRightTab] = useState<'library' | 'songs' | 'explorer' | 'presets'>('library');
+  const [activeRightTab, setActiveRightTab] = useState<'library' | 'songs' | 'explorer'>('library');
   const [isChordModalOpen, setIsChordModalOpen] = useState(false);
-  const [presetFilterTimeSig, setPresetFilterTimeSig] = useState<string>('ALL');
-  const [presetSearchQuery, setPresetSearchQuery] = useState<string>('');
 
   const handleLoadChordProgression = (
     chordsPerBeat: string[],
@@ -195,8 +193,7 @@ export default function AccompanimentView() {
     setIsSaveModalOpen(false);
     setPresetNameInput('');
     setPresetDescInput('');
-    setActiveRightTab('presets');
-    setPresetFilterTimeSig('CUSTOM');
+    setActiveRightTab('library');
   };
 
   const handleDeleteUserPreset = (id: string, e: React.MouseEvent) => {
@@ -936,19 +933,6 @@ export default function AccompanimentView() {
                 <Compass className="w-3.5 h-3.5" />
                 Explorer
               </button>
-
-              <button
-                onClick={() => setActiveRightTab('presets')}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
-                  activeRightTab === 'presets'
-                    ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
-                    : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
-                )}
-              >
-                <ListMusic className="w-3.5 h-3.5" />
-                Presets
-              </button>
             </div>
 
             {/* Active Chord Badge */}
@@ -1130,178 +1114,9 @@ export default function AccompanimentView() {
               </div>
             ) : activeRightTab === 'songs' ? (
               <SongLibraryPanel />
-            ) : activeRightTab === 'explorer' ? (
+            ) : (
               <div className="flex-1 min-h-0">
                 <ChordExplorer initialChord={activeExplorerChord} />
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3 h-full min-h-0">
-                {/* Search & Filter Header */}
-                <div className="flex flex-col gap-2">
-                  <div className="relative">
-                    <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")} />
-                    <input 
-                      type="text"
-                      placeholder="Search presets (e.g., Tangos, Flamenco, Jazz, C7, Paco)..."
-                      value={presetSearchQuery}
-                      onChange={(e) => setPresetSearchQuery(e.target.value)}
-                      className={cn(
-                        "w-full pl-8 pr-8 py-1.5 rounded-xl border text-xs font-medium outline-none transition-all focus:border-emerald-500",
-                        resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white placeholder:text-white/30" : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400"
-                      )}
-                    />
-                    {presetSearchQuery && (
-                      <button
-                        onClick={() => setPresetSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-widest text-[9px]">Filter Time Sig:</span>
-                    <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                      {[...userPresets, ...PROGRESSION_PRESETS].filter(p => {
-                        const matchesTs = presetFilterTimeSig === 'ALL' 
-                          ? true 
-                          : presetFilterTimeSig === 'CUSTOM' 
-                            ? p.isCustom 
-                            : p.timeSignature === presetFilterTimeSig;
-                        const query = presetSearchQuery.trim().toLowerCase();
-                        if (!query) return matchesTs;
-                        const matchName = p.name.toLowerCase().includes(query);
-                        const matchGenre = p.genre.toLowerCase().includes(query);
-                        const matchDesc = p.description.toLowerCase().includes(query);
-                        const matchChords = p.chordsPerBeat.some(c => c.toLowerCase().includes(query));
-                        return matchesTs && (matchName || matchGenre || matchDesc || matchChords);
-                      }).length} Presets
-                    </span>
-                  </div>
-                </div>
-
-                {/* Filter Pills */}
-                <div className={cn(
-                  "grid grid-cols-6 gap-1 p-1 rounded-xl border transition-colors",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
-                )}>
-                  {['ALL', 'CUSTOM', '4/4', '3/4', '6/8', '5/4'].map(ts => (
-                    <button
-                      key={ts}
-                      onClick={() => setPresetFilterTimeSig(ts)}
-                      className={cn(
-                        "py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all text-center",
-                        presetFilterTimeSig === ts
-                          ? (resolvedTheme === 'dark' ? "bg-white text-black shadow" : "bg-slate-900 text-white shadow")
-                          : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-500 hover:text-slate-900")
-                      )}
-                    >
-                      {ts === 'CUSTOM' ? '★ Custom' : ts}
-                    </button>
-                  ))}
-                </div>
-
-                {/* List of Presets */}
-                <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2.5">
-                  {[...userPresets, ...PROGRESSION_PRESETS]
-                    .filter(p => {
-                      const matchesTs = presetFilterTimeSig === 'ALL' 
-                        ? true 
-                        : presetFilterTimeSig === 'CUSTOM' 
-                          ? p.isCustom 
-                          : p.timeSignature === presetFilterTimeSig;
-                      const query = presetSearchQuery.trim().toLowerCase();
-                      if (!query) return matchesTs;
-                      const matchName = p.name.toLowerCase().includes(query);
-                      const matchGenre = p.genre.toLowerCase().includes(query);
-                      const matchDesc = p.description.toLowerCase().includes(query);
-                      const matchChords = p.chordsPerBeat.some(c => c.toLowerCase().includes(query));
-                      return matchesTs && (matchName || matchGenre || matchDesc || matchChords);
-                    })
-                    .map(preset => {
-                      const explicitChords = preset.chordsPerBeat.filter(c => c.trim() !== '');
-                      const uniqueExplicitChords = Array.from(new Set<string>(explicitChords));
-                      const beatsPerMeasure = preset.timeSignature === '4/4' ? 4 : preset.timeSignature === '3/4' ? 3 : preset.timeSignature === '6/8' ? 6 : 5;
-                      const totalMeasures = Math.ceil(preset.chordsPerBeat.length / beatsPerMeasure);
-
-                      return (
-                        <div
-                          key={preset.id}
-                          onClick={() => handleSelectPreset(preset)}
-                          className={cn(
-                            "group p-3 rounded-xl border transition-all cursor-pointer flex flex-col gap-1.5 relative overflow-hidden",
-                            resolvedTheme === 'dark'
-                              ? "bg-white/[0.03] border-white/10 hover:border-emerald-500/50 hover:bg-white/[0.06]"
-                              : "bg-white border-slate-200 hover:border-emerald-500 hover:shadow-md"
-                          )}
-                        >
-                          {/* Top row: Title & Badges */}
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-black tracking-tight group-hover:text-emerald-500 transition-colors">
-                                  {preset.name}
-                                </span>
-                                {preset.isCustom && (
-                                  <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
-                                    ★ Custom
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[9px] text-slate-400 font-medium">
-                                {preset.description}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                {preset.timeSignature}
-                              </span>
-                              <span className={cn(
-                                "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border",
-                                resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/70" : "bg-slate-100 border-slate-200 text-slate-600"
-                              )}>
-                                {preset.genre}
-                              </span>
-
-                              {preset.isCustom && (
-                                <button
-                                  onClick={(e) => handleDeleteUserPreset(preset.id, e)}
-                                  className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors ml-1"
-                                  title="Delete custom preset"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Bottom row: Chords Sequence Preview */}
-                          <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-white/5 text-[9px]">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="font-mono text-slate-400 text-[8px] mr-0.5">Chords:</span>
-                              {uniqueExplicitChords.slice(0, 6).map((c, i) => (
-                                <span
-                                  key={i}
-                                  className="font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px]"
-                                >
-                                  {formatChordName(c)}
-                                </span>
-                              ))}
-                              {uniqueExplicitChords.length > 6 && (
-                                <span className="text-[8px] text-slate-400 font-mono">+{uniqueExplicitChords.length - 6} more</span>
-                              )}
-                            </div>
-
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider shrink-0 ml-2">
-                              {totalMeasures} {totalMeasures === 1 ? 'Bar' : 'Bars'}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
               </div>
             )}
           </div>
