@@ -18,6 +18,7 @@ import { InstrumentType } from '../../types.ts';
 import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
 import GrooveEnginePanel from './GrooveEnginePanel.tsx';
 import SongLibraryPanel from './SongLibraryPanel.tsx';
+import ChordProgressionsModal from './ChordProgressionsModal.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
   CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, ARPEGGIO_RATES,
@@ -74,9 +75,50 @@ export default function AccompanimentView() {
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
-  const [activeRightTab, setActiveRightTab] = useState<'songs' | 'library' | 'explorer' | 'presets'>('songs');
+  const [activeRightTab, setActiveRightTab] = useState<'library' | 'songs' | 'explorer' | 'presets'>('library');
+  const [isChordModalOpen, setIsChordModalOpen] = useState(false);
   const [presetFilterTimeSig, setPresetFilterTimeSig] = useState<string>('ALL');
   const [presetSearchQuery, setPresetSearchQuery] = useState<string>('');
+
+  const handleLoadChordProgression = (
+    chordsPerBeat: string[],
+    timeSignature: '4/4' | '3/4' | '6/8' | '5/4',
+    songBpm: number | undefined,
+    mode: 'replace' | 'add',
+    progressionName: string,
+    shift: number
+  ) => {
+    const targetPattern = DEFAULT_PRESETS.find(p => p.timeSignature === timeSignature);
+    if (targetPattern) {
+      setActivePattern(targetPattern);
+    }
+    if (songBpm) {
+      setBpm(songBpm);
+    }
+
+    if (mode === 'replace') {
+      const newProg = chordsPerBeat.map((chordName, i) => ({
+        id: `prog_beat_${Date.now()}_${i}`,
+        name: chordName,
+      }));
+      setProgression(newProg);
+      setSelectedBeatIndex(0);
+    } else {
+      const newSlots = chordsPerBeat.map((chordName, i) => ({
+        id: `prog_beat_append_${Date.now()}_${i}`,
+        name: chordName,
+      }));
+      setProgression([...progression, ...newSlots]);
+    }
+
+    const firstChord = chordsPerBeat.find(c => c && c.trim() !== '');
+    if (firstChord) {
+      playChord(firstChord, selectedInstrument, accompanimentVolume);
+      setTrackedChord(firstChord);
+    }
+
+    setIsChordModalOpen(false);
+  };
 
   // Compact layout and Section Label modal state
   const [gridColumns, setGridColumns] = useState<1 | 2>(2);
@@ -857,22 +899,9 @@ export default function AccompanimentView() {
           <div className="p-4 pb-0 flex items-center justify-between border-b border-slate-200 dark:border-white/10">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
               <button
-                onClick={() => setActiveRightTab('songs')}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0",
-                  activeRightTab === 'songs'
-                    ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
-                    : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
-                )}
-              >
-                <Music className="w-3.5 h-3.5 text-emerald-500" />
-                Song Library
-              </button>
-
-              <button
                 onClick={() => setActiveRightTab('library')}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0",
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
                   activeRightTab === 'library'
                     ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
                     : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
@@ -883,9 +912,22 @@ export default function AccompanimentView() {
               </button>
 
               <button
+                onClick={() => setActiveRightTab('songs')}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
+                  activeRightTab === 'songs'
+                    ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
+                    : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
+                )}
+              >
+                <Music className="w-3.5 h-3.5 text-emerald-500" />
+                Song Library
+              </button>
+
+              <button
                 onClick={() => setActiveRightTab('explorer')}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0",
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
                   activeRightTab === 'explorer'
                     ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
                     : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
@@ -898,7 +940,7 @@ export default function AccompanimentView() {
               <button
                 onClick={() => setActiveRightTab('presets')}
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0",
+                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
                   activeRightTab === 'presets'
                     ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
                     : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
@@ -917,11 +959,9 @@ export default function AccompanimentView() {
 
           {/* Tab Content Area */}
           <div className="flex-1 p-4 flex flex-col overflow-y-auto min-h-0">
-            {activeRightTab === 'songs' ? (
-              <SongLibraryPanel />
-            ) : activeRightTab === 'library' ? (
+            {activeRightTab === 'library' ? (
               <div className="flex flex-col gap-4 h-full">
-                {/* Target Beat & Enharmonic Toggle Banner */}
+                {/* Target Beat, Enharmonic Toggle & Chord Progressions Modal Trigger Banner */}
                 <div className="flex items-center justify-between text-[10px] font-bold flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-400 uppercase tracking-widest text-[9px]">Root Note:</span>
@@ -934,7 +974,7 @@ export default function AccompanimentView() {
                           }
                         }}
                         className={cn(
-                          "px-2 py-0.5 rounded text-[8px] font-black transition-all",
+                          "px-2 py-0.5 rounded text-[8px] font-black transition-all cursor-pointer",
                           accidentalMode === 'sharp'
                             ? "bg-emerald-500 text-white shadow-xs"
                             : "text-slate-500 dark:text-white/40 hover:text-slate-800 dark:hover:text-white"
@@ -951,7 +991,7 @@ export default function AccompanimentView() {
                           }
                         }}
                         className={cn(
-                          "px-2 py-0.5 rounded text-[8px] font-black transition-all",
+                          "px-2 py-0.5 rounded text-[8px] font-black transition-all cursor-pointer",
                           accidentalMode === 'flat'
                             ? "bg-emerald-500 text-white shadow-xs"
                             : "text-slate-500 dark:text-white/40 hover:text-slate-800 dark:hover:text-white"
@@ -963,9 +1003,20 @@ export default function AccompanimentView() {
                     </div>
                   </div>
 
-                  <span className="text-[9px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    {selectedBeatIndex !== null ? `Target Beat ${selectedBeatIndex + 1}` : 'Target: New Beat'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsChordModalOpen(true)}
+                      className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] uppercase tracking-wider flex items-center gap-1 shadow-xs border border-indigo-500 transition-all cursor-pointer active:scale-95 shrink-0"
+                      title="Pick from common chord progressions and variations (J-Pop, Anime, Jazz, Rock, etc.)"
+                    >
+                      <Layers className="w-3 h-3" />
+                      <span>Chord Progressions</span>
+                    </button>
+
+                    <span className="text-[9px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
+                      {selectedBeatIndex !== null ? `Target Beat ${selectedBeatIndex + 1}` : 'Target: New Beat'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* SUGGESTED ALTERNATIVE CHORDS SECTION */}
@@ -1077,6 +1128,8 @@ export default function AccompanimentView() {
                   })}
                 </div>
               </div>
+            ) : activeRightTab === 'songs' ? (
+              <SongLibraryPanel />
             ) : activeRightTab === 'explorer' ? (
               <div className="flex-1 min-h-0">
                 <ChordExplorer initialChord={activeExplorerChord} />
@@ -1486,6 +1539,14 @@ export default function AccompanimentView() {
           </motion.div>
         </div>
       )}
+
+      {/* Popular Chord Progressions Modal Window */}
+      <ChordProgressionsModal
+        isOpen={isChordModalOpen}
+        onClose={() => setIsChordModalOpen(false)}
+        onLoadProgression={handleLoadChordProgression}
+        hasExistingChords={progression.some(p => p.name && p.name.trim() !== '')}
+      />
     </div>
   );
 }
