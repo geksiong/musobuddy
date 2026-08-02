@@ -27,6 +27,7 @@ import {
   PROGRESSION_PRESETS, ProgressionPreset, getUserPresets, saveUserPreset, deleteUserPreset 
 } from './progressionPresets.ts';
 import { DEFAULT_PRESETS } from '../Metronome/constants.ts';
+import { getSuggestedChords } from '../../lib/chordSuggestions.ts';
 
 const INSTRUMENTS = [
   { id: InstrumentType.Piano, label: 'Acoustic Piano', icon: Music },
@@ -207,6 +208,37 @@ export default function AccompanimentView() {
     playChord(chordName, selectedInstrument, accompanimentVolume);
     setTrackedChord(chordName);
   };
+
+  const handleSelectSuggestedChord = (chordName: string) => {
+    if (selectedBeatIndex !== null && selectedBeatIndex < progression.length) {
+      const nextProg = [...progression];
+      nextProg[selectedBeatIndex] = { ...nextProg[selectedBeatIndex], name: chordName };
+      setProgression(nextProg);
+    } else {
+      addBeat(chordName);
+    }
+
+    playChord(chordName, selectedInstrument, accompanimentVolume);
+    setTrackedChord(chordName);
+  };
+
+  const selectedBeatSlot = selectedBeatIndex !== null ? progression[selectedBeatIndex] : null;
+  const isSelectedBeatExplicit = !!(selectedBeatSlot && selectedBeatSlot.name.trim() !== '');
+
+  const prevBeatChord = selectedBeatIndex !== null && selectedBeatIndex > 0 
+    ? (progression[selectedBeatIndex - 1]?.name || getEffectiveChord(progression, selectedBeatIndex - 1)?.chord || null) 
+    : null;
+
+  const nextBeatChord = selectedBeatIndex !== null && selectedBeatIndex < progression.length - 1 
+    ? (progression[selectedBeatIndex + 1]?.name || getEffectiveChord(progression, selectedBeatIndex + 1)?.chord || null) 
+    : null;
+
+  const suggestedChords = getSuggestedChords(
+    isSelectedBeatExplicit ? selectedBeatSlot?.name : null,
+    prevBeatChord,
+    nextBeatChord,
+    accidentalMode === 'flat'
+  );
 
   const activePlayChordInfo = getEffectiveChord(progression, currentIndex);
   const selectedBeatChordInfo = selectedBeatIndex !== null ? getEffectiveChord(progression, selectedBeatIndex) : null;
@@ -695,7 +727,11 @@ export default function AccompanimentView() {
                           return (
                             <button
                               key={bIdx}
-                              onClick={() => addBeat('')}
+                              onClick={() => {
+                                addBeat('');
+                                setSelectedBeatIndex(progression.length);
+                                setActiveRightTab('library');
+                              }}
                               className={cn(
                                 "h-14 sm:h-16 rounded-xl border border-dashed flex flex-col items-center justify-center transition-all opacity-40 hover:opacity-100",
                                 resolvedTheme === 'dark' ? "border-white/10 hover:border-emerald-500 text-white/40" : "border-slate-300 hover:border-emerald-500 text-slate-400"
@@ -719,6 +755,7 @@ export default function AccompanimentView() {
                             key={chordSlot.id}
                             onClick={() => {
                               setSelectedBeatIndex(globalBeatIndex);
+                              setActiveRightTab('library');
                               const playTarget = isExplicit ? chordSlot.name : effective?.chord;
                               if (playTarget) {
                                 playChord(playTarget, selectedInstrument, accompanimentVolume);
@@ -929,6 +966,68 @@ export default function AccompanimentView() {
                   <span className="text-[9px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                     {selectedBeatIndex !== null ? `Target Beat ${selectedBeatIndex + 1}` : 'Target: New Beat'}
                   </span>
+                </div>
+
+                {/* SUGGESTED ALTERNATIVE CHORDS SECTION */}
+                <div className={cn(
+                  "p-3 rounded-2xl border flex flex-col gap-2 transition-all shadow-xs shrink-0",
+                  resolvedTheme === 'dark'
+                    ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+                    : "bg-emerald-50/80 border-emerald-200 text-emerald-950"
+                )}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
+                        {isSelectedBeatExplicit
+                          ? `Alternatives for ${formatChordName(selectedBeatSlot?.name || '')}`
+                          : selectedBeatIndex !== null
+                            ? `Suggested for Beat ${selectedBeatIndex + 1}`
+                            : 'Suggested Chords'}
+                      </span>
+                    </div>
+                    <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 shrink-0">
+                      {suggestedChords.length} options
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+                    {suggestedChords.map((s) => {
+                      const isCurrentSelected = isSelectedBeatExplicit && selectedBeatSlot?.name === s.chord;
+                      return (
+                        <button
+                          key={`${s.chord}_${s.label}`}
+                          onClick={() => handleSelectSuggestedChord(s.chord)}
+                          className={cn(
+                            "group flex flex-col p-2 rounded-xl border text-left transition-all active:scale-95 shadow-2xs cursor-pointer",
+                            isCurrentSelected
+                              ? "bg-emerald-500 text-white border-emerald-400 font-bold"
+                              : resolvedTheme === 'dark'
+                                ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-emerald-500/50"
+                                : "bg-white border-slate-200 hover:bg-emerald-50 hover:border-emerald-400"
+                          )}
+                          title={`${s.chord}: ${s.reason}`}
+                        >
+                          <div className="flex items-center justify-between w-full leading-none mb-1">
+                            <span className="text-xs font-black font-mono tracking-tight group-hover:text-emerald-500 dark:group-hover:text-emerald-400">
+                              {formatChordName(s.chord)}
+                            </span>
+                            <span className={cn(
+                              "text-[7px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded shrink-0 ml-1",
+                              isCurrentSelected
+                                ? "bg-white/20 text-white"
+                                : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+                            )}>
+                              {s.label}
+                            </span>
+                          </div>
+                          <span className="text-[8px] opacity-75 line-clamp-1 font-medium leading-tight">
+                            {s.reason}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Root Note Selector Pills */}
