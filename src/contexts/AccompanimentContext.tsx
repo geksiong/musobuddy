@@ -101,6 +101,12 @@ interface AccompanimentContextType {
   earlyPushEvent: EarlyPushNotification | null;
   setEarlyPushEvent: React.Dispatch<React.SetStateAction<EarlyPushNotification | null>>;
 
+  // Measure / Section Labels
+  measureLabels: Record<number, string>;
+  setMeasureLabels: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+  setMeasureLabel: (measureIndex: number, label: string) => void;
+  deleteMeasureLabel: (measureIndex: number) => void;
+
   // Backwards compatibility aliases
   isRhythmEngineEnabled: boolean;
   setIsRhythmEngineEnabled: (enabled: boolean) => void;
@@ -526,11 +532,33 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  const [measureLabels, setMeasureLabels] = useState<Record<number, string>>({});
+
+  const setMeasureLabel = (measureIndex: number, label: string) => {
+    setMeasureLabels(prev => {
+      if (!label || label.trim() === '') {
+        const next = { ...prev };
+        delete next[measureIndex];
+        return next;
+      }
+      return { ...prev, [measureIndex]: label.trim() };
+    });
+  };
+
+  const deleteMeasureLabel = (measureIndex: number) => {
+    setMeasureLabels(prev => {
+      const next = { ...prev };
+      delete next[measureIndex];
+      return next;
+    });
+  };
+
   const clearAll = () => {
     setProgression(Array.from({ length: masterLength }, () => ({
       id: Math.random().toString(36).substr(2, 9),
       name: ''
     })));
+    setMeasureLabels({});
     setSelectedBeatIndex(0);
     setIsPlaying(false);
   };
@@ -549,6 +577,10 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     accompanimentVolume, setAccompanimentVolume,
     isPendingStart, setIsPendingStart,
     currentIndex, setCurrentIndex,
+
+    // Measure / Section Labels
+    measureLabels, setMeasureLabels,
+    setMeasureLabel, deleteMeasureLabel,
 
     // Groove Engine
     isGrooveEngineEnabled, setIsGrooveEngineEnabled,

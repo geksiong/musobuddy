@@ -30,7 +30,8 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
   const { 
     setProgression, setSelectedBeatIndex, setTrackedChord, 
     selectedInstrument, accompanimentVolume, setActiveGroovePattern, 
-    setIsGrooveEngineEnabled, progression, activeGroovePattern
+    setIsGrooveEngineEnabled, progression, activeGroovePattern,
+    setMeasureLabels, measureLabels
   } = useAccompaniment();
 
   const { setBpm, setActivePattern, bpm, activePattern } = useMetronome();
@@ -82,12 +83,13 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
   const handleLoadSong = (song: Song) => {
     const chords = getTransposedSongChords(song);
 
-    // 1. Set Progression
+    // 1. Set Progression & Section Labels
     const newProg = chords.map((chordName, i) => ({
       id: `song_beat_${Date.now()}_${i}`,
       name: chordName,
     }));
     setProgression(newProg);
+    setMeasureLabels(song.sectionLabels || {});
     setSelectedBeatIndex(0);
 
     // 2. Set Metronome Time Signature & BPM
@@ -145,6 +147,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
       grooveId: activeGroovePattern?.id || 'pop-acoustic-push',
       description: songDescInput.trim() || 'Custom song progression created in accompaniment view.',
       chordsPerBeat,
+      sectionLabels: measureLabels,
       tags: ['Custom Song', songGenreInput],
     });
 

@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { 
   Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
   Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles,
-  ArrowLeftRight, BookmarkPlus, Save, Hash, Search
+  ArrowLeftRight, BookmarkPlus, Save, Hash, Search, Tag, LayoutGrid, Rows, Edit2
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useMetronome } from '../../hooks/useMetronome.ts';
@@ -56,6 +56,7 @@ function KeyboardIcon({ className }: { className?: string }) {
 export default function AccompanimentView() {
   const { 
     progression, setProgression,
+    measureLabels, setMeasureLabel, deleteMeasureLabel,
     selectedBeatIndex, setSelectedBeatIndex,
     clearBeat, deleteBeat, insertBeat, addBeat, addMeasure, clearAll,
     arpeggioPreset, setArpeggioPreset,
@@ -75,6 +76,11 @@ export default function AccompanimentView() {
   const [activeRightTab, setActiveRightTab] = useState<'songs' | 'library' | 'explorer' | 'presets'>('songs');
   const [presetFilterTimeSig, setPresetFilterTimeSig] = useState<string>('ALL');
   const [presetSearchQuery, setPresetSearchQuery] = useState<string>('');
+
+  // Compact layout and Section Label modal state
+  const [gridColumns, setGridColumns] = useState<1 | 2>(2);
+  const [editingMeasureIndex, setEditingMeasureIndex] = useState<number | null>(null);
+  const [customLabelInput, setCustomLabelInput] = useState<string>('');
 
   // Enharmonic and Transposition state
   const [accidentalMode, setAccidentalMode] = useState<'sharp' | 'flat'>('sharp');
@@ -584,62 +590,102 @@ export default function AccompanimentView() {
               >
                 <RefreshCw className="w-3 h-3" /> Clear All
               </button>
+
+              {/* Layout Mode Toggle: 2 Meas/Row vs 1 Meas/Row */}
+              <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-black/20 ml-1">
+                <button
+                  onClick={() => setGridColumns(2)}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 transition-all",
+                    gridColumns === 2
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                  title="2 measures per line (Compact mode for long songs)"
+                >
+                  <LayoutGrid className="w-3 h-3" /> 2 / Line
+                </button>
+                <button
+                  onClick={() => setGridColumns(1)}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 transition-all",
+                    gridColumns === 1
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                  title="1 measure per line (Expanded view)"
+                >
+                  <Rows className="w-3 h-3" /> 1 / Line
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Beat Grid Area - Vertical alignment across measures */}
-          <div className="w-full overflow-x-auto pb-2">
-            <div className="min-w-[580px] flex flex-col gap-2">
-              {/* Column Headers (Aligned Vertically for identical beats) */}
-              <div 
-                className="grid gap-2 text-[10px] font-black uppercase tracking-wider text-slate-400 px-1"
-                style={{ gridTemplateColumns: `42px repeat(${masterLength}, minmax(0, 1fr)) 12px` }}
-              >
-                <div className="flex items-center justify-center font-mono opacity-60">Bar</div>
-                {Array.from({ length: masterLength }).map((_, beatIdx) => {
-                  const isCurrentBeatColumn = isPlaying && (currentIndex % masterLength === beatIdx);
-                  return (
-                    <div 
-                      key={beatIdx} 
-                      className={cn(
-                        "text-center py-1 rounded-md transition-colors border border-transparent font-mono",
-                        isCurrentBeatColumn ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/30" : ""
-                      )}
-                    >
-                      Beat {beatIdx + 1}
-                    </div>
-                  );
-                })}
-                <div />
-              </div>
+          {/* Beat Grid Area - Supporting Compact 2-Measures-Per-Row */}
+          <div className="w-full pb-2">
+            <div className={cn(
+              "grid gap-3 transition-all",
+              gridColumns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+            )}>
+              {Array.from({ length: totalMeasures }).map((_, mIdx) => {
+                const startBeatIndex = mIdx * masterLength;
+                const isCurrentMeasure = isPlaying && Math.floor(currentIndex / masterLength) === mIdx;
+                const currentLabel = measureLabels[mIdx];
 
-              {/* Measure Rows with Barlines */}
-              <div className="flex flex-col gap-3">
-                {Array.from({ length: totalMeasures }).map((_, mIdx) => {
-                  const startBeatIndex = mIdx * masterLength;
-                  const isCurrentMeasure = isPlaying && Math.floor(currentIndex / masterLength) === mIdx;
-
-                  return (
-                    <div 
-                      key={mIdx}
-                      className={cn(
-                        "grid gap-2 items-center p-2 rounded-2xl border transition-all relative",
-                        isCurrentMeasure 
-                          ? (resolvedTheme === 'dark' ? "bg-emerald-500/5 border-emerald-500/30" : "bg-emerald-50/60 border-emerald-300")
-                          : (resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/10" : "bg-slate-50/80 border-slate-200")
-                      )}
-                      style={{ gridTemplateColumns: `42px repeat(${masterLength}, minmax(0, 1fr)) 12px` }}
-                    >
-                      {/* Measure Label & Left Barline */}
-                      <div className="flex items-center justify-between pr-2 border-r border-slate-300 dark:border-white/15 h-full min-h-[90px]">
-                        <span className="text-[10px] font-black font-mono text-slate-400">
+                return (
+                  <div 
+                    key={mIdx}
+                    className={cn(
+                      "group/measure flex flex-col p-2.5 rounded-2xl border transition-all relative overflow-hidden",
+                      isCurrentMeasure 
+                        ? (resolvedTheme === 'dark' ? "bg-emerald-500/10 border-emerald-500/40 shadow-sm shadow-emerald-500/10" : "bg-emerald-50/90 border-emerald-400 shadow-sm")
+                        : (resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/10 hover:border-white/20" : "bg-slate-50/80 border-slate-200 hover:border-slate-300 shadow-2xs")
+                    )}
+                  >
+                    {/* Measure Card Top Bar: Measure number + Section Label Tag */}
+                    <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200 dark:border-white/10">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="text-[10px] font-black font-mono text-slate-500 dark:text-slate-400">
                           m.{mIdx + 1}
                         </span>
-                        {/* Visual Barline | */}
-                        <div className="w-1.5 h-16 bg-slate-700 dark:bg-slate-300 rounded-sm" />
+
+                        {currentLabel ? (
+                          <button
+                            onClick={() => {
+                              setEditingMeasureIndex(mIdx);
+                              setCustomLabelInput(currentLabel);
+                            }}
+                            className="px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-2xs transition-all truncate"
+                            title="Click to edit section label"
+                          >
+                            <Tag className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                            <span className="truncate">{currentLabel}</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setEditingMeasureIndex(mIdx);
+                              setCustomLabelInput('');
+                            }}
+                            className="opacity-40 group-hover/measure:opacity-100 hover:opacity-100 px-1.5 py-0.5 rounded border border-dashed border-slate-300 dark:border-white/20 text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 text-[9px] font-medium transition-all flex items-center gap-1"
+                            title="Add section label (e.g. Chorus 1, Verse 1, Bridge)"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Label</span>
+                          </button>
+                        )}
                       </div>
 
-                      {/* Beat Slots for this Measure */}
+                      <div className="text-[8px] font-mono text-slate-400 uppercase tracking-wider pl-1">
+                        {masterLength} Beats
+                      </div>
+                    </div>
+
+                    {/* Beat Slots Grid for this Measure */}
+                    <div 
+                      className="grid gap-1.5 items-center w-full"
+                      style={{ gridTemplateColumns: `repeat(${masterLength}, minmax(0, 1fr))` }}
+                    >
                       {Array.from({ length: masterLength }).map((_, bIdx) => {
                         const globalBeatIndex = startBeatIndex + bIdx;
                         const chordSlot = progression[globalBeatIndex];
@@ -651,12 +697,12 @@ export default function AccompanimentView() {
                               key={bIdx}
                               onClick={() => addBeat('')}
                               className={cn(
-                                "h-24 rounded-xl border border-dashed flex flex-col items-center justify-center transition-all opacity-40 hover:opacity-100",
+                                "h-14 sm:h-16 rounded-xl border border-dashed flex flex-col items-center justify-center transition-all opacity-40 hover:opacity-100",
                                 resolvedTheme === 'dark' ? "border-white/10 hover:border-emerald-500 text-white/40" : "border-slate-300 hover:border-emerald-500 text-slate-400"
                               )}
                             >
-                              <Plus className="w-4 h-4 mb-1" />
-                              <span className="text-[8px] font-bold uppercase tracking-wider">Add Beat</span>
+                              <Plus className="w-3.5 h-3.5 mb-0.5" />
+                              <span className="text-[7px] font-bold uppercase tracking-wider">Add</span>
                             </button>
                           );
                         }
@@ -680,20 +726,20 @@ export default function AccompanimentView() {
                               }
                             }}
                             className={cn(
-                              "relative group/cell h-24 rounded-xl flex flex-col justify-between p-2 transition-colors cursor-pointer overflow-hidden",
+                              "relative group/cell h-14 sm:h-16 rounded-xl flex flex-col justify-between p-1.5 transition-all cursor-pointer overflow-hidden border",
                               isCellPlaying
-                                ? "bg-emerald-500 text-white ring-2 ring-emerald-300 shadow-lg shadow-emerald-500/30 z-10 font-bold"
+                                ? "bg-emerald-500 text-white border-emerald-400 ring-2 ring-emerald-300 shadow-md z-10 font-bold scale-[1.02]"
                                 : isSelected
-                                  ? cn(isExplicit ? chordTypeInfo.color : (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-slate-100 text-slate-900"), "ring-2 ring-emerald-500 shadow-md z-10")
+                                  ? cn(isExplicit ? chordTypeInfo.color : (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-slate-100 text-slate-900"), "ring-2 ring-emerald-500 border-emerald-500 shadow-xs z-10")
                                   : isExplicit
-                                    ? cn(chordTypeInfo.color, "hover:brightness-110 shadow-sm")
-                                    : (resolvedTheme === 'dark' ? "bg-black/20 text-white/40 hover:bg-black/30" : "bg-slate-100/60 text-slate-400 hover:bg-slate-100")
+                                    ? cn(chordTypeInfo.color, "hover:brightness-110 border-transparent shadow-2xs")
+                                    : (resolvedTheme === 'dark' ? "bg-black/20 border-white/5 text-white/40 hover:bg-black/30" : "bg-slate-100/70 border-slate-200 text-slate-400 hover:bg-slate-100")
                             )}
                           >
-                            {/* Cell Top Badge */}
-                            <div className="flex items-center justify-between w-full">
+                            {/* Cell Top Header */}
+                            <div className="flex items-center justify-between w-full leading-none">
                               <span className={cn(
-                                "text-[8px] font-black font-mono tracking-wider px-1 py-0.2 rounded",
+                                "text-[7px] font-black font-mono px-1 py-0.2 rounded",
                                 isCellPlaying
                                   ? "bg-white/20 text-white"
                                   : (resolvedTheme === 'dark' ? "bg-white/5 text-white/40" : "bg-black/5 text-slate-500")
@@ -701,31 +747,26 @@ export default function AccompanimentView() {
                                 b.{bIdx + 1}
                               </span>
 
-                              <span className={cn(
-                                "text-[7px] font-bold uppercase tracking-wider px-1 py-0.2 rounded",
-                                isExplicit 
-                                  ? (isCellPlaying ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/10 opacity-80")
-                                  : "opacity-40"
-                              )}>
-                                {isExplicit ? 'Change' : 'Sustain'}
-                              </span>
-                            </div>
-
-                            {/* Center Chord Display */}
-                            <div className="flex flex-col items-center justify-center my-0.5">
-                              {isExplicit ? (
-                                <span className="text-xl font-black font-mono tracking-tighter">{formatChordName(chordSlot.name)}</span>
-                              ) : (
-                                <div className="flex flex-col items-center">
-                                  <span className="text-xs font-bold font-mono opacity-50 italic">
-                                    {effective?.chord ? `(${formatChordName(effective.chord)})` : '—'}
-                                  </span>
-                                </div>
+                              {!isExplicit && (
+                                <span className="text-[6px] font-bold uppercase tracking-tight opacity-50">sus</span>
                               )}
                             </div>
 
-                            {/* Bottom Action Bar on Cell Hover */}
-                            <div className="flex items-center justify-between w-full opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                            {/* Center Chord Name Display */}
+                            <div className="flex flex-col items-center justify-center my-0.5 leading-none">
+                              {isExplicit ? (
+                                <span className="text-sm sm:text-base font-black font-mono tracking-tighter truncate max-w-full">
+                                  {formatChordName(chordSlot.name)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold font-mono opacity-50 italic truncate max-w-full">
+                                  {effective?.chord ? `(${formatChordName(effective.chord)})` : '—'}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Cell Bottom Hover Quick Actions */}
+                            <div className="flex items-center justify-between w-full opacity-0 group-hover/cell:opacity-100 transition-opacity leading-none">
                               <button
                                 title="Insert empty beat before"
                                 onClick={(e) => {
@@ -738,7 +779,7 @@ export default function AccompanimentView() {
                               </button>
 
                               <button
-                                title="Clear chord (keep beat empty)"
+                                title="Clear chord"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   clearBeat(globalBeatIndex);
@@ -749,7 +790,7 @@ export default function AccompanimentView() {
                               </button>
 
                               <button
-                                title="Delete beat (shift left)"
+                                title="Delete beat"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   deleteBeat(globalBeatIndex);
@@ -762,20 +803,10 @@ export default function AccompanimentView() {
                           </div>
                         );
                       })}
-
-                      {/* Right Barline | or || */}
-                      <div className="flex items-center justify-center pl-1 h-full min-h-[90px]">
-                        <div className="flex gap-0.5">
-                          <div className="w-1.5 h-16 bg-slate-700 dark:bg-slate-300 rounded-sm" />
-                          {mIdx === totalMeasures - 1 && (
-                            <div className="w-1.5 h-16 bg-slate-700 dark:bg-slate-300 rounded-sm" />
-                          )}
-                        </div>
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1236,6 +1267,123 @@ export default function AccompanimentView() {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Section Label Selection Modal */}
+      {editingMeasureIndex !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className={cn(
+              "w-full max-w-md p-6 rounded-3xl border shadow-2xl flex flex-col gap-4",
+              resolvedTheme === 'dark' ? "bg-slate-900 border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            )}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <Tag className="w-4 h-4 text-indigo-500" />
+                <h3 className="text-sm font-black uppercase tracking-wider">
+                  Measure {editingMeasureIndex + 1} Section Label
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingMeasureIndex(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Select a quick section preset or enter custom label text (e.g. Chorus 1, Bridge, Guitar Solo):
+            </p>
+
+            {/* Quick Presets */}
+            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1">
+              {[
+                'Intro', 'Verse 1', 'Verse 2', 'Verse 3',
+                'Pre-Chorus', 'Chorus 1', 'Chorus 2', 'Chorus 3',
+                'Bridge', 'Solo', 'Guitar Solo', 'Outro',
+                'A Section', 'B Section', 'Turnaround', 'Ending'
+              ].map((label) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    setMeasureLabel(editingMeasureIndex, label);
+                    setEditingMeasureIndex(null);
+                  }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border",
+                    measureLabels[editingMeasureIndex] === label
+                      ? "bg-indigo-600 text-white border-indigo-500 shadow-xs"
+                      : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-indigo-500 hover:text-indigo-500"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customLabelInput.trim()) {
+                  setMeasureLabel(editingMeasureIndex, customLabelInput.trim());
+                } else {
+                  deleteMeasureLabel(editingMeasureIndex);
+                }
+                setEditingMeasureIndex(null);
+              }}
+              className="flex flex-col gap-2 pt-2 border-t border-slate-200 dark:border-white/10"
+            >
+              <label className="text-[10px] font-bold uppercase text-slate-400">Custom Section Name</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. Breakdown, Sax Solo..."
+                  value={customLabelInput}
+                  onChange={(e) => setCustomLabelInput(e.target.value)}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:border-indigo-500",
+                    resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                  )}
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-all shrink-0"
+                >
+                  Set
+                </button>
+              </div>
+            </form>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-white/10">
+              {measureLabels[editingMeasureIndex] ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    deleteMeasureLabel(editingMeasureIndex);
+                    setEditingMeasureIndex(null);
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors"
+                >
+                  Clear Label
+                </button>
+              ) : <div />}
+
+              <button
+                type="button"
+                onClick={() => setEditingMeasureIndex(null)}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
