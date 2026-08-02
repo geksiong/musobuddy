@@ -333,6 +333,7 @@ function ScoreDisplay({
   playbackTime: number
 }) {
   const { resolvedTheme } = useTheme();
+  const { exportActiveScore } = useScores();
   
   if (!score) return (
     <div className={cn("flex-1 flex flex-col items-center justify-center gap-4 transition-colors", resolvedTheme === 'dark' ? "text-white/10" : "text-slate-200")}>
@@ -371,7 +372,9 @@ function ScoreDisplay({
           <div className="flex flex-wrap items-center gap-4 mt-2">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>{score.format} MODE</span>
+              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                {score.format === ScoreFormat.MusicXML ? (score.isMxl ? 'MUSICXML (.MXL)' : 'MUSICXML (.XML)') : `${score.format} MODE`}
+              </span>
             </div>
 
             {score.format === ScoreFormat.ABC && (
@@ -567,17 +570,49 @@ function ScoreDisplay({
                 </button>
               )}
 
-              <button 
-                onClick={onDownload}
-                className={cn(
-                  "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95",
-                  resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900"
-                )}
-                title="Save Score"
-              >
-                <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save</span>
-              </button>
+              {score.format === ScoreFormat.MusicXML ? (
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => exportActiveScore(true)}
+                    className={cn(
+                      "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                      score.isMxl 
+                        ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
+                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
+                    )}
+                    title="Save as Compressed MusicXML (.mxl)"
+                  >
+                    <Download className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Save .MXL</span>
+                  </button>
+
+                  <button 
+                    onClick={() => exportActiveScore(false)}
+                    className={cn(
+                      "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                      !score.isMxl 
+                        ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
+                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
+                    )}
+                    title="Save as Standard MusicXML (.xml)"
+                  >
+                    <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save .XML</span>
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={onDownload}
+                  className={cn(
+                    "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                    resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900"
+                  )}
+                  title="Save Score"
+                >
+                  <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save</span>
+                </button>
+              )}
 
               <button 
                 onClick={onDelete}

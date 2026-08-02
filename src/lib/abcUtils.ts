@@ -5,6 +5,7 @@
 
 import * as abcjs from 'abcjs';
 import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
+import { createMxlBlob } from './mxlUtils.ts';
 
 /**
  * Converts scientific pitch notation (e.g. E2, A2, D3, G3, B3, E4, Gb3, F#4, C4, E5)
@@ -102,16 +103,50 @@ export function generateMidiForAbc(abc: string, tuneIndex: number = 0, transpose
 /**
  * Exports/downloads a ScoreData item as a file
  */
-export function exportScore(score: ScoreData | null | undefined): void {
+export async function exportScore(score: ScoreData | null | undefined, saveAsMxlOverride?: boolean): Promise<void> {
   if (!score) return;
+
+  if (score.format === ScoreFormat.MusicXML) {
+    const shouldSaveAsMxl = saveAsMxlOverride !== undefined ? saveAsMxlOverride : !!score.isMxl;
+    const xmlContent = score.content as string;
+
+    if (shouldSaveAsMxl) {
+      try {
+        const mxlBlob = await createMxlBlob(xmlContent);
+        const url = URL.createObjectURL(mxlBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${score.title || 'score'}.mxl`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        return;
+      } catch (err) {
+        console.error('Failed to create MXL file:', err);
+      }
+    }
+
+    // Fallback or explicit XML export
+    const blob = new Blob([xmlContent], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${score.title || 'score'}.xml`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return;
+  }
   
   let content = '';
   let mimeType = 'text/plain';
   let fileName = '';
 
-  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text || score.format === ScoreFormat.MusicXML) {
+  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text) {
     content = score.content as string;
-    const ext = score.format === ScoreFormat.ABC ? 'abc' : (score.format === ScoreFormat.MusicXML ? 'xml' : 'txt');
+    const ext = score.format === ScoreFormat.ABC ? 'abc' : 'txt';
     fileName = `${score.title || 'score'}.${ext}`;
   } else {
     const fileUrl = Array.isArray(score.content) ? score.content[0] : (score.content as string);

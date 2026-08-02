@@ -15,6 +15,7 @@ export interface Song {
   description: string;
   chordsPerBeat: string[];
   tags: string[];
+  sectionLabels?: Record<number, string> | string[];
   isCustom?: boolean;
 }
 

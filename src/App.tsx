@@ -177,7 +177,7 @@ export default function App() {
               ref={fileInputRef} 
               className="hidden" 
               multiple 
-              accept=".abc,.txt,.pdf,.xml,.musicxml,image/*,audio/*"
+              accept=".abc,.txt,.pdf,.xml,.musicxml,.mxl,image/*,audio/*"
               onChange={handleHeaderFileChange}
             />
 

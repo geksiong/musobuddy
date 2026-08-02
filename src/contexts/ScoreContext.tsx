@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
+import { parseMxlFile } from '../lib/mxlUtils.ts';
 
 interface GlobalAudio {
   url: string;
@@ -22,7 +23,7 @@ interface ScoreContextType {
   setGlobalAudio: React.Dispatch<React.SetStateAction<GlobalAudio | null>>;
   loadFiles: (files: FileList | File[]) => Promise<string | null>;
   createScore: (format: ScoreFormat) => string;
-  exportActiveScore: () => void;
+  exportActiveScore: (asMxl?: boolean) => void;
   playbackTime: number;
   setPlaybackTime: React.Dispatch<React.SetStateAction<number>>;
 }
@@ -114,8 +115,8 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [activeScore?.id, activeScore?.content, activeScore?.selectedTuneIndex, activeScore?.transpose, activeScore?.audioUrl]);
 
-  const exportActiveScore = useCallback(() => {
-    exportScore(activeScore);
+  const exportActiveScore = useCallback((asMxl?: boolean) => {
+    exportScore(activeScore, asMxl);
   }, [activeScore]);
 
   const createScore = useCallback((format: ScoreFormat): string => {
@@ -192,6 +193,7 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       let content: string | string[] = '';
       let audioUrl: string | undefined = undefined;
       let audioName: string | undefined = undefined;
+      let isMxl = false;
 
       if (ext === 'pdf') {
         format = ScoreFormat.PDF;
@@ -207,6 +209,16 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       } else if (ext === 'xml' || ext === 'musicxml') {
         format = ScoreFormat.MusicXML;
         content = await file.text();
+      } else if (ext === 'mxl') {
+        format = ScoreFormat.MusicXML;
+        try {
+          content = await parseMxlFile(file);
+          isMxl = true;
+        } catch (err) {
+          console.error('Failed to parse .mxl file:', err);
+          alert(`Error reading compressed MusicXML file (${file.name}): ${err instanceof Error ? err.message : String(err)}`);
+          continue;
+        }
       } else if (ext === 'txt') {
         format = ScoreFormat.Text;
         content = await file.text();
@@ -219,6 +231,7 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
         title: name,
         format,
         content,
+        isMxl,
         zoom: 1,
         pan: { x: 0, y: 0 },
         viewMode: 'scroll',

@@ -26,4 +26,5 @@ export interface ScoreData {
   transpose?: number;
   tablature?: 'guitar' | 'ukulele' | 'mandolin' | 'banjo' | 'violin' | 'none';
   tuning?: string[]; // Array of strings for string tunings e.g. ['E,', 'A,', 'D'...]
+  isMxl?: boolean; // Indicates if MusicXML score is/was compressed .mxl format
 }
