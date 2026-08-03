@@ -889,7 +889,7 @@ export default function AccompanimentView() {
 
         {/* Right Side Tabbed Panel: Chord Library / Chord Explorer / Presets */}
         <section className={cn(
-          "lg:col-span-5 xl:col-span-4 w-full min-w-0 rounded-2xl border flex flex-col min-h-[580px] overflow-hidden transition-colors self-stretch",
+          "lg:col-span-5 xl:col-span-4 w-full min-w-0 rounded-2xl border flex flex-col min-h-[580px] lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-5rem)] overflow-hidden transition-colors",
           resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl"
         )}>
           {/* Tab Header Bar */}
@@ -1005,7 +1005,7 @@ export default function AccompanimentView() {
 
                 {/* SUGGESTED ALTERNATIVE CHORDS SECTION */}
                 <div className={cn(
-                  "p-3 rounded-2xl border flex flex-col gap-2 transition-all shadow-xs shrink-0",
+                  "p-2.5 rounded-xl border flex flex-col gap-1.5 transition-all shadow-xs shrink-0",
                   resolvedTheme === 'dark'
                     ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
                     : "bg-emerald-50/80 border-emerald-200 text-emerald-950"
@@ -1026,7 +1026,7 @@ export default function AccompanimentView() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+                  <div className="grid grid-cols-2 gap-1 max-h-36 overflow-y-auto pr-0.5">
                     {suggestedChords.map((s) => {
                       const isCurrentSelected = isSelectedBeatExplicit && selectedBeatSlot?.name === s.chord;
                       return (
@@ -1034,7 +1034,7 @@ export default function AccompanimentView() {
                           key={`${s.chord}_${s.label}`}
                           onClick={() => handleSelectSuggestedChord(s.chord)}
                           className={cn(
-                            "group flex flex-col p-2 rounded-xl border text-left transition-all active:scale-95 shadow-2xs cursor-pointer",
+                            "group flex flex-col p-1.5 rounded-lg border text-left transition-all active:scale-95 shadow-2xs cursor-pointer",
                             isCurrentSelected
                               ? "bg-emerald-500 text-white border-emerald-400 font-bold"
                               : resolvedTheme === 'dark'
@@ -1043,12 +1043,12 @@ export default function AccompanimentView() {
                           )}
                           title={`${s.chord}: ${s.reason}`}
                         >
-                          <div className="flex items-center justify-between w-full leading-none mb-1">
+                          <div className="flex items-center justify-between w-full leading-none mb-0.5">
                             <span className="text-xs font-black font-mono tracking-tight group-hover:text-emerald-500 dark:group-hover:text-emerald-400">
                               {formatChordName(s.chord)}
                             </span>
                             <span className={cn(
-                              "text-[7px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded shrink-0 ml-1",
+                              "text-[6.5px] font-extrabold uppercase tracking-wider px-1 py-0.2 rounded shrink-0 ml-1",
                               isCurrentSelected
                                 ? "bg-white/20 text-white"
                                 : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
@@ -1056,7 +1056,7 @@ export default function AccompanimentView() {
                               {s.label}
                             </span>
                           </div>
-                          <span className="text-[8px] opacity-75 line-clamp-1 font-medium leading-tight">
+                          <span className="text-[7.5px] opacity-75 line-clamp-1 font-medium leading-tight">
                             {s.reason}
                           </span>
                         </button>
@@ -1067,7 +1067,7 @@ export default function AccompanimentView() {
 
                 {/* Root Note Selector Pills */}
                 <div className={cn(
-                  "grid grid-cols-6 gap-1 p-1.5 rounded-xl border transition-colors",
+                  "grid grid-cols-6 sm:grid-cols-12 gap-1 p-1 rounded-xl border transition-colors",
                   resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
                 )}>
                   {(accidentalMode === 'flat' ? CHORD_ROOTS_FLAT : CHORD_ROOTS_SHARP).map(root => (
@@ -1075,9 +1075,9 @@ export default function AccompanimentView() {
                       key={root}
                       onClick={() => setSelectedLibraryRoot(root)}
                       className={cn(
-                        "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all text-center",
+                        "py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all text-center",
                         selectedLibraryRoot === root 
-                          ? (resolvedTheme === 'dark' ? "bg-white text-black shadow-md" : "bg-slate-900 text-white shadow-md")
+                          ? (resolvedTheme === 'dark' ? "bg-white text-black shadow-xs" : "bg-slate-900 text-white shadow-xs")
                           : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-500 hover:text-slate-900")
                       )}
                     >
@@ -1086,12 +1086,12 @@ export default function AccompanimentView() {
                   ))}
                 </div>
 
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                   Chord Types ({formatChordName(selectedLibraryRoot)}):
                 </span>
 
                 {/* Grid of Chords for Selected Root */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 overflow-y-auto pr-1">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 overflow-y-auto pr-1">
                   {CHORD_TYPES.map(type => {
                     const chordName = `${selectedLibraryRoot}${type.suffix}`;
                     return (
@@ -1099,12 +1099,12 @@ export default function AccompanimentView() {
                         key={type.label}
                         onClick={() => handleLibraryChordClick(chordName)}
                         className={cn(
-                          "group flex flex-col items-center justify-center gap-1 p-3 rounded-xl transition-all active:scale-95 min-h-[72px] shadow-sm hover:brightness-105",
+                          "group flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-lg transition-all active:scale-95 min-h-[46px] shadow-2xs hover:brightness-105 cursor-pointer",
                           type.color
                         )}
                       >
-                        <span className="text-lg font-black font-mono tracking-tighter">{formatChordName(chordName)}</span>
-                        <span className="text-[7px] font-black uppercase tracking-widest opacity-50 group-hover:opacity-100 transition-opacity text-center">
+                        <span className="text-xs sm:text-sm font-black font-mono tracking-tighter leading-none">{formatChordName(chordName)}</span>
+                        <span className="text-[6.5px] font-extrabold uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity text-center leading-tight truncate max-w-full px-0.5">
                           {type.label}
                         </span>
                       </button>
