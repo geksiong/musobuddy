@@ -31,7 +31,8 @@ import {
   Waves,
   Piano,
   Download,
-  Sliders
+  Sliders,
+  Compass
 } from 'lucide-react';
 import { ScoreFormat, ScoreData } from './types.ts';
 import { TUNINGS } from './constants.ts';
@@ -51,8 +52,8 @@ import { transposeAbc } from '../../lib/abcTransposer.ts';
 import { toAbcNoteName, generateMidiForAbc } from '../../lib/abcUtils.ts';
 
 // Lazy load complex components
-const PdfRenderer = React.lazy(() => import('./PdfRenderer.tsx'));
-const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer.tsx'));
+const PdfRenderer = React.lazy(() => import('./PdfRenderer'));
+const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer'));
 
 export default function ScoreView() {
   const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore, playbackTime } = useScores();
@@ -346,30 +347,58 @@ function ScoreDisplay({
   );
 
   const viewMode = score.viewMode || 'scroll';
+  const [headerExtra, setHeaderExtra] = useState<React.ReactNode | null>(null);
+  const [sidebarState, setSidebarState] = useState<{ isOpen: boolean; toggle: () => void } | null>(null);
+  const [headerHeight, setHeaderHeight] = useState<number>(112);
+  const [scoreViewHeight, setScoreViewHeight] = useState<number>(0);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const scoreViewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setHeaderExtra(null);
+    setSidebarState(null);
+  }, [score?.id, score?.format]);
+
+  useEffect(() => {
+    const updateMetrics = () => {
+      if (headerRef.current) {
+        setHeaderHeight(headerRef.current.offsetHeight);
+      }
+      if (scoreViewRef.current) {
+        setScoreViewHeight(scoreViewRef.current.clientHeight);
+      }
+    };
+    updateMetrics();
+    const observer = new ResizeObserver(updateMetrics);
+    if (headerRef.current) observer.observe(headerRef.current);
+    if (scoreViewRef.current) observer.observe(scoreViewRef.current);
+    return () => observer.disconnect();
+  }, [headerExtra, score?.format, score?.id]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative min-h-0 h-full">
+    <div ref={scoreViewRef} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative min-h-0 h-full">
       {/* Toolbar */}
-      <div className={cn(
-        "sticky top-0 z-30 px-4 sm:px-6 py-4 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between border-b transition-all gap-4 sm:gap-6 backdrop-blur-xl shrink-0 shadow-sm",
-        resolvedTheme === 'dark' ? "border-white/10 bg-[#121215]/95 text-white" : "border-black/10 bg-white/95 text-slate-900"
-      )}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold text-orange-400 tracking-[0.3em] uppercase italic opacity-60">Active Session</span>
-          </div>
-          <div className="flex items-center gap-3">
+      <div 
+        ref={headerRef}
+        className={cn(
+          "sticky top-0 z-30 px-3 sm:px-5 py-2 sm:py-2.5 flex flex-col border-b transition-all gap-2 backdrop-blur-xl shrink-0 shadow-sm",
+          resolvedTheme === 'dark' ? "border-white/10 bg-[#121215]/95 text-white" : "border-black/10 bg-white/95 text-slate-900"
+        )}
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <input 
               value={score.title}
               onChange={(e) => onUpdate({ title: e.target.value })}
               className={cn(
-                "w-full bg-transparent text-3xl font-black focus:outline-none uppercase tracking-tighter italic transition-colors",
+                "w-full bg-transparent text-lg sm:text-2xl font-black focus:outline-none uppercase tracking-tighter italic transition-colors py-0.5",
                 resolvedTheme === 'dark' ? "text-white placeholder:text-white/10" : "text-slate-900 placeholder:text-slate-200"
               )}
               placeholder="UNTITLED SCORE"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-4 mt-2">
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
               <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
@@ -378,7 +407,7 @@ function ScoreDisplay({
             </div>
 
             {score.format === ScoreFormat.ABC && (
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pl-4 border-l border-black/10 dark:border-white/10">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-3 border-l border-black/10 dark:border-white/10">
                 {/* Tune Picker */}
                 <div className="flex items-center gap-2">
                   <Music className="w-3.5 h-3.5 text-orange-500" />
@@ -503,31 +532,45 @@ function ScoreDisplay({
                 )}
               </div>
             )}
-          </div>
-        </div>
 
-        <div className="flex items-center gap-4 lg:gap-6 shrink-0">
-          <div className="flex items-center gap-3 ml-2 lg:ml-4 border-l border-black/5 dark:border-white/5 pl-4 lg:pl-6">
+            <div className="flex items-center gap-2 sm:gap-3 pl-2 border-l border-black/5 dark:border-white/5">
+              {/* Sidebar Toggle for PDF (Placed at the leftmost side of same row as page mode toggle & save button) */}
+              {score.format === ScoreFormat.PDF && sidebarState && (
+                <button 
+                  onClick={sidebarState.toggle}
+                  className={cn(
+                    "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0",
+                    sidebarState.isOpen 
+                      ? "bg-orange-500 border-orange-500 text-white font-bold" 
+                      : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-orange-400 hover:text-white" : "bg-white border-black/10 text-orange-600 hover:text-slate-900")
+                  )}
+                  title={sidebarState.isOpen ? "Close Sidebar" : "Open Navigation Sidebar"}
+                >
+                  <Compass className="w-4 h-4 group-hover:rotate-45 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Sidebar</span>
+                </button>
+              )}
+
               {/* View Mode Selector */}
               {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
                 <div className={cn("flex p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
                   <button 
                     onClick={() => onUpdate({ viewMode: 'scroll' })}
-                    className={cn("p-2 rounded-lg transition-all", viewMode === 'scroll' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'scroll' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
                     title="Continuous Scroll"
                   >
                     <Scroll className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => onUpdate({ viewMode: 'single' })}
-                    className={cn("p-2 rounded-lg transition-all", viewMode === 'single' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'single' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
                     title="Single Page"
                   >
                     <Square className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => onUpdate({ viewMode: 'double' })}
-                    className={cn("p-2 rounded-lg transition-all", viewMode === 'double' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'double' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
                     title="Double Page"
                   >
                     <Columns className="w-4 h-4" />
@@ -540,14 +583,14 @@ function ScoreDisplay({
                 <div className={cn("flex p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
                   <button 
                     onClick={() => onUpdate({ zoom: Math.max(0.5, score.zoom - 0.1) })}
-                    className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
+                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
                   >
                     <ZoomOut className="w-4 h-4" />
                   </button>
                   <div className={cn("w-[1px] self-stretch my-1", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
                   <button 
                     onClick={() => onUpdate({ zoom: Math.min(3, score.zoom + 0.1) })}
-                    className={cn("p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
+                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
                   >
                     <ZoomIn className="w-4 h-4" />
                   </button>
@@ -625,8 +668,16 @@ function ScoreDisplay({
           </div>
         </div>
 
+        {/* Header Extra Slot (Annotation Toolbar for PDF) */}
+        {headerExtra && (
+          <div className="pt-1.5 border-t border-black/5 dark:border-white/10 min-w-0">
+            {headerExtra}
+          </div>
+        )}
+      </div>
+
       {/* Rendering Area */}
-      <div className="flex-1 relative p-4 sm:p-8 pb-4 sm:pb-6">
+      <div className={cn("flex-1 relative", score.format === ScoreFormat.PDF ? "p-0" : "p-4 sm:p-8 pb-4 sm:pb-6")}>
         {((score.format === ScoreFormat.PDF || score.format === ScoreFormat.Image) && !score.content) ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-12">
             <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-6", resolvedTheme === 'dark' ? "bg-white/5 text-white/20" : "bg-slate-100 text-slate-300")}>
@@ -645,94 +696,101 @@ function ScoreDisplay({
           </div>
         ) : (
           <React.Suspense fallback={<div className="flex items-center justify-center p-20 animate-pulse text-[10px] uppercase font-black tracking-widest">Initialising Renderer...</div>}>
-            <div 
-              className={cn(
-                "transition-transform origin-top-left",
-                viewMode === 'scroll' ? "flex flex-col gap-8" : "h-full"
-              )}
-              style={{ transform: `scale(${score.zoom})` }}
-            >
-              {score.format === ScoreFormat.ABC && (
-              <div className="flex flex-col gap-8 w-full">
-                {score.showEditor && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="relative group w-full"
-                  >
-                    <div className="absolute -inset-0.5 bg-gradient-to-b from-orange-500/20 to-transparent rounded-xl blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
-                    <div className={cn(
-                      "relative w-full rounded-xl overflow-hidden border transition-all shadow-inner",
-                      resolvedTheme === 'dark' ? "border-white/10" : "border-black/5"
-                    )}>
-                      <CodeMirror
-                        value={score.content as string}
-                        height="300px"
-                        theme={resolvedTheme === 'dark' ? vscodeDark : 'light'}
-                        extensions={[abc()]}
-                        onChange={(value) => onUpdate({ content: value })}
-                        className="text-sm"
-                        basicSetup={{
-                          lineNumbers: true,
-                          foldGutter: true,
-                          highlightActiveLine: true,
-                        }}
-                      />
-                    </div>
-                    <div className={cn("absolute bottom-4 right-4 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none z-10", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>ABC Editor</div>
-                  </motion.div>
-                )}
-
-                <div className={cn("rounded-2xl p-10 shadow-2xl overflow-x-auto min-h-[400px] transition-colors w-full", resolvedTheme === 'dark' ? "bg-white text-black" : "bg-white text-black border border-black/5")}>
-                  <AbcRenderer 
-                    abc={score.content as string} 
-                    tuneIndex={score.selectedTuneIndex || 0} 
-                    transpose={0} // Text is already transposed
-                    tablature={score.tablature || 'none'}
-                    tuning={score.tuning || []}
-                    currentTime={playbackTime}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {score.format === ScoreFormat.Text && (
-              <div className="max-w-3xl mx-auto pt-8">
-                <textarea 
-                  value={score.content as string}
-                  placeholder="TYPE CHORDS OR LYRICS HERE..."
-                  onChange={(e) => onUpdate({ content: e.target.value })}
-                  className={cn(
-                    "w-full h-[800px] bg-transparent font-mono text-lg focus:outline-none whitespace-pre leading-relaxed transition-colors",
-                    resolvedTheme === 'dark' ? "text-white/80 placeholder:text-white/5" : "text-slate-700 placeholder:text-slate-200"
-                  )}
-                  spellCheck={false}
-                />
-              </div>
-            )}
-
-            {score.format === ScoreFormat.Image && (
-              <ImageViewer 
-                content={score.content} 
-                viewMode={viewMode}
-                onRemove={() => onUpdate({ content: '' })}
-              />
-            )}
-
-            {score.format === ScoreFormat.PDF && (
+            {score.format === ScoreFormat.PDF ? (
               <PdfRenderer 
                 url={score.content as string} 
-                viewMode={viewMode} 
+                viewMode={viewMode}
+                scoreTitle={score.title}
+                scoreId={score.id}
+                zoom={score.zoom}
+                headerHeight={headerHeight}
+                scoreViewHeight={scoreViewHeight}
+                onHeaderContentChange={setHeaderExtra}
+                onSidebarStateChange={setSidebarState}
               />
-            )}
+            ) : (
+              <div 
+                className={cn(
+                  "transition-transform origin-top-left",
+                  viewMode === 'scroll' ? "flex flex-col gap-8" : "h-full"
+                )}
+                style={{ transform: `scale(${score.zoom})` }}
+              >
+                {score.format === ScoreFormat.ABC && (
+                <div className="flex flex-col gap-8 w-full">
+                  {score.showEditor && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="relative group w-full"
+                    >
+                      <div className="absolute -inset-0.5 bg-gradient-to-b from-orange-500/20 to-transparent rounded-xl blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
+                      <div className={cn(
+                        "relative w-full rounded-xl overflow-hidden border transition-all shadow-inner",
+                        resolvedTheme === 'dark' ? "border-white/10" : "border-black/5"
+                      )}>
+                        <CodeMirror
+                          value={score.content as string}
+                          height="300px"
+                          theme={resolvedTheme === 'dark' ? vscodeDark : 'light'}
+                          extensions={[abc()]}
+                          onChange={(value) => onUpdate({ content: value })}
+                          className="text-sm"
+                          basicSetup={{
+                            lineNumbers: true,
+                            foldGutter: true,
+                            highlightActiveLine: true,
+                          }}
+                        />
+                      </div>
+                      <div className={cn("absolute bottom-4 right-4 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none z-10", resolvedTheme === 'dark' ? "text-white/20" : "text-slate-400")}>ABC Editor</div>
+                    </motion.div>
+                  )}
 
-            {score.format === ScoreFormat.MusicXML && (
-              <MusicXmlRenderer 
-                xml={score.content as string} 
-              />
-            )}
-          </div>
+                  <div className={cn("rounded-2xl p-10 shadow-2xl overflow-x-auto min-h-[400px] transition-colors w-full", resolvedTheme === 'dark' ? "bg-white text-black" : "bg-white text-black border border-black/5")}>
+                    <AbcRenderer 
+                      abc={score.content as string} 
+                      tuneIndex={score.selectedTuneIndex || 0} 
+                      transpose={0} // Text is already transposed
+                      tablature={score.tablature || 'none'}
+                      tuning={score.tuning || []}
+                      currentTime={playbackTime}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {score.format === ScoreFormat.Text && (
+                <div className="max-w-3xl mx-auto pt-8">
+                  <textarea 
+                    value={score.content as string}
+                    placeholder="TYPE CHORDS OR LYRICS HERE..."
+                    onChange={(e) => onUpdate({ content: e.target.value })}
+                    className={cn(
+                      "w-full h-[800px] bg-transparent font-mono text-lg focus:outline-none whitespace-pre leading-relaxed transition-colors",
+                      resolvedTheme === 'dark' ? "text-white/80 placeholder:text-white/5" : "text-slate-700 placeholder:text-slate-200"
+                    )}
+                    spellCheck={false}
+                  />
+                </div>
+              )}
+
+              {score.format === ScoreFormat.Image && (
+                <ImageViewer 
+                  content={score.content} 
+                  viewMode={viewMode}
+                  onRemove={() => onUpdate({ content: '' })}
+                />
+              )}
+
+              {score.format === ScoreFormat.MusicXML && (
+                <MusicXmlRenderer 
+                  xml={score.content as string} 
+                />
+              )}
+            </div>
+          )}
         </React.Suspense>
         )}
       </div>
