@@ -51,6 +51,7 @@ import { abc } from '../../lib/abcLanguage.ts';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { transposeAbc } from '../../lib/abcTransposer.ts';
 import { toAbcNoteName, generateMidiForAbc } from '../../lib/abcUtils.ts';
+import { detectAbcRenderer } from '../../lib/abcDetector.ts';
 
 // Lazy load complex components
 const PdfRenderer = React.lazy(() => import('./PdfRenderer'));
@@ -385,6 +386,7 @@ function ScoreDisplay({
   );
 
   const viewMode = score.viewMode || 'scroll';
+  const detectedResult = score.format === ScoreFormat.ABC ? detectAbcRenderer(score.content as string) : null;
   const [headerExtra, setHeaderExtra] = useState<React.ReactNode | null>(null);
   const [sidebarState, setSidebarState] = useState<{ isOpen: boolean; toggle: () => void } | null>(null);
   const [headerHeight, setHeaderHeight] = useState<number>(112);
@@ -643,6 +645,48 @@ function ScoreDisplay({
                       </select>
                     </div>
                   )}
+
+                  {/* Renderer Picker & Detector Status */}
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1">
+                      <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Engine</span>
+                      {detectedResult?.renderer === 'abc2svg' && (
+                        <span 
+                          className="text-[8px] bg-orange-500/20 text-orange-400 font-bold px-1 rounded-full cursor-help tracking-tight" 
+                          title={`abcm2ps directives detected: ${detectedResult.reasons.join(', ')}`}
+                        >
+                          abcm2ps
+                        </span>
+                      )}
+                    </div>
+                    <select 
+                      value={score.abcRenderer || 'auto'}
+                      onChange={(e) => {
+                        onUpdate({ abcRenderer: e.target.value as 'auto' | 'abcjs' | 'abc2svg' });
+                        e.target.blur();
+                        setTimeout(() => e.target.blur(), 0);
+                      }}
+                      className={cn(
+                        "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
+                        resolvedTheme === 'dark' ? "text-white/80" : "text-slate-700"
+                      )}
+                      title={
+                        score.abcRenderer && score.abcRenderer !== 'auto'
+                          ? `Manual renderer choice: ${score.abcRenderer}`
+                          : `Auto-detected: ${detectedResult?.renderer} (${detectedResult?.reasons.join('; ')})`
+                      }
+                    >
+                      <option value="auto" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        Auto ({detectedResult?.renderer || 'abcjs'})
+                      </option>
+                      <option value="abcjs" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        abcjs (Traditional)
+                      </option>
+                      <option value="abc2svg" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        abc2svg (abcm2ps)
+                      </option>
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -884,6 +928,7 @@ function ScoreDisplay({
                       tablature={score.tablature || 'none'}
                       tuning={score.tuning || []}
                       currentTime={playbackTime}
+                      rendererPreference={score.abcRenderer || 'auto'}
                     />
                   </div>
                 </div>

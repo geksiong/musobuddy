@@ -6,6 +6,8 @@
 import React, { useEffect, useRef } from 'react';
 import * as abcjs from 'abcjs';
 import { toAbcNoteName, getAbcjsTablatureInstrument } from '../../lib/abcUtils.ts';
+import { Abc2svgRenderer } from './Abc2svgRenderer.tsx';
+import { detectAbcRenderer } from '../../lib/abcDetector.ts';
 
 interface Props {
   abc: string;
@@ -15,6 +17,7 @@ interface Props {
   tablature?: string;
   tuning?: string[];
   currentTime?: number;
+  rendererPreference?: 'auto' | 'abcjs' | 'abc2svg';
 }
 
 export const AbcRenderer: React.FC<Props> = ({ 
@@ -24,9 +27,52 @@ export const AbcRenderer: React.FC<Props> = ({
   transpose = 0,
   tablature = 'none',
   tuning = [],
+  currentTime = 0,
+  rendererPreference = 'auto'
+}) => {
+  const detectionResult = detectAbcRenderer(abc);
+  const activeRenderer = rendererPreference && rendererPreference !== 'auto'
+    ? rendererPreference
+    : detectionResult.renderer;
+
+  if (activeRenderer === 'abc2svg') {
+    return (
+      <Abc2svgRenderer 
+        abc={abc}
+        responsive={responsive}
+        tuneIndex={tuneIndex}
+        transpose={transpose}
+        tablature={tablature}
+        tuning={tuning}
+        currentTime={currentTime}
+      />
+    );
+  }
+
+  return (
+    <AbcjsRenderer 
+      abc={abc}
+      responsive={responsive}
+      tuneIndex={tuneIndex}
+      transpose={transpose}
+      tablature={tablature}
+      tuning={tuning}
+      currentTime={currentTime}
+    />
+  );
+};
+
+const AbcjsRenderer: React.FC<Props> = ({ 
+  abc, 
+  responsive = true, 
+  tuneIndex = 0,
+  transpose = 0,
+  tablature = 'none',
+  tuning = [],
   currentTime = 0
 }) => {
   const divRef = useRef<HTMLDivElement>(null);
+
   const visualObjRef = useRef<any>(null);
   const timingCallbacksRef = useRef<any>(null);
 

@@ -27,4 +27,5 @@ export interface ScoreData {
   tablature?: 'guitar' | 'ukulele' | 'mandolin' | 'banjo' | 'violin' | 'none';
   tuning?: string[]; // Array of strings for string tunings e.g. ['E,', 'A,', 'D'...]
   isMxl?: boolean; // Indicates if MusicXML score is/was compressed .mxl format
+  abcRenderer?: 'auto' | 'abcjs' | 'abc2svg'; // Renderer preference for ABC scores
 }

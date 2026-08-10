@@ -62,6 +62,71 @@ interface ScoreAudioPlayerProps {
   renderTopBarControls?: (controls: AudioPlayerControls) => React.ReactNode;
 }
 
+function fixMidiBuffer(buffer: ArrayBuffer): ArrayBuffer {
+  try {
+    const bytes = new Uint8Array(buffer);
+    if (bytes.length < 14 || bytes[0] !== 0x4d || bytes[1] !== 0x54 || bytes[2] !== 0x68 || bytes[3] !== 0x64) {
+      return buffer;
+    }
+
+    const chunks: Uint8Array[] = [];
+    let pos = 0;
+
+    // Header chunk
+    const headerLen = 8 + ((bytes[4] << 24) | (bytes[5] << 16) | (bytes[6] << 8) | bytes[7]);
+    if (headerLen > bytes.length) return buffer;
+    chunks.push(bytes.subarray(0, headerLen));
+    pos = headerLen;
+
+    while (pos < bytes.length) {
+      if (pos + 8 > bytes.length) break;
+      // Check for MTrk
+      if (bytes[pos] === 0x4d && bytes[pos+1] === 0x54 && bytes[pos+2] === 0x72 && bytes[pos+3] === 0x6b) {
+        const trackLen = ((bytes[pos+4] << 24) >>> 0) + (bytes[pos+5] << 16) + (bytes[pos+6] << 8) + bytes[pos+7];
+        let trackDataEnd = pos + 8 + trackLen;
+        if (trackDataEnd > bytes.length) {
+          trackDataEnd = bytes.length;
+        }
+        let trackData = Array.from(bytes.subarray(pos + 8, trackDataEnd));
+
+        const len = trackData.length;
+        const endsWithEndTrack = len >= 3 && trackData[len - 3] === 0xff && trackData[len - 2] === 0x2f && trackData[len - 1] === 0x00;
+
+        if (!endsWithEndTrack) {
+          trackData.push(0x00, 0xff, 0x2f, 0x00);
+        }
+
+        const newTrackLen = trackData.length;
+        const trackHeader = new Uint8Array([
+          0x4d, 0x54, 0x72, 0x6b,
+          (newTrackLen >>> 24) & 0xff,
+          (newTrackLen >>> 16) & 0xff,
+          (newTrackLen >>> 8) & 0xff,
+          newTrackLen & 0xff
+        ]);
+        chunks.push(trackHeader);
+        chunks.push(new Uint8Array(trackData));
+
+        pos = pos + 8 + trackLen;
+      } else {
+        pos++;
+      }
+    }
+
+    const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
+    const fixed = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const c of chunks) {
+      fixed.set(c, offset);
+      offset += c.length;
+    }
+    return fixed.buffer;
+  } catch (err) {
+    console.warn('Failed to fix MIDI buffer:', err);
+    return buffer;
+  }
+}
+
 export default function ScoreAudioPlayer({ 
   url, 
   filename, 
@@ -256,7 +321,8 @@ export default function ScoreAudioPlayer({
           }
         });
 
-        player.loadArrayBuffer(arrayBuffer);
+        const sanitizedBuffer = fixMidiBuffer(arrayBuffer);
+        player.loadArrayBuffer(sanitizedBuffer);
         setDuration(player.getSongTime());
         setLoopEnd(player.getSongTime());
 

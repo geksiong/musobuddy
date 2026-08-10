@@ -53,6 +53,62 @@ eB B2 efge|eB B2 defg|afec dBAF|DEFD E2:|`,
     viewMode: 'scroll',
     selectedTuneIndex: 0,
     transpose: 0
+  },
+  {
+    id: 'petzold-minuet',
+    title: "Minuet in G (abcm2ps Score)",
+    format: ScoreFormat.ABC,
+    content: `%%pageheight 29.7cm
+%%pagewidth 21cm
+%%scale 0.75
+%%titleformat T-1 S-1
+%%begintext
+Minuet in G major - Christian Petzold / J.S. Bach
+Demonstrating abcm2ps page directives, custom text blocks, and multi-staves.
+%%endtext
+X: 1
+T: Minuet in G
+C: Christian Petzold (1677-1733)
+M: 3/4
+L: 1/8
+K: G
+V: 1 clef=treble
+|: d2 GABc | d2 G2 G2 | e2 CDEF | g2 G2 G2 |
+c2 dcBA | B2 cBAG | A2 B2 C2 | A6 :|
+V: 2 clef=bass
+|: [G,3D3] B, A, G, | [G,3B,3] A, G, F, | C,2 E,2 D,2 | [B,,3G,,3] A,, G,, F,, |
+A,,2 B,,2 C,2 | G,,2 A,,2 B,,2 | C,2 G,,2 A,,2 | D,2 C,2 B,,2 :|`,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    viewMode: 'scroll',
+    selectedTuneIndex: 0,
+    transpose: 0,
+    abcRenderer: 'auto'
+  },
+  {
+    id: 'jianpu-sample',
+    title: "Jasmine Flower / 茉莉花 (Jianpu Score)",
+    format: ScoreFormat.ABC,
+    content: `%%jianpu 1
+%%pageheight 29.7cm
+%%pagewidth 21cm
+%%scale 0.8
+%%titleformat T-1 S-1
+X: 1
+T: Jasmine Flower (茉莉花)
+C: Traditional Chinese Folk Song
+M: 4/4
+L: 1/8
+K: D
+| E E F A | B B A F | A A F E | F A E2 |
+| E E F A | B B A F | A A F E | F E D2 |
+| F F E D | E F A2 | B B A F | E E D2 |`,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    viewMode: 'scroll',
+    selectedTuneIndex: 0,
+    transpose: 0,
+    abcRenderer: 'auto'
   }
 ];
 

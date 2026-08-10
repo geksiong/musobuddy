@@ -88,11 +88,22 @@ export function generateMidiForAbc(abc: string, tuneIndex: number = 0, transpose
     });
     
     if (visualObjs && visualObjs.length > 0) {
-      const midiBuffer = abcjs.synth.getMidiFile(visualObjs[0], {
+      const res = abcjs.synth.getMidiFile(visualObjs[0], {
         midiOutputType: 'binary'
-      }) as Uint8Array;
-      const blob = new Blob([midiBuffer], { type: 'audio/midi' });
-      return URL.createObjectURL(blob);
+      }) as any;
+
+      let rawBytes: Uint8Array | null = null;
+      if (Array.isArray(res) && res.length > 0) {
+        rawBytes = res[0] instanceof Uint8Array ? res[0] : new Uint8Array(res[0]);
+      } else if (res instanceof Uint8Array) {
+        rawBytes = res;
+      }
+
+      if (rawBytes) {
+        const buffer = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength);
+        const blob = new Blob([buffer], { type: 'audio/midi' });
+        return URL.createObjectURL(blob);
+      }
     }
   } catch (err) {
     console.error('Failed to generate MIDI:', err);
