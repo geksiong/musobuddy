@@ -5,6 +5,7 @@
     "microphone"
   ],
   "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API",
     "audio_processing",
     "music_notation",
     "practice_tools"
