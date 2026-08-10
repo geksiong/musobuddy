@@ -26,6 +26,9 @@ interface ScoreContextType {
   exportActiveScore: (asMxl?: boolean) => void;
   playbackTime: number;
   setPlaybackTime: React.Dispatch<React.SetStateAction<number>>;
+  isDistractionFree: boolean;
+  setIsDistractionFree: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleDistractionFree: () => void;
 }
 
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
@@ -82,6 +85,11 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
 
   const [globalAudio, setGlobalAudio] = useState<GlobalAudio | null>(null);
   const [playbackTime, setPlaybackTime] = useState<number>(0);
+  const [isDistractionFree, setIsDistractionFree] = useState<boolean>(false);
+
+  const toggleDistractionFree = useCallback(() => {
+    setIsDistractionFree(prev => !prev);
+  }, []);
 
   const setActiveScoreId = useCallback((id: string | null) => {
     setActiveScoreIdState(id);
@@ -322,7 +330,10 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       createScore,
       exportActiveScore,
       playbackTime,
-      setPlaybackTime
+      setPlaybackTime,
+      isDistractionFree,
+      setIsDistractionFree,
+      toggleDistractionFree
     }}>
       {children}
     </ScoreContext.Provider>

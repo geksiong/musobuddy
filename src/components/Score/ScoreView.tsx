@@ -13,6 +13,7 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize2,
+  Minimize2,
   Trash2,
   FileCode,
   Layout,
@@ -56,7 +57,7 @@ const PdfRenderer = React.lazy(() => import('./PdfRenderer'));
 const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer'));
 
 export default function ScoreView() {
-  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore, playbackTime } = useScores();
+  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore, playbackTime, isDistractionFree, toggleDistractionFree } = useScores();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { resolvedTheme } = useTheme();
@@ -159,6 +160,43 @@ export default function ScoreView() {
       }
     }
   }, [activeScoreId, scores, setScores]);
+
+  const currentAbcScore = scores.find(s => s.id === activeScoreId);
+
+  useEffect(() => {
+    if (!currentAbcScore || currentAbcScore.format !== ScoreFormat.ABC) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        (activeEl as HTMLElement).isContentEditable
+      )) {
+        return;
+      }
+
+      const titles = getAbcTuneTitles(currentAbcScore.content as string);
+      if (titles.length <= 1) return;
+
+      const currentIndex = currentAbcScore.selectedTuneIndex || 0;
+
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        if (currentIndex > 0) {
+          setScores(prev => prev.map(s => s.id === currentAbcScore.id ? { ...s, selectedTuneIndex: currentIndex - 1 } : s));
+        }
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        if (currentIndex < titles.length - 1) {
+          setScores(prev => prev.map(s => s.id === currentAbcScore.id ? { ...s, selectedTuneIndex: currentIndex + 1 } : s));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentAbcScore, getAbcTuneTitles, setScores]);
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     loadFiles(files);
@@ -334,7 +372,7 @@ function ScoreDisplay({
   playbackTime: number
 }) {
   const { resolvedTheme } = useTheme();
-  const { exportActiveScore } = useScores();
+  const { exportActiveScore, isDistractionFree, toggleDistractionFree } = useScores();
   
   if (!score) return (
     <div className={cn("flex-1 flex flex-col items-center justify-center gap-4 transition-colors", resolvedTheme === 'dark' ? "text-white/10" : "text-slate-200")}>
@@ -377,143 +415,193 @@ function ScoreDisplay({
 
   return (
     <div ref={scoreViewRef} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative min-h-0 h-full">
-      {/* Toolbar */}
-      <div 
-        ref={headerRef}
-        className={cn(
-          "sticky top-0 z-30 px-3 sm:px-5 py-2 sm:py-2.5 flex flex-col border-b transition-all gap-2 backdrop-blur-xl shrink-0 shadow-sm",
-          resolvedTheme === 'dark' ? "border-white/10 bg-[#121215]/95 text-white" : "border-black/10 bg-white/95 text-slate-900"
-        )}
-      >
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-4">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <input 
-              value={score.title}
-              onChange={(e) => onUpdate({ title: e.target.value })}
-              className={cn(
-                "w-full bg-transparent text-lg sm:text-2xl font-black focus:outline-none uppercase tracking-tighter italic transition-colors py-0.5",
-                resolvedTheme === 'dark' ? "text-white placeholder:text-white/10" : "text-slate-900 placeholder:text-slate-200"
-              )}
-              placeholder="UNTITLED SCORE"
-            />
+      {/* Floating HUD for No Distraction mode */}
+      {isDistractionFree && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 sm:gap-3.5 px-3.5 sm:px-5 py-2 bg-black/90 backdrop-blur-2xl border border-white/20 text-white rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all hover:opacity-100 opacity-90 max-w-[95vw]">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse shrink-0" />
+            <span className="text-xs font-black uppercase tracking-wider truncate max-w-[120px] sm:max-w-[260px]">
+              {score.title || "UNTITLED SCORE"}
+            </span>
+            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0 hidden sm:inline-block">
+              No Distraction
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-              <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-                {score.format === ScoreFormat.MusicXML ? (score.isMxl ? 'MUSICXML (.MXL)' : 'MUSICXML (.XML)') : `${score.format} MODE`}
-              </span>
+          <div className="h-4 w-[1px] bg-white/20 shrink-0" />
+
+          {/* View Mode Selector */}
+          {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
+            <div className="flex items-center gap-1 bg-white/10 p-0.5 rounded-xl shrink-0">
+              <button 
+                onClick={() => onUpdate({ viewMode: 'scroll' })}
+                className={cn("p-1.5 rounded-lg transition-all", viewMode === 'scroll' ? "bg-orange-500 text-white" : "text-white/60 hover:text-white")}
+                title="Continuous Scroll Mode"
+              >
+                <Scroll className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={() => onUpdate({ viewMode: 'single' })}
+                className={cn("p-1.5 rounded-lg transition-all", viewMode === 'single' ? "bg-orange-500 text-white" : "text-white/60 hover:text-white")}
+                title="Single Page Mode (Use ←/→ or PgUp/PgDn to flip)"
+              >
+                <Square className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={() => onUpdate({ viewMode: 'double' })}
+                className={cn("p-1.5 rounded-lg transition-all", viewMode === 'double' ? "bg-orange-500 text-white" : "text-white/60 hover:text-white")}
+                title="Double Page Mode (Use ←/→ or PgUp/PgDn to flip)"
+              >
+                <Columns className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Zoom Controls */}
+          {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
+            <div className="flex items-center gap-0.5 bg-white/10 p-0.5 rounded-xl shrink-0">
+              <button 
+                onClick={() => onUpdate({ zoom: Math.max(0.5, score.zoom - 0.1) })}
+                className="p-1.5 text-white/70 hover:text-white transition-colors"
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={() => onUpdate({ zoom: Math.min(3, score.zoom + 0.1) })}
+                className="p-1.5 text-white/70 hover:text-white transition-colors"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Exit Button */}
+          <button
+            onClick={toggleDistractionFree}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-black text-[10px] font-black uppercase tracking-wider rounded-full transition-all shadow-lg active:scale-95 cursor-pointer shrink-0"
+            title="Exit No Distraction Mode (Press Esc)"
+          >
+            <Minimize2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Exit (Esc)</span>
+          </button>
+        </div>
+      )}
+
+      {/* Toolbar */}
+      {!isDistractionFree && (
+        <div 
+          ref={headerRef}
+          className={cn(
+            "sticky top-0 z-30 px-3 sm:px-5 py-2 sm:py-2.5 flex flex-col border-b transition-all gap-2 backdrop-blur-xl shrink-0 shadow-sm",
+            resolvedTheme === 'dark' ? "border-white/10 bg-[#121215]/95 text-white" : "border-black/10 bg-white/95 text-slate-900"
+          )}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <input 
+                value={score.title}
+                onChange={(e) => onUpdate({ title: e.target.value })}
+                className={cn(
+                  "w-full bg-transparent text-lg sm:text-2xl font-black focus:outline-none uppercase tracking-tighter italic transition-colors py-0.5",
+                  resolvedTheme === 'dark' ? "text-white placeholder:text-white/10" : "text-slate-900 placeholder:text-slate-200"
+                )}
+                placeholder="UNTITLED SCORE"
+              />
             </div>
 
-            {score.format === ScoreFormat.ABC && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-3 border-l border-black/10 dark:border-white/10">
-                {/* Tune Picker */}
-                <div className="flex items-center gap-2">
-                  <Music className="w-3.5 h-3.5 text-orange-500" />
-                  <div className="flex items-center gap-1 group">
-                    <select 
-                      value={score.selectedTuneIndex || 0}
-                      onChange={(e) => {
-                        onUpdate({ selectedTuneIndex: parseInt(e.target.value) });
-                        e.target.blur();
-                        setTimeout(() => e.target.blur(), 0);
-                      }}
-                      className={cn(
-                        "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors py-1",
-                        resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
-                      )}
-                    >
-                      {getAbcTuneTitles(score.content as string).map((title, i) => (
-                        <option key={i} value={i} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                          {i + 1}. {title}
-                        </option>
-                      ))}
-                    </select>
-                    
-                    <button 
-                      onClick={onReloadMidi}
-                      title="Reload MIDI"
-                      className="p-1.5 hover:text-orange-500 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
+                  {score.format === ScoreFormat.MusicXML ? (score.isMxl ? 'MUSICXML (.MXL)' : 'MUSICXML (.XML)') : `${score.format} MODE`}
+                </span>
+              </div>
 
-                {/* Transpose Control */}
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col">
-                    <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Transpose</span>
-                    <div className="flex items-center gap-1">
-                      <button 
-                        onClick={() => onTranspose(-1)}
-                        className={cn("p-1 hover:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}
-                      >
-                        <ChevronLeft className="w-3 h-3" />
-                      </button>
-                      <select
-                        value={score.transpose || 0}
+              {score.format === ScoreFormat.ABC && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-3 border-l border-black/10 dark:border-white/10">
+                  {/* Tune Picker */}
+                  <div className="flex items-center gap-2">
+                    <Music className="w-3.5 h-3.5 text-orange-500" />
+                    <div className="flex items-center gap-1 group">
+                      <select 
+                        value={score.selectedTuneIndex || 0}
                         onChange={(e) => {
-                          onTranspose(parseInt(e.target.value) - (score.transpose || 0));
+                          onUpdate({ selectedTuneIndex: parseInt(e.target.value) });
                           e.target.blur();
                           setTimeout(() => e.target.blur(), 0);
                         }}
                         className={cn(
-                          "bg-transparent text-[11px] font-black tabular-nums outline-none cursor-pointer hover:text-orange-500 transition-colors appearance-none",
-                          resolvedTheme === 'dark' ? "text-white/80" : "text-slate-700"
+                          "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors py-1",
+                          resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
                         )}
                       >
-                        {Array.from({ length: 35 }, (_, i) => 17 - i).map(val => (
-                          <option key={val} value={val} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                            {val > 0 ? `+${val}` : val}
+                        {getAbcTuneTitles(score.content as string).map((title, i) => (
+                          <option key={i} value={i} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                            {i + 1}. {title}
                           </option>
                         ))}
                       </select>
+                      
                       <button 
-                        onClick={() => onTranspose(1)}
-                        className={cn("p-1 hover:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}
+                        onClick={onReloadMidi}
+                        title="Reload MIDI"
+                        className="p-1.5 hover:text-orange-500 transition-colors opacity-0 group-hover:opacity-100"
                       >
-                        <ChevronRight className="w-3 h-3" />
+                        <RefreshCw className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
-                </div>
 
-                {/* Instrument Picker */}
-                <div className="flex flex-col">
-                  <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Instrument</span>
-                  <select 
-                    value={score.tablature || 'none'}
-                    onChange={(e) => {
-                      const val = e.target.value as any;
-                      const defaultTuning = val !== 'none' ? TUNINGS[val]?.[0]?.value : [];
-                      onUpdate({ tablature: val, tuning: defaultTuning });
-                      e.target.blur();
-                      setTimeout(() => e.target.blur(), 0);
-                    }}
-                    className={cn(
-                      "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
-                      resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
-                    )}
-                  >
-                    <option value="none" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Score Only</option>
-                    <option value="guitar" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Guitar</option>
-                    <option value="ukulele" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Ukulele</option>
-                    <option value="mandolin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Mandolin</option>
-                    <option value="banjo" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Banjo</option>
-                    <option value="violin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Violin / Fiddle</option>
-                  </select>
-                </div>
+                  {/* Transpose Control */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col">
+                      <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Transpose</span>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => onTranspose(-1)}
+                          className={cn("p-1 hover:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </button>
+                        <select
+                          value={score.transpose || 0}
+                          onChange={(e) => {
+                            onTranspose(parseInt(e.target.value) - (score.transpose || 0));
+                            e.target.blur();
+                            setTimeout(() => e.target.blur(), 0);
+                          }}
+                          className={cn(
+                            "bg-transparent text-[11px] font-black tabular-nums outline-none cursor-pointer hover:text-orange-500 transition-colors appearance-none",
+                            resolvedTheme === 'dark' ? "text-white/80" : "text-slate-700"
+                          )}
+                        >
+                          {Array.from({ length: 35 }, (_, i) => 17 - i).map(val => (
+                            <option key={val} value={val} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                              {val > 0 ? `+${val}` : val}
+                            </option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={() => onTranspose(1)}
+                          className={cn("p-1 hover:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Tuning Picker */}
-                {score.tablature && score.tablature !== 'none' && (
+                  {/* Instrument Picker */}
                   <div className="flex flex-col">
-                    <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tuning</span>
+                    <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Instrument</span>
                     <select 
-                      value={JSON.stringify((score.tuning || []).map(toAbcNoteName))}
+                      value={score.tablature || 'none'}
                       onChange={(e) => {
-                        onUpdate({ tuning: JSON.parse(e.target.value) });
+                        const val = e.target.value as any;
+                        const defaultTuning = val !== 'none' ? TUNINGS[val]?.[0]?.value : [];
+                        onUpdate({ tablature: val, tuning: defaultTuning });
                         e.target.blur();
                         setTimeout(() => e.target.blur(), 0);
                       }}
@@ -522,160 +610,200 @@ function ScoreDisplay({
                         resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
                       )}
                     >
-                      {(TUNINGS[score.tablature] || []).map((t, i) => (
-                        <option key={i} value={JSON.stringify(t.value)} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                          {t.label}
-                        </option>
-                      ))}
+                      <option value="none" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Score Only</option>
+                      <option value="guitar" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Guitar</option>
+                      <option value="ukulele" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Ukulele</option>
+                      <option value="mandolin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Mandolin</option>
+                      <option value="banjo" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Banjo</option>
+                      <option value="violin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Violin / Fiddle</option>
                     </select>
                   </div>
-                )}
-              </div>
-            )}
 
-            <div className="flex items-center gap-2 sm:gap-3 pl-2 border-l border-black/5 dark:border-white/5">
-              {/* Sidebar Toggle for PDF (Placed at the leftmost side of same row as page mode toggle & save button) */}
-              {score.format === ScoreFormat.PDF && sidebarState && (
+                  {/* Tuning Picker */}
+                  {score.tablature && score.tablature !== 'none' && (
+                    <div className="flex flex-col">
+                      <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tuning</span>
+                      <select 
+                        value={JSON.stringify((score.tuning || []).map(toAbcNoteName))}
+                        onChange={(e) => {
+                          onUpdate({ tuning: JSON.parse(e.target.value) });
+                          e.target.blur();
+                          setTimeout(() => e.target.blur(), 0);
+                        }}
+                        className={cn(
+                          "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
+                          resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
+                        )}
+                      >
+                        {(TUNINGS[score.tablature] || []).map((t, i) => (
+                          <option key={i} value={JSON.stringify(t.value)} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 sm:gap-3 pl-2 border-l border-black/5 dark:border-white/5">
+                {/* Sidebar Toggle for PDF (Placed at the leftmost side of same row as page mode toggle & save button) */}
+                {score.format === ScoreFormat.PDF && sidebarState && (
+                  <button 
+                    onClick={sidebarState.toggle}
+                    className={cn(
+                      "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0",
+                      sidebarState.isOpen 
+                        ? "bg-orange-500 border-orange-500 text-white font-bold" 
+                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-orange-400 hover:text-white" : "bg-white border-black/10 text-orange-600 hover:text-slate-900")
+                    )}
+                    title={sidebarState.isOpen ? "Close Sidebar" : "Open Navigation Sidebar"}
+                  >
+                    <Compass className="w-4 h-4 group-hover:rotate-45 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Sidebar</span>
+                  </button>
+                )}
+
+                {/* View Mode Selector */}
+                {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
+                  <div className={cn("flex p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
+                    <button 
+                      onClick={() => onUpdate({ viewMode: 'scroll' })}
+                      className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'scroll' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                      title="Continuous Scroll"
+                    >
+                      <Scroll className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => onUpdate({ viewMode: 'single' })}
+                      className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'single' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                      title="Single Page"
+                    >
+                      <Square className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => onUpdate({ viewMode: 'double' })}
+                      className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'double' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                      title="Double Page"
+                    >
+                      <Columns className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Zoom Controls */}
+                {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
+                  <div className={cn("flex p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
+                    <button 
+                      onClick={() => onUpdate({ zoom: Math.max(0.5, score.zoom - 0.1) })}
+                      className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <div className={cn("w-[1px] self-stretch my-1", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
+                    <button 
+                      onClick={() => onUpdate({ zoom: Math.min(3, score.zoom + 0.1) })}
+                      className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {score.format === ScoreFormat.ABC && (
+                  <button 
+                    onClick={() => onUpdate({ showEditor: !score.showEditor })}
+                    className={cn(
+                      "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95",
+                      score.showEditor 
+                        ? "bg-orange-500 border-orange-500 text-white" 
+                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900")
+                    )}
+                    title={score.showEditor ? "Hide Editor" : "Show Editor"}
+                  >
+                    <Layout className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{score.showEditor ? 'Hide' : 'Code'}</span>
+                  </button>
+                )}
+
+                {/* No Distraction Button */}
                 <button 
-                  onClick={sidebarState.toggle}
+                  onClick={toggleDistractionFree}
                   className={cn(
                     "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0",
-                    sidebarState.isOpen 
+                    isDistractionFree 
                       ? "bg-orange-500 border-orange-500 text-white font-bold" 
                       : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-orange-400 hover:text-white" : "bg-white border-black/10 text-orange-600 hover:text-slate-900")
                   )}
-                  title={sidebarState.isOpen ? "Close Sidebar" : "Open Navigation Sidebar"}
+                  title="No Distraction Mode (Full screen view)"
                 >
-                  <Compass className="w-4 h-4 group-hover:rotate-45 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Sidebar</span>
+                  <Maximize2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">No Distraction</span>
                 </button>
-              )}
 
-              {/* View Mode Selector */}
-              {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
-                <div className={cn("flex p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
-                  <button 
-                    onClick={() => onUpdate({ viewMode: 'scroll' })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'scroll' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
-                    title="Continuous Scroll"
-                  >
-                    <Scroll className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => onUpdate({ viewMode: 'single' })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'single' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
-                    title="Single Page"
-                  >
-                    <Square className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => onUpdate({ viewMode: 'double' })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", viewMode === 'double' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
-                    title="Double Page"
-                  >
-                    <Columns className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+                {score.format === ScoreFormat.MusicXML ? (
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => exportActiveScore(true)}
+                      className={cn(
+                        "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                        score.isMxl 
+                          ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
+                          : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
+                      )}
+                      title="Save as Compressed MusicXML (.mxl)"
+                    >
+                      <Download className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Save .MXL</span>
+                    </button>
 
-              {/* Zoom Controls */}
-              {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
-                <div className={cn("flex p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
+                    <button 
+                      onClick={() => exportActiveScore(false)}
+                      className={cn(
+                        "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                        !score.isMxl 
+                          ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
+                          : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
+                      )}
+                      title="Save as Standard MusicXML (.xml)"
+                    >
+                      <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                      <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save .XML</span>
+                    </button>
+                  </div>
+                ) : (
                   <button 
-                    onClick={() => onUpdate({ zoom: Math.max(0.5, score.zoom - 0.1) })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
-                  >
-                    <ZoomOut className="w-4 h-4" />
-                  </button>
-                  <div className={cn("w-[1px] self-stretch my-1", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
-                  <button 
-                    onClick={() => onUpdate({ zoom: Math.min(3, score.zoom + 0.1) })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {score.format === ScoreFormat.ABC && (
-                <button 
-                  onClick={() => onUpdate({ showEditor: !score.showEditor })}
-                  className={cn(
-                    "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95",
-                    score.showEditor 
-                      ? "bg-orange-500 border-orange-500 text-white" 
-                      : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900")
-                  )}
-                  title={score.showEditor ? "Hide Editor" : "Show Editor"}
-                >
-                  <Layout className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{score.showEditor ? 'Hide' : 'Code'}</span>
-                </button>
-              )}
-
-              {score.format === ScoreFormat.MusicXML ? (
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => exportActiveScore(true)}
+                    onClick={onDownload}
                     className={cn(
-                      "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
-                      score.isMxl 
-                        ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
-                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
+                      "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                      resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900"
                     )}
-                    title="Save as Compressed MusicXML (.mxl)"
-                  >
-                    <Download className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Save .MXL</span>
-                  </button>
-
-                  <button 
-                    onClick={() => exportActiveScore(false)}
-                    className={cn(
-                      "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
-                      !score.isMxl 
-                        ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
-                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
-                    )}
-                    title="Save as Standard MusicXML (.xml)"
+                    title="Save Score"
                   >
                     <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save .XML</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save</span>
                   </button>
-                </div>
-              ) : (
-                <button 
-                  onClick={onDownload}
-                  className={cn(
-                    "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95 cursor-pointer",
-                    resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900"
-                  )}
-                  title="Save Score"
-                >
-                  <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save</span>
-                </button>
-              )}
+                )}
 
-              <button 
-                onClick={onDelete}
-                className="p-2 rounded-xl border border-red-500/10 text-red-500/30 hover:text-white hover:bg-red-500 hover:border-red-500 transition-all shadow-sm active:scale-95 group"
-                title="Delete Score"
-              >
-                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              </button>
+                <button 
+                  onClick={onDelete}
+                  className="p-2 rounded-xl border border-red-500/10 text-red-500/30 hover:text-white hover:bg-red-500 hover:border-red-500 transition-all shadow-sm active:scale-95 group"
+                  title="Delete Score"
+                >
+                  <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Header Extra Slot (Annotation Toolbar for PDF) */}
+          {headerExtra && (
+            <div className="pt-1.5 border-t border-black/5 dark:border-white/10 min-w-0">
+              {headerExtra}
+            </div>
+          )}
         </div>
-
-        {/* Header Extra Slot (Annotation Toolbar for PDF) */}
-        {headerExtra && (
-          <div className="pt-1.5 border-t border-black/5 dark:border-white/10 min-w-0">
-            {headerExtra}
-          </div>
-        )}
-      </div>
-
+      )}
       {/* Rendering Area */}
       <div className={cn("flex-1 relative", score.format === ScoreFormat.PDF ? "p-0" : "p-4 sm:p-8 pb-4 sm:pb-6")}>
         {((score.format === ScoreFormat.PDF || score.format === ScoreFormat.Image) && !score.content) ? (
@@ -801,6 +929,37 @@ function ScoreDisplay({
 function ImageViewer({ content, viewMode, onRemove }: { content: string | string[], viewMode: string, onRemove: () => void }) {
   const images = Array.isArray(content) ? content : (content ? [content] : []);
   const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    if (viewMode !== 'single' && viewMode !== 'double') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        (activeEl as HTMLElement).isContentEditable
+      )) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        setPage(p => Math.max(0, p - 1));
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        if (viewMode === 'single') {
+          setPage(p => Math.min(images.length - 1, p + 1));
+        } else if (viewMode === 'double') {
+          const maxSpreads = Math.floor((images.length - 1) / 2);
+          setPage(p => Math.min(maxSpreads, p + 1));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, images.length]);
 
   if (images.length === 0) return null;
 

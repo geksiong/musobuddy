@@ -157,6 +157,37 @@ export default function PdfRenderer({
     };
   }, [url]);
 
+  useEffect(() => {
+    if (viewMode !== 'single' && viewMode !== 'double') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        (activeEl as HTMLElement).isContentEditable
+      )) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        setCurrentPage(p => Math.max(1, p - 1));
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        if (viewMode === 'single') {
+          setCurrentPage(p => Math.min(numPages, p + 1));
+        } else if (viewMode === 'double') {
+          const maxSpreads = Math.ceil(numPages / 2);
+          setCurrentPage(p => Math.min(maxSpreads, p + 1));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, numPages]);
+
   const handleNavigateToPage = (page: number) => {
     if (viewMode === 'scroll') {
       const pageEl = document.getElementById(`pdf-page-${page}`);
