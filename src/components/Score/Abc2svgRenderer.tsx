@@ -27,6 +27,7 @@ interface Props {
   tablature?: string;
   tuning?: string[];
   currentTime?: number;
+  zoom?: number;
 }
 
 let isEngineInitialized = false;
@@ -97,7 +98,8 @@ export const Abc2svgRenderer: React.FC<Props> = ({
   transpose = 0,
   tablature = 'none',
   tuning = [],
-  currentTime = 0
+  currentTime = 0,
+  zoom = 1
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [renderErrors, setRenderErrors] = useState<string[]>([]);
@@ -134,6 +136,18 @@ export const Abc2svgRenderer: React.FC<Props> = ({
           targetAbc = targetAbc.replace(/^(X:[^\n]*)/m, `$1\n%%transpose ${transpose}`);
         } else {
           targetAbc = `%%transpose ${transpose}\n${targetAbc}`;
+        }
+      }
+
+      // Apply zoom scale if zoom !== 1 or if scale is specified
+      if (zoom !== 1) {
+        if (/^\s*%%scale\b/m.test(targetAbc)) {
+          targetAbc = targetAbc.replace(/^(\s*%%scale\s+)([\d.]+)/m, (_, prefix, val) => {
+            const origScale = parseFloat(val) || 0.75;
+            return `${prefix}${(origScale * zoom).toFixed(3)}`;
+          });
+        } else {
+          targetAbc = `%%scale ${(0.75 * zoom).toFixed(3)}\n${targetAbc}`;
         }
       }
 
@@ -175,7 +189,7 @@ export const Abc2svgRenderer: React.FC<Props> = ({
       console.error('Abc2svg rendering error:', err);
       setRenderErrors([err?.message || 'Unknown abc2svg rendering error']);
     }
-  }, [abc, tuneIndex, transpose, responsive]);
+  }, [abc, tuneIndex, transpose, responsive, zoom]);
 
   return (
     <div className="w-full relative flex flex-col items-center">

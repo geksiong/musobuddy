@@ -477,20 +477,43 @@ function PdfPage({
         const page = await pdf.getPage(pageNum);
         if (!active) return;
         
-        const viewport = page.getViewport({ scale: 1.5 });
+        // Calculate base display scale so oversized PDFs (e.g. > 850pt) fit nicely in standard window view (~850px wide) at 100% zoom
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        let baseScale = 1.35;
+        if (unscaledViewport.width > 0) {
+          if (unscaledViewport.width > 850) {
+            baseScale = 850 / unscaledViewport.width;
+          } else if (unscaledViewport.width < 500) {
+            baseScale = 750 / unscaledViewport.width;
+          }
+        }
+
+        const displayViewport = page.getViewport({ scale: baseScale });
+
+        // Render canvas at high-DPI (at least 2.0x scale relative to display size) for ultra crisp rendering
+        const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 2) : 2;
+        const canvasDprScale = Math.max(dpr, 2.0);
+        const renderViewport = page.getViewport({ scale: baseScale * canvasDprScale });
+
         const canvas = canvasRef.current;
         if (!canvas || !active) return;
 
         const context = canvas.getContext('2d', { alpha: false });
         if (!context || !active) return;
 
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        setDims({ width: viewport.width, height: viewport.height });
+        canvas.height = Math.floor(renderViewport.height);
+        canvas.width = Math.floor(renderViewport.width);
+        canvas.style.width = '100%';
+        canvas.style.height = 'auto';
+
+        setDims({ 
+          width: Math.floor(displayViewport.width), 
+          height: Math.floor(displayViewport.height) 
+        });
 
         const renderContext: any = {
           canvasContext: context,
-          viewport: viewport,
+          viewport: renderViewport,
         };
 
         const renderTask = page.render(renderContext);

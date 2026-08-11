@@ -439,24 +439,29 @@ function ScoreDisplay({
           )}
 
           {/* Zoom Controls */}
-          {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
-            <div className="flex items-center gap-0.5 bg-white/10 p-0.5 rounded-xl shrink-0">
-              <button 
-                onClick={() => onUpdate({ zoom: Math.max(0.5, score.zoom - 0.1) })}
-                className="p-1.5 text-white/70 hover:text-white transition-colors"
-                title="Zoom Out"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={() => onUpdate({ zoom: Math.min(3, score.zoom + 0.1) })}
-                className="p-1.5 text-white/70 hover:text-white transition-colors"
-                title="Zoom In"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-0.5 bg-white/10 p-0.5 rounded-xl shrink-0">
+            <button 
+              onClick={() => onUpdate({ zoom: Math.max(0.1, Math.round(((score.zoom || 1) - 0.1) * 10) / 10) })}
+              className="p-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
+              title="Zoom Out (Min 10%)"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button 
+              onClick={() => onUpdate({ zoom: 1 })}
+              className="px-1.5 text-[10px] font-black tabular-nums text-white/90 hover:text-orange-400 transition-colors cursor-pointer"
+              title="Reset Zoom to 100%"
+            >
+              {Math.round((score.zoom || 1) * 100)}%
+            </button>
+            <button 
+              onClick={() => onUpdate({ zoom: Math.min(5, Math.round(((score.zoom || 1) + 0.1) * 10) / 10) })}
+              className="p-1.5 text-white/70 hover:text-white transition-colors cursor-pointer"
+              title="Zoom In (Max 500%)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           {/* Exit Button */}
           <button
@@ -715,23 +720,32 @@ function ScoreDisplay({
                 )}
 
                 {/* Zoom Controls */}
-                {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
-                  <div className={cn("flex p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
-                    <button 
-                      onClick={() => onUpdate({ zoom: Math.max(0.5, score.zoom - 0.1) })}
-                      className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
-                    >
-                      <ZoomOut className="w-4 h-4" />
-                    </button>
-                    <div className={cn("w-[1px] self-stretch my-1", resolvedTheme === 'dark' ? "bg-white/5" : "bg-black/5")} />
-                    <button 
-                      onClick={() => onUpdate({ zoom: Math.min(3, score.zoom + 0.1) })}
-                      className={cn("p-1.5 sm:p-2 rounded-lg transition-all", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
-                    >
-                      <ZoomIn className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                <div className={cn("flex items-center p-1 rounded-xl border transition-colors", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
+                  <button 
+                    onClick={() => onUpdate({ zoom: Math.max(0.1, Math.round(((score.zoom || 1) - 0.1) * 10) / 10) })}
+                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
+                    title="Zoom Out (Min 10%)"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => onUpdate({ zoom: 1 })}
+                    className={cn(
+                      "px-2 text-[10px] font-black tabular-nums transition-colors hover:text-orange-500 cursor-pointer",
+                      resolvedTheme === 'dark' ? "text-white/70" : "text-slate-600"
+                    )}
+                    title="Reset Zoom to 100%"
+                  >
+                    {Math.round((score.zoom || 1) * 100)}%
+                  </button>
+                  <button 
+                    onClick={() => onUpdate({ zoom: Math.min(5, Math.round(((score.zoom || 1) + 0.1) * 10) / 10) })}
+                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
+                    title="Zoom In (Max 500%)"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                </div>
 
                 {score.format === ScoreFormat.ABC && (
                   <button 
@@ -862,10 +876,14 @@ function ScoreDisplay({
             ) : (
               <div 
                 className={cn(
-                  "transition-transform origin-top-left",
+                  "transition-transform",
+                  score.format === ScoreFormat.Image && "w-full flex flex-col items-center justify-center",
                   viewMode === 'scroll' ? "flex flex-col gap-8" : "h-full"
                 )}
-                style={{ transform: `scale(${score.zoom})` }}
+                style={(score.format === ScoreFormat.Image || score.format === ScoreFormat.Text) ? { 
+                  transform: `scale(${score.zoom})`, 
+                  transformOrigin: score.format === ScoreFormat.Image ? 'top center' : 'top left' 
+                } : undefined}
               >
                 {score.format === ScoreFormat.ABC && (
                 <div className="flex flex-col gap-8 w-full">
@@ -908,6 +926,7 @@ function ScoreDisplay({
                       tuning={score.tuning || []}
                       currentTime={playbackTime}
                       rendererPreference={score.abcRenderer || 'auto'}
+                      zoom={score.zoom || 1}
                     />
                   </div>
                 </div>
@@ -939,6 +958,7 @@ function ScoreDisplay({
               {score.format === ScoreFormat.MusicXML && (
                 <MusicXmlRenderer 
                   xml={score.content as string} 
+                  zoom={score.zoom || 1}
                 />
               )}
             </div>

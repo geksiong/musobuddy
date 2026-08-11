@@ -18,6 +18,7 @@ interface Props {
   tuning?: string[];
   currentTime?: number;
   rendererPreference?: 'auto' | 'abcjs' | 'abc2svg';
+  zoom?: number;
 }
 
 export const AbcRenderer: React.FC<Props> = ({ 
@@ -28,7 +29,8 @@ export const AbcRenderer: React.FC<Props> = ({
   tablature = 'none',
   tuning = [],
   currentTime = 0,
-  rendererPreference = 'auto'
+  rendererPreference = 'auto',
+  zoom = 1
 }) => {
   const detectionResult = detectAbcRenderer(abc);
   const activeRenderer = rendererPreference && rendererPreference !== 'auto'
@@ -49,6 +51,7 @@ export const AbcRenderer: React.FC<Props> = ({
         tablature={tablature}
         tuning={tuning}
         currentTime={currentTime}
+        zoom={zoom}
       />
     );
   }
@@ -62,6 +65,7 @@ export const AbcRenderer: React.FC<Props> = ({
       tablature={tablature}
       tuning={tuning}
       currentTime={currentTime}
+      zoom={zoom}
     />
   );
 };
@@ -73,7 +77,8 @@ const AbcjsRenderer: React.FC<Props> = ({
   transpose = 0,
   tablature = 'none',
   tuning = [],
-  currentTime = 0
+  currentTime = 0,
+  zoom = 1
 }) => {
   const divRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +107,8 @@ const AbcjsRenderer: React.FC<Props> = ({
           startingTune: 0, // Target ABC is sliced to single tune, so index is always 0
           visualTranspose: transpose,
           add_classes: true,
-          staffwidth: 800,
+          staffwidth: 800 * zoom,
+          scale: zoom,
         };
 
         // Prepare ABC
@@ -201,7 +207,7 @@ const AbcjsRenderer: React.FC<Props> = ({
         timingCallbacksRef.current = null;
       }
     };
-  }, [abc, responsive, tuneIndex, transpose, tablature, tuning]);
+  }, [abc, responsive, tuneIndex, transpose, tablature, tuning, zoom]);
 
   // Sync highlighting with currentTime
   useEffect(() => {
