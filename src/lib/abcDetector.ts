@@ -25,6 +25,11 @@ const ABCM2PS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
   { pattern: /^%%endtext\b/m, description: '%%endtext block' },
 
   // Page layout & dimensions
+  { pattern: /^%%newpage\b/m, description: '%%newpage directive' },
+  { pattern: /^%%pagebreak\b/m, description: '%%pagebreak directive' },
+  { pattern: /^%%vskip\b/m, description: '%%vskip directive' },
+  { pattern: /^%%center\b/m, description: '%%center text directive' },
+  { pattern: /^%%topspace\b/m, description: '%%topspace directive' },
   { pattern: /^%%pageheight\b/m, description: '%%pageheight layout directive' },
   { pattern: /^%%pagewidth\b/m, description: '%%pagewidth layout directive' },
   { pattern: /^%%landscape\b/m, description: '%%landscape orientation directive' },

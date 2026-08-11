@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as abcjs from 'abcjs';
-import { toAbcNoteName, getAbcjsTablatureInstrument } from '../../lib/abcUtils.ts';
+import { toAbcNoteName, getAbcjsTablatureInstrument, parseAbcItems } from '../../lib/abcUtils.ts';
 import { Abc2svgRenderer } from './Abc2svgRenderer.tsx';
 import { detectAbcRenderer } from '../../lib/abcDetector.ts';
 
@@ -35,7 +35,11 @@ export const AbcRenderer: React.FC<Props> = ({
     ? rendererPreference
     : detectionResult.renderer;
 
-  if (activeRenderer === 'abc2svg') {
+  const items = parseAbcItems(abc);
+  const selectedItem = items[Math.min(tuneIndex, items.length - 1)];
+
+  // Pre-tune text/metadata pages (0.1, 0.2) require abc2svg engine for layout and rendering
+  if (selectedItem?.type === 'prepage' || activeRenderer === 'abc2svg') {
     return (
       <Abc2svgRenderer 
         abc={abc}
@@ -95,7 +99,7 @@ const AbcjsRenderer: React.FC<Props> = ({
           paddingbottom: 0,
           paddingright: 0,
           paddingleft: 0,
-          startingTune: tuneIndex,
+          startingTune: 0, // Target ABC is sliced to single tune, so index is always 0
           visualTranspose: transpose,
           add_classes: true,
           staffwidth: 800,
@@ -103,15 +107,10 @@ const AbcjsRenderer: React.FC<Props> = ({
 
         // Prepare ABC
         let targetAbc = abc;
-        
-        // Filter out any lines starting with %% (directives/comments) ONLY before the first tune
-        const firstXMatch = targetAbc.match(/^X:/m);
-        if (firstXMatch && firstXMatch.index !== undefined) {
-          const header = targetAbc.substring(0, firstXMatch.index);
-          const rest = targetAbc.substring(firstXMatch.index);
-          targetAbc = header.replace(/^%%[^\n]*\n?/gm, '') + rest;
-        } else {
-          targetAbc = targetAbc.replace(/^%%[^\n]*\n?/gm, '');
+        const items = parseAbcItems(abc);
+        if (items.length > 0) {
+          const selectedItem = items[Math.min(tuneIndex, items.length - 1)] || items[0];
+          targetAbc = selectedItem.abc;
         }
 
         // Clean up any existing %%tablature directives to prevent duplicate or invalid lines

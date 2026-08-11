@@ -17,6 +17,7 @@ import pedline1Script from 'abc2svg/pedline-1.js?raw';
 import psvg1Script from 'abc2svg/psvg-1.js?raw';
 import roman1Script from 'abc2svg/roman-1.js?raw';
 import nns1Script from 'abc2svg/nns-1.js?raw';
+import { parseAbcItems } from '../../lib/abcUtils.ts';
 
 interface Props {
   abc: string;
@@ -118,43 +119,11 @@ export const Abc2svgRenderer: React.FC<Props> = ({
 
       let targetAbc = abc;
 
-      // Extract specific tune if tuneIndex is given and multiple tunes exist
-      const firstXMatch = targetAbc.match(/^X:/m);
-      let globalHeader = '';
-      let tuneBody = targetAbc;
-
-      if (firstXMatch && firstXMatch.index !== undefined) {
-        globalHeader = targetAbc.substring(0, firstXMatch.index);
-        tuneBody = targetAbc.substring(firstXMatch.index);
-      }
-
-      // Filter out metadata text, header fields, text blocks, and comments from globalHeader before the first tune
-      if (globalHeader) {
-        // Remove %%begintext ... %%endtext blocks
-        globalHeader = globalHeader.replace(/%%begintext[\s\S]*?%%endtext/gi, '');
-
-        globalHeader = globalHeader
-          .split('\n')
-          .filter(line => {
-            const trimmed = line.trim();
-            if (!trimmed) return false;
-            // Keep valid global formatting/layout directives starting with %%
-            if (trimmed.startsWith('%%')) {
-              // Exclude text, title, header/footer, and EPS/PS rendering directives
-              const isTextDirective = /^%%(begintext|endtext|text|center|title|subtitle|header|footer|eps|ps|postscript)\b/i.test(trimmed);
-              return !isTextDirective;
-            }
-            // Filter out comments (%), metadata fields (T:, C:, N:, etc.), and plain text before first tune
-            return false;
-          })
-          .join('\n');
-      }
-
-      const tunes = tuneBody.split(/(?=^X:)/m).filter(t => t.trim().includes('X:'));
-      
-      if (tunes.length > 0) {
-        const selectedTune = tunes[Math.min(tuneIndex, tunes.length - 1)] || tunes[0];
-        targetAbc = globalHeader ? `${globalHeader}\n${selectedTune}` : selectedTune;
+      // Extract specific item (prepage or tune) based on tuneIndex
+      const items = parseAbcItems(abc);
+      if (items.length > 0) {
+        const selectedItem = items[Math.min(tuneIndex, items.length - 1)] || items[0];
+        targetAbc = selectedItem.abc;
       }
 
       // Add transpose directive if needed
@@ -166,6 +135,21 @@ export const Abc2svgRenderer: React.FC<Props> = ({
         } else {
           targetAbc = `%%transpose ${transpose}\n${targetAbc}`;
         }
+      }
+
+      // Inject tight top/bottom margin & spacing defaults for digital screen rendering unless explicitly defined
+      let defaultDirectives = '';
+      if (!/^\s*%%topmargin\b/m.test(targetAbc)) {
+        defaultDirectives += '%%topmargin 0cm\n';
+      }
+      if (!/^\s*%%topspace\b/m.test(targetAbc)) {
+        defaultDirectives += '%%topspace 0\n';
+      }
+      if (!/^\s*%%botmargin\b/m.test(targetAbc)) {
+        defaultDirectives += '%%botmargin 0cm\n';
+      }
+      if (defaultDirectives) {
+        targetAbc = `${defaultDirectives}${targetAbc}`;
       }
 
       let generatedSvg = '';
@@ -196,10 +180,17 @@ export const Abc2svgRenderer: React.FC<Props> = ({
   return (
     <div className="w-full relative flex flex-col items-center">
       <style>{`
+        .abc2svg-container {
+          width: 100%;
+        }
+        .abc2svg-container .nobrk {
+          width: 100%;
+        }
         .abc2svg-container svg {
           display: block;
-          max-width: 100%;
-          height: auto;
+          width: 100% !important;
+          max-width: 100% !important;
+          height: auto !important;
           margin: 0 auto;
         }
         /* Ensure dark mode contrast when embedded */
@@ -225,7 +216,7 @@ export const Abc2svgRenderer: React.FC<Props> = ({
 
       <div 
         ref={containerRef}
-        className="abc2svg-container w-full overflow-x-auto flex flex-col items-center justify-center min-h-[200px]"
+        className="abc2svg-container w-full overflow-x-auto flex flex-col items-center"
         dangerouslySetInnerHTML={{ __html: svgHtml }}
       />
     </div>

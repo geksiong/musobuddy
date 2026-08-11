@@ -50,7 +50,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { abc } from '../../lib/abcLanguage.ts';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { transposeAbc } from '../../lib/abcTransposer.ts';
-import { toAbcNoteName, generateMidiForAbc } from '../../lib/abcUtils.ts';
+import { toAbcNoteName, generateMidiForAbc, parseAbcItems } from '../../lib/abcUtils.ts';
 import { detectAbcRenderer } from '../../lib/abcDetector.ts';
 
 // Lazy load complex components
@@ -100,32 +100,11 @@ export default function ScoreView() {
   const getAbcTuneTitles = useCallback((abc: string) => {
     try {
       if (!abc || typeof abc !== 'string') return ['Tune 1'];
-      
-      // Filter out any lines starting with %% (directives/comments) ONLY before the first tune
-      let filteredAbc = abc;
-      const firstXMatch = filteredAbc.match(/^X:/m);
-      if (firstXMatch && firstXMatch.index !== undefined) {
-        const header = filteredAbc.substring(0, firstXMatch.index);
-        const rest = filteredAbc.substring(firstXMatch.index);
-        filteredAbc = header.replace(/^%%[^\n]*\n?/gm, '') + rest;
-      } else {
-        filteredAbc = filteredAbc.replace(/^%%[^\n]*\n?/gm, '');
+      const items = parseAbcItems(abc);
+      if (items.length > 0) {
+        return items.map(item => item.title);
       }
-      
-      // Split by X: at the start of a line to detect multiple tunes in a tunebook
-      const tunes = filteredAbc.split(/(?=^X:)/m).filter(t => t.trim().includes('X:'));
-      
-      if (tunes.length > 0) {
-        return tunes.map((tune, i) => {
-          const titleMatch = tune.match(/^T:\s*(.*)$/m);
-          return titleMatch ? titleMatch[1].trim() : `Tune ${i + 1}`;
-        });
-      }
-      
-      // Fallback to traditional parsing if splitting fails
-      const visualObjs = abcjs.renderAbc(document.createElement('div'), filteredAbc);
-      if (!visualObjs || !visualObjs.length) return ['Tune 1'];
-      return visualObjs.map((obj, i) => obj.metaText?.title || `Tune ${i + 1}`);
+      return ['Tune 1'];
     } catch (err) {
       console.error('Failed to parse ABC titles:', err);
       return ['Tune 1'];
@@ -541,7 +520,7 @@ function ScoreDisplay({
                       >
                         {getAbcTuneTitles(score.content as string).map((title, i) => (
                           <option key={i} value={i} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                            {i + 1}. {title}
+                            {title}
                           </option>
                         ))}
                       </select>

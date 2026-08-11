@@ -7,6 +7,138 @@ import * as abcjs from 'abcjs';
 import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 import { createMxlBlob } from './mxlUtils.ts';
 
+export interface AbcItem {
+  type: 'prepage' | 'tune';
+  pageLabel: string;
+  title: string;
+  abc: string;
+}
+
+/**
+ * Parses an ABC document into individual pages/items, supporting pre-tune metadata pages
+ * (e.g., 0.1, 0.2 separated by %%newpage directives before the first X:) and individual tunes.
+ */
+export function parseAbcItems(abc: string): AbcItem[] {
+  if (!abc || typeof abc !== 'string') return [];
+
+  const items: AbcItem[] = [];
+  const firstXMatch = abc.match(/^X:/m);
+  let preamble = '';
+  let tuneBody = abc;
+
+  if (firstXMatch && firstXMatch.index !== undefined) {
+    preamble = abc.substring(0, firstXMatch.index);
+    tuneBody = abc.substring(firstXMatch.index);
+  }
+
+  // Extract global formatting directives from preamble (e.g. %%scale, %%pageheight, %%pagewidth)
+  let globalDirectives = '';
+  if (preamble) {
+    const cleanedPreamble = preamble.replace(/%%begintext[\s\S]*?%%endtext/gi, '');
+    globalDirectives = cleanedPreamble
+      .split('\n')
+      .filter(line => {
+        const t = line.trim();
+        if (!t.startsWith('%%')) return false;
+        return !/^%%(begintext|endtext|text|center|title|subtitle|header|footer|eps|ps|postscript|newpage|pagebreak|vskip)\b/i.test(t);
+      })
+      .join('\n');
+  }
+
+  // Helper to extract a friendly title for prepages
+  const getPrepageTitle = (content: string, pageNum: string) => {
+    const lines = content.split('\n');
+    let inBeginText = false;
+
+    for (const rawLine of lines) {
+      const t = rawLine.trim();
+      if (!t) continue;
+
+      if (/^%%begintext\b/i.test(t)) {
+        inBeginText = true;
+        continue;
+      }
+      if (/^%%endtext\b/i.test(t)) {
+        inBeginText = false;
+        continue;
+      }
+
+      if (inBeginText) {
+        if (t.length < 50 && !t.startsWith('%')) {
+          return `${pageNum}: ${t}`;
+        }
+        continue;
+      }
+
+      if (/^%%center\b/i.test(t)) {
+        const title = t.replace(/^%%center\s*/i, '').trim();
+        if (title && title.length < 50) return `${pageNum}: ${title}`;
+      }
+      if (/^%%title\b/i.test(t)) {
+        const title = t.replace(/^%%title\s*/i, '').trim();
+        if (title && title.length < 50) return `${pageNum}: ${title}`;
+      }
+      if (/^%%text\b/i.test(t)) {
+        const title = t.replace(/^%%text\s*/i, '').trim();
+        if (title && title.length < 50) return `${pageNum}: ${title}`;
+      }
+
+      // Ignore any directive starting with %
+      if (t.startsWith('%')) continue;
+
+      // Plain text line before X:
+      if (!t.includes(':') && t.length < 50) {
+        return `${pageNum}: ${t}`;
+      }
+    }
+    return pageNum;
+  };
+
+  // Parse preamble for pre-tune metadata pages (e.g., 0.1, 0.2)
+  if (preamble.trim()) {
+    const rawPages = preamble.split(/^%%newpage\b|^%%pagebreak\b/m);
+
+    const hasVisualContent = (str: string) => {
+      return /%%vskip|%%begintext|%%text|%%center/i.test(str) ||
+        str.split('\n').some(l => {
+          const t = l.trim();
+          return t && !t.startsWith('%') && !t.includes(':');
+        });
+    };
+
+    if (rawPages.some(hasVisualContent)) {
+      rawPages.forEach((pageContent, idx) => {
+        if (hasVisualContent(pageContent)) {
+          const pageNum = `0.${idx + 1}`;
+          const title = getPrepageTitle(pageContent, pageNum);
+          items.push({
+            type: 'prepage',
+            pageLabel: pageNum,
+            title: title,
+            abc: pageContent
+          });
+        }
+      });
+    }
+  }
+
+  // Parse tunes
+  const tunes = tuneBody.split(/(?=^X:)/m).filter(t => t.trim().includes('X:'));
+  tunes.forEach((tuneStr, idx) => {
+    const titleMatch = tuneStr.match(/^T:\s*(.*)$/m);
+    const tuneTitle = titleMatch ? titleMatch[1].trim() : `Tune ${idx + 1}`;
+    const fullTuneAbc = globalDirectives.trim() ? `${globalDirectives.trim()}\n${tuneStr}` : tuneStr;
+    items.push({
+      type: 'tune',
+      pageLabel: `${idx + 1}`,
+      title: `${idx + 1}. ${tuneTitle}`,
+      abc: fullTuneAbc
+    });
+  });
+
+  return items;
+}
+
 /**
  * Converts scientific pitch notation (e.g. E2, A2, D3, G3, B3, E4, Gb3, F#4, C4, E5)
  * into standard ABC note names (e.g. E,, A,, D, G, B, e, _G, ^f, c, e').
@@ -67,20 +199,9 @@ export function generateMidiForAbc(abc: string, tuneIndex: number = 0, transpose
   try {
     if (!abc || typeof abc !== 'string') return null;
     
-    // Filter out any lines starting with %% (directives/comments) ONLY before the first tune
-    let filteredAbc = abc;
-    const firstXMatch = filteredAbc.match(/^X:/m);
-    if (firstXMatch && firstXMatch.index !== undefined) {
-      const header = filteredAbc.substring(0, firstXMatch.index);
-      const rest = filteredAbc.substring(firstXMatch.index);
-      filteredAbc = header.replace(/^%%[^\n]*\n?/gm, '') + rest;
-    } else {
-      filteredAbc = filteredAbc.replace(/^%%[^\n]*\n?/gm, '');
-    }
-    
-    // Split into individual tunes to be more robust for tunebooks
-    const tunes = filteredAbc.split(/(?=^X:)/m).filter(t => t.trim().includes('X:'));
-    const targetAbc = tunes.length > tuneIndex ? tunes[tuneIndex] : filteredAbc;
+    const items = parseAbcItems(abc);
+    const targetItem = items.length > tuneIndex ? items[tuneIndex] : null;
+    const targetAbc = targetItem ? targetItem.abc : abc;
     
     const div = document.createElement('div');
     const visualObjs = abcjs.renderAbc(div, targetAbc, {
