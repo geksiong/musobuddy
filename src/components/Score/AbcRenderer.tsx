@@ -107,7 +107,7 @@ const AbcjsRenderer: React.FC<Props> = ({
           startingTune: 0, // Target ABC is sliced to single tune, so index is always 0
           visualTranspose: transpose,
           add_classes: true,
-          staffwidth: 800 * zoom,
+          staffwidth: 800 / zoom,
           scale: zoom,
         };
 
