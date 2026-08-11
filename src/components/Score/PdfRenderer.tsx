@@ -14,8 +14,8 @@ import { PdfAnnotationLayer } from './PdfAnnotationLayer';
 import { AnnotationSidebar } from './AnnotationSidebar';
 import { Annotation, AnnotationState } from './annotationTypes';
 
-// Set worker source using unpkg which is more reliable for specific versions
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Set worker source using local same-origin assets
+pdfjs.GlobalWorkerOptions.workerSrc = `/pdfjs/build/pdf.worker.min.mjs`;
 
 interface PdfRendererProps {
   url: string;
@@ -136,7 +136,15 @@ export default function PdfRenderer({
     const loadPdf = async () => {
       if (!url) return;
       try {
-        loadingTask = pdfjs.getDocument(url);
+        loadingTask = pdfjs.getDocument({
+          url,
+          cMapUrl: '/pdfjs/cmaps/',
+          cMapPacked: true,
+          standardFontDataUrl: '/pdfjs/standard_fonts/',
+          wasmUrl: '/pdfjs/wasm/',
+          iccUrl: '/pdfjs/iccs/',
+          isEvalSupported: true,
+        } as any);
         const pdf = await loadingTask.promise;
         if (isMounted) {
           setPdfProxy(pdf);
@@ -144,7 +152,20 @@ export default function PdfRenderer({
         }
       } catch (error: any) {
         if (isMounted && error?.name !== 'WorkerDestroyedException' && !error?.message?.includes('Worker was destroyed')) {
-          console.error('Error loading PDF:', error);
+          console.error('Error loading PDF with WASM options:', error);
+          // Fallback to basic getDocument call if advanced options fail
+          try {
+            loadingTask = pdfjs.getDocument({ url });
+            const pdf = await loadingTask.promise;
+            if (isMounted) {
+              setPdfProxy(pdf);
+              setNumPages(pdf.numPages);
+            }
+          } catch (fallbackError: any) {
+            if (isMounted && fallbackError?.name !== 'WorkerDestroyedException') {
+              console.error('Fallback Error loading PDF:', fallbackError);
+            }
+          }
         }
       }
     };
@@ -402,16 +423,57 @@ function PdfPage({
   onRemoveAnnotation,
   onSelectAnnotation,
 }: PdfPageProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<any>(null);
   const [loading, setLoading] = useState(true);
-  const [dims, setDims] = useState<{ width: number; height: number }>({ width: 1000, height: 1400 });
+  const [isVisible, setIsVisible] = useState(pageNum === 1);
+  const [dims, setDims] = useState<{ width: number; height: number }>({ width: 800, height: 1130 });
+
+  // IntersectionObserver to lazy render pages as they scroll into view
+  useEffect(() => {
+    if (isVisible) return;
+
+    const el = containerRef.current;
+    if (!el) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: '800px 0px',
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isVisible]);
 
   useEffect(() => {
+    if (!isVisible) return;
+
     let active = true;
 
     const renderPage = async () => {
       try {
+        if (renderTaskRef.current) {
+          try {
+            renderTaskRef.current.cancel();
+          } catch {
+            // ignore
+          }
+          renderTaskRef.current = null;
+        }
+
         const page = await pdf.getPage(pageNum);
         if (!active) return;
         
@@ -419,17 +481,8 @@ function PdfPage({
         const canvas = canvasRef.current;
         if (!canvas || !active) return;
 
-        const context = canvas.getContext('2d');
+        const context = canvas.getContext('2d', { alpha: false });
         if (!context || !active) return;
-
-        // Ensure any previous task on this canvas is cancelled
-        if (renderTaskRef.current) {
-          try {
-            await renderTaskRef.current.cancel();
-          } catch (e) {
-            // Error is expected if already cancelled
-          }
-        }
 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
@@ -440,11 +493,15 @@ function PdfPage({
           viewport: viewport,
         };
 
-        renderTaskRef.current = page.render(renderContext);
+        const renderTask = page.render(renderContext);
+        renderTaskRef.current = renderTask;
         
         try {
-          await renderTaskRef.current.promise;
-          if (active) setLoading(false);
+          await renderTask.promise;
+          if (active) {
+            setLoading(false);
+            renderTaskRef.current = null;
+          }
         } catch (error: any) {
           if (error?.name !== 'RenderingCancelledException' && !error?.message?.includes('Worker was destroyed')) {
             console.error('Error rendering page:', error);
@@ -462,15 +519,26 @@ function PdfPage({
     return () => {
       active = false;
       if (renderTaskRef.current) {
-        renderTaskRef.current.cancel();
+        try {
+          renderTaskRef.current.cancel();
+        } catch {
+          // ignore
+        }
+        renderTaskRef.current = null;
       }
     };
-  }, [pdf, pageNum]);
+  }, [pdf, pageNum, isVisible]);
 
   return (
     <div 
+      ref={containerRef}
       id={`pdf-page-${pageNum}`}
-      className="relative rounded-2xl shadow-2xl overflow-hidden bg-white border border-white/10 group transition-all duration-300"
+      style={{
+        width: dims.width ? `${dims.width}px` : '800px',
+        maxWidth: '100%',
+        aspectRatio: loading ? `${dims.width} / ${dims.height}` : undefined,
+      }}
+      className="relative rounded-2xl shadow-2xl overflow-hidden bg-white border border-white/10 group transition-all duration-300 min-h-[300px]"
     >
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/5 backdrop-blur-sm animate-pulse z-10">

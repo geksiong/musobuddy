@@ -30,7 +30,7 @@
     "midi-player-js": "^2.0.17",
     "motion": "^12.23.24",
     "opensheetmusicdisplay": "2.1.2",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.2.108",
     "pitchy": "^4.1.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
