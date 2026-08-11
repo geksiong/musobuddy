@@ -653,6 +653,13 @@ function ScoreDisplay({
                 </button>
               )}
 
+              {/* Header Extra Slot (Annotation Toolbar for PDF) - now on the same row */}
+              {headerExtra && (
+                <div className="flex-1 min-w-0 flex items-center">
+                  {headerExtra}
+                </div>
+              )}
+
               {/* ABC Specific Controls */}
               {score.format === ScoreFormat.ABC && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
@@ -839,13 +846,6 @@ function ScoreDisplay({
               )}
             </div>
           </div>
-
-          {/* Header Extra Slot (Annotation Toolbar for PDF) */}
-          {headerExtra && (
-            <div className="pt-1.5 border-t border-black/5 dark:border-white/10 min-w-0 w-full">
-              {headerExtra}
-            </div>
-          )}
         </div>
       )}
       {/* Rendering Area */}

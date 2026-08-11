@@ -190,7 +190,7 @@ export function AnnotationToolbar({
       {/* COMPACT COLLAPSED VIEW */}
       {isCollapsed ? (
         <div className={cn(
-          "px-3 py-1.5 rounded-full border backdrop-blur-xl flex items-center gap-2 shadow-xl transition-all w-max mx-auto",
+          "px-3 py-1.5 rounded-full border backdrop-blur-xl flex items-center gap-2 shadow-xl transition-all w-max",
           resolvedTheme === 'dark' 
             ? "bg-[#18181b]/95 border-white/15 text-white" 
             : "bg-white/95 border-black/10 text-slate-900"
