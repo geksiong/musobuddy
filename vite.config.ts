@@ -4,41 +4,66 @@ import path from 'path';
 import fs from 'fs';
 import {defineConfig, loadEnv, Plugin} from 'vite';
 
-function pdfjsAssetsPlugin(): Plugin {
+function staticAssetsPlugin(): Plugin {
   const pdfjsDir = path.resolve(__dirname, 'node_modules/pdfjs-dist');
   const publicPdfjsDir = path.resolve(__dirname, 'public/pdfjs');
+  const alphatabDir = path.resolve(__dirname, 'node_modules/@coderline/alphatab/dist');
+  const publicAlphatabDir = path.resolve(__dirname, 'public/alphatab');
 
-  function copyPdfjsFiles() {
-    if (!fs.existsSync(pdfjsDir)) return;
-    const targets = [
-      { src: 'build/pdf.worker.min.mjs', dest: 'build/pdf.worker.min.mjs' },
-      { src: 'wasm', dest: 'wasm' },
-      { src: 'cmaps', dest: 'cmaps' },
-      { src: 'standard_fonts', dest: 'standard_fonts' },
-      { src: 'iccs', dest: 'iccs' },
-    ];
+  function copyAssets() {
+    // Copy PDF.js assets
+    if (fs.existsSync(pdfjsDir)) {
+      const targets = [
+        { src: 'build/pdf.worker.min.mjs', dest: 'build/pdf.worker.min.mjs' },
+        { src: 'wasm', dest: 'wasm' },
+        { src: 'cmaps', dest: 'cmaps' },
+        { src: 'standard_fonts', dest: 'standard_fonts' },
+        { src: 'iccs', dest: 'iccs' },
+      ];
 
-    for (const target of targets) {
-      const srcPath = path.join(pdfjsDir, target.src);
-      const destPath = path.join(publicPdfjsDir, target.dest);
-      if (fs.existsSync(srcPath)) {
-        fs.mkdirSync(path.dirname(destPath), { recursive: true });
-        if (fs.statSync(srcPath).isDirectory()) {
-          fs.cpSync(srcPath, destPath, { recursive: true });
-        } else {
-          fs.copyFileSync(srcPath, destPath);
+      for (const target of targets) {
+        const srcPath = path.join(pdfjsDir, target.src);
+        const destPath = path.join(publicPdfjsDir, target.dest);
+        if (fs.existsSync(srcPath)) {
+          fs.mkdirSync(path.dirname(destPath), { recursive: true });
+          if (fs.statSync(srcPath).isDirectory()) {
+            fs.cpSync(srcPath, destPath, { recursive: true });
+          } else {
+            fs.copyFileSync(srcPath, destPath);
+          }
+        }
+      }
+    }
+
+    // Copy AlphaTab font and soundfont assets
+    if (fs.existsSync(alphatabDir)) {
+      const alphatabTargets = [
+        { src: 'font', dest: 'font' },
+        { src: 'soundfont', dest: 'soundfont' },
+      ];
+
+      for (const target of alphatabTargets) {
+        const srcPath = path.join(alphatabDir, target.src);
+        const destPath = path.join(publicAlphatabDir, target.dest);
+        if (fs.existsSync(srcPath)) {
+          fs.mkdirSync(path.dirname(destPath), { recursive: true });
+          if (fs.statSync(srcPath).isDirectory()) {
+            fs.cpSync(srcPath, destPath, { recursive: true });
+          } else {
+            fs.copyFileSync(srcPath, destPath);
+          }
         }
       }
     }
   }
 
   return {
-    name: 'pdfjs-assets-plugin',
+    name: 'static-assets-plugin',
     buildStart() {
-      copyPdfjsFiles();
+      copyAssets();
     },
     configureServer() {
-      copyPdfjsFiles();
+      copyAssets();
     }
   };
 }
@@ -46,7 +71,7 @@ function pdfjsAssetsPlugin(): Plugin {
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    plugins: [react(), tailwindcss(), pdfjsAssetsPlugin()],
+    plugins: [react(), tailwindcss(), staticAssetsPlugin()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

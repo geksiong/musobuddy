@@ -56,6 +56,7 @@ import { detectAbcRenderer } from '../../lib/abcDetector.ts';
 // Lazy load complex components
 const PdfRenderer = React.lazy(() => import('./PdfRenderer'));
 const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer'));
+const GuitarProRenderer = React.lazy(() => import('./GuitarProRenderer'));
 
 export default function ScoreView() {
   const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore, playbackTime, isDistractionFree, toggleDistractionFree } = useScores();
@@ -328,6 +329,7 @@ function ScoreIcon({ format }: { format: ScoreFormat }) {
   switch (format) {
     case ScoreFormat.ABC: return <FileCode className="w-4 h-4" />;
     case ScoreFormat.Image: return <ImageIcon className="w-4 h-4" />;
+    case ScoreFormat.GuitarPro: return <Music className="w-4 h-4 text-orange-500" />;
     default: return <FileText className="w-4 h-4" />;
   }
 }
@@ -632,7 +634,11 @@ function ScoreDisplay({
               <div className="flex items-center gap-2 shrink-0">
                 <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
                 <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-                  {score.format === ScoreFormat.MusicXML ? (score.isMxl ? 'MUSICXML (.MXL)' : 'MUSICXML (.XML)') : `${score.format} MODE`}
+                  {score.format === ScoreFormat.MusicXML 
+                    ? (score.isMxl ? 'MUSICXML (.MXL)' : 'MUSICXML (.XML)') 
+                    : score.format === ScoreFormat.GuitarPro 
+                      ? 'GUITAR PRO / TAB' 
+                      : `${score.format} MODE`}
                 </span>
               </div>
 
@@ -850,14 +856,14 @@ function ScoreDisplay({
       )}
       {/* Rendering Area */}
       <div className={cn("flex-1 relative", score.format === ScoreFormat.PDF ? "p-0" : "p-4 sm:p-8 pb-4 sm:pb-6")}>
-        {((score.format === ScoreFormat.PDF || score.format === ScoreFormat.Image) && !score.content) ? (
+        {((score.format === ScoreFormat.PDF || score.format === ScoreFormat.Image || (score.format === ScoreFormat.GuitarPro && !score.content)) && !score.content) ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-12">
             <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-6", resolvedTheme === 'dark' ? "bg-white/5 text-white/20" : "bg-slate-100 text-slate-300")}>
               <Upload className="w-8 h-8" />
             </div>
             <h2 className={cn("text-xl font-black uppercase tracking-tighter italic mb-2", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>File session expired</h2>
             <p className={cn("text-xs uppercase font-bold tracking-widest max-w-xs leading-relaxed", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-              Cloud-less sessions expire on reload for PDF and Image files. Please re-upload your document.
+              Cloud-less sessions expire on reload for PDF, Image, and uploaded binary files. Please re-upload your document.
             </p>
             <button 
               className="mt-8 px-6 py-3 bg-orange-500 text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-orange-400 transition-colors"
@@ -966,6 +972,14 @@ function ScoreDisplay({
                 <MusicXmlRenderer 
                   xml={score.content as string} 
                   zoom={score.zoom || 1}
+                />
+              )}
+
+              {score.format === ScoreFormat.GuitarPro && (
+                <GuitarProRenderer 
+                  data={score.content as string}
+                  zoom={score.zoom || 1}
+                  scoreTitle={score.title}
                 />
               )}
             </div>

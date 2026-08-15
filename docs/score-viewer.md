@@ -9,7 +9,8 @@ The **Score Viewer** module is one of MusoBuddy's central features. It renders s
 | Format | Renderer Component | Underlying Library | Key Features |
 | :--- | :--- | :--- | :--- |
 | **ABC Notation** | `AbcRenderer.tsx` | `abcjs` | Dynamic notation, inline editing, TAB generation, transpose, MIDI playback sync |
-| **MusicXML** | `MusicXmlRenderer.tsx` | `OpenSheetMusicDisplay` (OSMD) | Standard XML music scores, multi-staff rendering, auto-layout |
+| **Guitar Pro / AlphaTex** | `GuitarProRenderer.tsx` | `@coderline/alphatab` | `.gp`, `.gp3`, `.gp4`, `.gp5`, `.gpx`, `.ptb`, multi-track mixer, soundfont playback, TAB/standard view toggle |
+| **MusicXML** | `MusicXmlRenderer.tsx` | `OpenSheetMusicDisplay` (OSMD) | Standard XML music scores, compressed `.mxl` support, multi-staff rendering, auto-layout |
 | **PDF Documents** | `PdfRenderer.tsx` | `pdfjs-dist` | Page-by-page rendering, zoom controls, responsive canvas rendering |
 
 ---

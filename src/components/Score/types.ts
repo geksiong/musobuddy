@@ -8,7 +8,8 @@ export enum ScoreFormat {
   PDF = 'pdf',
   ABC = 'abc',
   Text = 'text',
-  MusicXML = 'musicxml'
+  MusicXML = 'musicxml',
+  GuitarPro = 'guitarpro'
 }
 
 export interface ScoreData {

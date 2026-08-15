@@ -188,7 +188,7 @@ export default function App() {
                 ref={fileInputRef} 
                 className="hidden" 
                 multiple 
-                accept=".abc,.txt,.pdf,.xml,.musicxml,.mxl,image/*,audio/*"
+                accept=".abc,.txt,.pdf,.xml,.musicxml,.mxl,.gp,.gp3,.gp4,.gp5,.gpx,.ptb,image/*,audio/*"
                 onChange={handleHeaderFileChange}
               />
 
@@ -246,6 +246,26 @@ export default function App() {
                         <div>
                           <div className="text-xs font-black uppercase tracking-tight">ABC Score</div>
                           <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">Notation</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          createScore(ScoreFormat.GuitarPro);
+                          setCurrentView('score');
+                          setIsNewScoreOpen(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left group",
+                          resolvedTheme === 'dark' ? "hover:bg-white/10" : "hover:bg-slate-100"
+                        )}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                          <Music className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-tight">Guitar Tab</div>
+                          <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">AlphaTex / GP</div>
                         </div>
                       </button>
 

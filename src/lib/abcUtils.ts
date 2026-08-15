@@ -276,9 +276,9 @@ export async function exportScore(score: ScoreData | null | undefined, saveAsMxl
   let mimeType = 'text/plain';
   let fileName = '';
 
-  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text) {
+  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text || (score.format === ScoreFormat.GuitarPro && typeof score.content === 'string' && !score.content.startsWith('blob:') && !score.content.startsWith('http'))) {
     content = score.content as string;
-    const ext = score.format === ScoreFormat.ABC ? 'abc' : 'txt';
+    const ext = score.format === ScoreFormat.ABC ? 'abc' : score.format === ScoreFormat.GuitarPro ? 'gp' : 'txt';
     fileName = `${score.title || 'score'}.${ext}`;
   } else {
     const fileUrl = Array.isArray(score.content) ? score.content[0] : (score.content as string);
@@ -286,7 +286,11 @@ export async function exportScore(score: ScoreData | null | undefined, saveAsMxl
     
     const link = document.createElement('a');
     link.href = fileUrl;
-    link.download = score.title || 'score';
+    let downloadName = score.title || 'score';
+    if (score.format === ScoreFormat.GuitarPro && !downloadName.match(/\.(gp\d?|gpx|ptb)$/i)) {
+      downloadName = `${downloadName}.gp`;
+    }
+    link.download = downloadName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

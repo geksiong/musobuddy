@@ -109,6 +109,23 @@ K: D
     selectedTuneIndex: 0,
     transpose: 0,
     abcRenderer: 'auto'
+  },
+  {
+    id: 'canon-in-d-tab',
+    title: "Canon in D (Fingerstyle Guitar Tab)",
+    format: ScoreFormat.GuitarPro,
+    content: `\\title "Canon in D"
+\\artist "Johann Pachelbel"
+\\tempo 80
+.
+\\track "Acoustic Guitar" "acoustic_guitar_steel"
+\\tuning e4 b3 g3 d3 a2 e2
+:4. 2.1 0.1 3.2 2.2 | 0.2 3.3 2.3 0.3 | 2.4 0.4 3.5 2.5 | 0.5 3.6 2.6 0.6 |
+:8 2.1 3.1 5.1 3.1 2.1 0.1 3.2 2.2 | 0.2 2.2 3.2 0.2 3.3 2.3 0.3 2.3 | 2.4 3.4 5.4 3.4 2.4 0.4 3.5 2.5 | 0.5 2.5 3.5 0.5 3.6 2.6 0.6 2.6`,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    viewMode: 'scroll',
+    selectedTuneIndex: 0
   }
 ];
 
@@ -191,6 +208,14 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
     if (format === ScoreFormat.ABC) {
       title = 'New ABC Score';
       initialContent = 'X:1\nT:New ABC Score\nM:4/4\nK:C\nC D E F | G A B c |';
+    } else if (format === ScoreFormat.GuitarPro) {
+      title = 'New Guitar Tab';
+      initialContent = `\\title "New Guitar Tab"
+\\tempo 120
+.
+\\track "Acoustic Guitar" "acoustic_guitar_steel"
+\\tuning e4 b3 g3 d3 a2 e2
+:4. 0.3 2.3 0.2 1.2 | 0.3 2.3 0.2 1.2 | 3.2 1.2 0.2 2.3 | 0.3 2.3 0.2 1.2`;
     } else if (format === ScoreFormat.Text) {
       title = 'New Text Sheet';
       initialContent = '';
@@ -283,6 +308,9 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
           alert(`Error reading compressed MusicXML file (${file.name}): ${err instanceof Error ? err.message : String(err)}`);
           continue;
         }
+      } else if (['gp', 'gp3', 'gp4', 'gp5', 'gpx', 'ptb'].includes(ext || '')) {
+        format = ScoreFormat.GuitarPro;
+        content = URL.createObjectURL(file);
       } else if (ext === 'txt') {
         format = ScoreFormat.Text;
         content = await file.text();
@@ -359,7 +387,7 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
     const scoresToSave = scores.map(s => ({
       ...s,
       // Clear blob URLs on save to prevent attempting to load dead blobs
-      content: (s.format === 'pdf' || s.format === 'image') ? '' : s.content,
+      content: (s.format === 'pdf' || s.format === 'image' || (s.format === 'guitarpro' && typeof s.content === 'string' && s.content.startsWith('blob:'))) ? '' : s.content,
       audioUrl: '' 
     }));
     localStorage.setItem('studio_buddy_scores', JSON.stringify(scoresToSave));
