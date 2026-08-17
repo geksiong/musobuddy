@@ -52,6 +52,7 @@ import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { transposeAbc } from '../../lib/abcTransposer.ts';
 import { toAbcNoteName, generateMidiForAbc, parseAbcItems } from '../../lib/abcUtils.ts';
 import { detectAbcRenderer } from '../../lib/abcDetector.ts';
+import ScoreErrorBoundary from './ScoreErrorBoundary.tsx';
 
 // Lazy load complex components
 const PdfRenderer = React.lazy(() => import('./PdfRenderer'));
@@ -70,11 +71,6 @@ export default function ScoreView() {
 
     const newContent = transposeAbc(score.content as string, semitones);
     
-    // Cleanup old blob if it was generated
-    if (score.audioUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(score.audioUrl);
-    }
-
     const targetTuneIndex = score.selectedTuneIndex || 0;
     const targetTranspose = (score.transpose || 0) + semitones;
     // We pass 0 here because newContent is already transposed via transposeAbc
@@ -249,11 +245,6 @@ export default function ScoreView() {
         const transposeChanged = s.format === ScoreFormat.ABC && updates.transpose !== undefined && updates.transpose !== s.transpose;
 
         if (contentChanged || tuneChanged || transposeChanged) {
-          // Cleanup old blob if it was generated
-          if (s.audioUrl?.startsWith('blob:')) {
-            URL.revokeObjectURL(s.audioUrl);
-          }
-
           const targetTuneIndex = updates.selectedTuneIndex !== undefined ? updates.selectedTuneIndex : (s.selectedTuneIndex || 0);
           const targetTranspose = updates.transpose !== undefined ? updates.transpose : (s.transpose || 0);
           const midiUrl = generateMidiForAbc(updated.content as string, targetTuneIndex, targetTranspose);
@@ -307,9 +298,6 @@ export default function ScoreView() {
                     activeScore.transpose || 0
                   );
                   if (midiUrl) {
-                    if (activeScore.audioUrl?.startsWith('blob:')) {
-                      URL.revokeObjectURL(activeScore.audioUrl);
-                    }
                     updateActiveScore({
                       audioUrl: midiUrl,
                       audioName: `${activeScore.title || 'score'}.mid`
@@ -381,19 +369,32 @@ function ScoreDisplay({
   }, [score?.id, score?.format]);
 
   useEffect(() => {
+    let animationFrameId: number | null = null;
     const updateMetrics = () => {
-      if (headerRef.current) {
-        setHeaderHeight(headerRef.current.offsetHeight);
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
       }
-      if (scoreViewRef.current) {
-        setScoreViewHeight(scoreViewRef.current.clientHeight);
-      }
+      animationFrameId = requestAnimationFrame(() => {
+        if (headerRef.current) {
+          const h = headerRef.current.offsetHeight;
+          setHeaderHeight(prev => (prev !== h ? h : prev));
+        }
+        if (scoreViewRef.current) {
+          const ch = scoreViewRef.current.clientHeight;
+          setScoreViewHeight(prev => (prev !== ch ? ch : prev));
+        }
+      });
     };
     updateMetrics();
     const observer = new ResizeObserver(updateMetrics);
     if (headerRef.current) observer.observe(headerRef.current);
     if (scoreViewRef.current) observer.observe(scoreViewRef.current);
-    return () => observer.disconnect();
+    return () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      observer.disconnect();
+    };
   }, [headerExtra, score?.format, score?.id]);
 
   return (
@@ -969,18 +970,29 @@ function ScoreDisplay({
               )}
 
               {score.format === ScoreFormat.MusicXML && (
-                <MusicXmlRenderer 
-                  xml={score.content as string} 
-                  zoom={score.zoom || 1}
-                />
+                <ScoreErrorBoundary fallbackTitle="MusicXML Score Error" key={score.id}>
+                  <MusicXmlRenderer 
+                    key={score.id}
+                    xml={score.content as string} 
+                    zoom={score.zoom || 1}
+                  />
+                </ScoreErrorBoundary>
               )}
 
               {score.format === ScoreFormat.GuitarPro && (
-                <GuitarProRenderer 
-                  data={score.content as string}
-                  zoom={score.zoom || 1}
-                  scoreTitle={score.title}
-                />
+                <ScoreErrorBoundary fallbackTitle="Guitar Pro Score Error" key={score.id}>
+                  <GuitarProRenderer 
+                    key={score.id}
+                    data={score.content as string}
+                    zoom={score.zoom || 1}
+                    scoreTitle={score.title}
+                    onMidiReady={(midiUrl, midiName) => {
+                      if (score.audioUrl !== midiUrl) {
+                        onUpdate({ audioUrl: midiUrl, audioName: midiName });
+                      }
+                    }}
+                  />
+                </ScoreErrorBoundary>
               )}
             </div>
           )}
