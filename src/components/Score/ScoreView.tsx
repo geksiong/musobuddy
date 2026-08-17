@@ -356,6 +356,12 @@ function ScoreDisplay({
 
   const viewMode = score.viewMode || 'scroll';
   const detectedResult = score.format === ScoreFormat.ABC ? detectAbcRenderer(score.content as string) : null;
+  const effectiveRenderer = score.abcRenderer && score.abcRenderer !== 'auto'
+    ? score.abcRenderer
+    : (detectedResult?.renderer || 'abcjs');
+  const abcItems = score.format === ScoreFormat.ABC ? parseAbcItems(score.content as string) : [];
+  const selectedAbcItem = abcItems[Math.min(score.selectedTuneIndex || 0, Math.max(0, abcItems.length - 1))];
+  const isAbc2svgEngine = selectedAbcItem?.type === 'prepage' || effectiveRenderer === 'abc2svg';
   const [headerExtra, setHeaderExtra] = useState<React.ReactNode | null>(null);
   const [sidebarState, setSidebarState] = useState<{ isOpen: boolean; toggle: () => void } | null>(null);
   const [headerHeight, setHeaderHeight] = useState<number>(112);
@@ -742,55 +748,60 @@ function ScoreDisplay({
                     </div>
                   </div>
 
-                  {/* Instrument Picker */}
-                  <div className="flex flex-col">
-                    <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Instrument</span>
-                    <select 
-                      value={score.tablature || 'none'}
-                      onChange={(e) => {
-                        const val = e.target.value as any;
-                        const defaultTuning = val !== 'none' ? TUNINGS[val]?.[0]?.value : [];
-                        onUpdate({ tablature: val, tuning: defaultTuning });
-                        e.target.blur();
-                        setTimeout(() => e.target.blur(), 0);
-                      }}
-                      className={cn(
-                        "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
-                        resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
-                      )}
-                    >
-                      <option value="none" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Score Only</option>
-                      <option value="guitar" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Guitar</option>
-                      <option value="ukulele" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Ukulele</option>
-                      <option value="mandolin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Mandolin</option>
-                      <option value="banjo" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Banjo</option>
-                      <option value="violin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Violin / Fiddle</option>
-                    </select>
-                  </div>
+                  {/* Instrument & Tuning Pickers (applicable only to abcjs renderer) */}
+                  {!isAbc2svgEngine && (
+                    <>
+                      {/* Instrument Picker */}
+                      <div className="flex flex-col">
+                        <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Instrument</span>
+                        <select 
+                          value={score.tablature || 'none'}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            const defaultTuning = val !== 'none' ? TUNINGS[val]?.[0]?.value : [];
+                            onUpdate({ tablature: val, tuning: defaultTuning });
+                            e.target.blur();
+                            setTimeout(() => e.target.blur(), 0);
+                          }}
+                          className={cn(
+                            "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
+                            resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
+                          )}
+                        >
+                          <option value="none" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Score Only</option>
+                          <option value="guitar" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Guitar</option>
+                          <option value="ukulele" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Ukulele</option>
+                          <option value="mandolin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Mandolin</option>
+                          <option value="banjo" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Banjo</option>
+                          <option value="violin" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>Violin / Fiddle</option>
+                        </select>
+                      </div>
 
-                  {/* Tuning Picker */}
-                  {score.tablature && score.tablature !== 'none' && (
-                    <div className="flex flex-col">
-                      <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tuning</span>
-                      <select 
-                        value={JSON.stringify((score.tuning || []).map(toAbcNoteName))}
-                        onChange={(e) => {
-                          onUpdate({ tuning: JSON.parse(e.target.value) });
-                          e.target.blur();
-                          setTimeout(() => e.target.blur(), 0);
-                        }}
-                        className={cn(
-                          "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
-                          resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
-                        )}
-                      >
-                        {(TUNINGS[score.tablature] || []).map((t, i) => (
-                          <option key={i} value={JSON.stringify(t.value)} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                      {/* Tuning Picker */}
+                      {score.tablature && score.tablature !== 'none' && (
+                        <div className="flex flex-col">
+                          <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Tuning</span>
+                          <select 
+                            value={JSON.stringify((score.tuning || []).map(toAbcNoteName))}
+                            onChange={(e) => {
+                              onUpdate({ tuning: JSON.parse(e.target.value) });
+                              e.target.blur();
+                              setTimeout(() => e.target.blur(), 0);
+                            }}
+                            className={cn(
+                              "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
+                              resolvedTheme === 'dark' ? "text-white/60" : "text-slate-500"
+                            )}
+                          >
+                            {(TUNINGS[score.tablature] || []).map((t, i) => (
+                              <option key={i} value={JSON.stringify(t.value)} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* Renderer Picker & Detector Status */}
