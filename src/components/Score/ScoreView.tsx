@@ -52,6 +52,8 @@ import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { transposeAbc } from '../../lib/abcTransposer.ts';
 import { toAbcNoteName, generateMidiForAbc, parseAbcItems } from '../../lib/abcUtils.ts';
 import { detectAbcRenderer } from '../../lib/abcDetector.ts';
+import { detectChordEngine } from '../../lib/chordSheetUtils.ts';
+import { ChordSheetRenderer } from './ChordSheetRenderer.tsx';
 import ScoreErrorBoundary from './ScoreErrorBoundary.tsx';
 
 // Lazy load complex components
@@ -67,26 +69,31 @@ export default function ScoreView() {
 
   const handleTransposeInternal = (semitones: number) => {
     const score = scores.find(s => s.id === activeScoreId);
-    if (!score || score.format !== ScoreFormat.ABC) return;
+    if (!score) return;
 
-    const newContent = transposeAbc(score.content as string, semitones);
-    
-    const targetTuneIndex = score.selectedTuneIndex || 0;
-    const targetTranspose = (score.transpose || 0) + semitones;
-    // We pass 0 here because newContent is already transposed via transposeAbc
-    const midiUrl = generateMidiForAbc(newContent, targetTuneIndex, 0);
+    if (score.format === ScoreFormat.ABC) {
+      const newContent = transposeAbc(score.content as string, semitones);
+      
+      const targetTuneIndex = score.selectedTuneIndex || 0;
+      const targetTranspose = (score.transpose || 0) + semitones;
+      // We pass 0 here because newContent is already transposed via transposeAbc
+      const midiUrl = generateMidiForAbc(newContent, targetTuneIndex, 0);
 
-    const updates: Partial<ScoreData> = { 
-      content: newContent,
-      transpose: targetTranspose
-    };
+      const updates: Partial<ScoreData> = { 
+        content: newContent,
+        transpose: targetTranspose
+      };
 
-    if (midiUrl) {
-      updates.audioUrl = midiUrl;
-      updates.audioName = `${score.title || 'score'}.mid`;
+      if (midiUrl) {
+        updates.audioUrl = midiUrl;
+        updates.audioName = `${score.title || 'score'}.mid`;
+      }
+
+      updateActiveScore(updates);
+    } else {
+      const targetTranspose = (score.transpose || 0) + semitones;
+      updateActiveScore({ transpose: targetTranspose });
     }
-
-    updateActiveScore(updates);
   };
 
   // Integration Contexts
@@ -318,6 +325,7 @@ function ScoreIcon({ format }: { format: ScoreFormat }) {
     case ScoreFormat.ABC: return <FileCode className="w-4 h-4" />;
     case ScoreFormat.Image: return <ImageIcon className="w-4 h-4" />;
     case ScoreFormat.GuitarPro: return <Music className="w-4 h-4 text-orange-500" />;
+    case ScoreFormat.ChordSheet: return <FileText className="w-4 h-4 text-[#FF4E00]" />;
     default: return <FileText className="w-4 h-4" />;
   }
 }
@@ -356,6 +364,9 @@ function ScoreDisplay({
 
   const viewMode = score.viewMode || 'scroll';
   const detectedResult = score.format === ScoreFormat.ABC ? detectAbcRenderer(score.content as string) : null;
+  const detectedChordResult = score.format === ScoreFormat.ChordSheet && typeof score.content === 'string' 
+    ? detectChordEngine(score.content) 
+    : null;
   const effectiveRenderer = score.abcRenderer && score.abcRenderer !== 'auto'
     ? score.abcRenderer
     : (detectedResult?.renderer || 'abcjs');
@@ -645,7 +656,9 @@ function ScoreDisplay({
                     ? (score.isMxl ? 'MUSICXML (.MXL)' : 'MUSICXML (.XML)') 
                     : score.format === ScoreFormat.GuitarPro 
                       ? 'GUITAR PRO / TAB' 
-                      : `${score.format} MODE`}
+                      : score.format === ScoreFormat.ChordSheet
+                        ? 'CHORD SHEET'
+                        : `${score.format} MODE`}
                 </span>
               </div>
 
@@ -862,6 +875,147 @@ function ScoreDisplay({
                   </button>
                 </div>
               )}
+
+              {/* ChordSheet Specific Controls */}
+              {score.format === ScoreFormat.ChordSheet && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
+                  {/* Engine Picker */}
+                  <div className="flex flex-col">
+                    <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Engine</span>
+                    <select 
+                      value={score.chordEngine || 'auto'}
+                      onChange={(e) => {
+                        onUpdate({ chordEngine: e.target.value as any });
+                        e.target.blur();
+                      }}
+                      className={cn(
+                        "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
+                        resolvedTheme === 'dark' ? "text-white/80" : "text-slate-700"
+                      )}
+                      title={
+                        score.chordEngine && score.chordEngine !== 'auto'
+                          ? `Manual engine choice: ${score.chordEngine}`
+                          : `Auto-detected: ${detectedChordResult?.engine} (${detectedChordResult?.reason})`
+                      }
+                    >
+                      <option value="auto" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        Auto ({detectedChordResult?.engine || 'chordsOverWords'})
+                      </option>
+                      <option value="chordsOverWords" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        Chords over words
+                      </option>
+                      <option value="ultimateGuitar" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        Ultimate Guitar
+                      </option>
+                      <option value="chordpro" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        ChordPro
+                      </option>
+                    </select>
+                  </div>
+
+                  {/* View Format Picker */}
+                  <div className="flex flex-col">
+                    <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>View Format</span>
+                    <select 
+                      value={score.chordFormat || 'html'}
+                      onChange={(e) => {
+                        onUpdate({ chordFormat: e.target.value as any });
+                        e.target.blur();
+                      }}
+                      className={cn(
+                        "bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer hover:text-orange-500 transition-colors",
+                        resolvedTheme === 'dark' ? "text-white/80" : "text-slate-700"
+                      )}
+                    >
+                      <option value="html" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        Formatted Sheet
+                      </option>
+                      <option value="chordpro" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        ChordPro Syntax
+                      </option>
+                      <option value="text" className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                        Plain Text
+                      </option>
+                    </select>
+                  </div>
+
+                  {/* Transpose Control */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col">
+                      <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Transpose</span>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => onTranspose(-1)}
+                          className={cn("p-1 hover:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}
+                          title="Transpose down 1 semitone"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </button>
+                        <select
+                          value={score.transpose || 0}
+                          onChange={(e) => {
+                            onTranspose(parseInt(e.target.value) - (score.transpose || 0));
+                            e.target.blur();
+                          }}
+                          className={cn(
+                            "bg-transparent text-[11px] font-black tabular-nums outline-none cursor-pointer hover:text-orange-500 transition-colors appearance-none",
+                            resolvedTheme === 'dark' ? "text-white/80" : "text-slate-700"
+                          )}
+                        >
+                          {Array.from({ length: 25 }, (_, i) => 12 - i).map(val => (
+                            <option key={val} value={val} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
+                              {val > 0 ? `+${val}` : val}
+                            </option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={() => onTranspose(1)}
+                          className={cn("p-1 hover:text-orange-500 transition-colors", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}
+                          title="Transpose up 1 semitone"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sharp / Flat Accidental Preference Toggle Button */}
+                  <div className="flex flex-col">
+                    <span className={cn("text-[7px] font-black uppercase tracking-widest opacity-30 mb-0.5", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>Accidentals</span>
+                    <button
+                      onClick={() => {
+                        const currentAcc = score.accidentalPreference || '#';
+                        const nextAcc = currentAcc === '#' ? 'b' : '#';
+                        onUpdate({ accidentalPreference: nextAcc });
+                      }}
+                      className={cn(
+                        "px-2.5 py-0.5 rounded-lg border text-[11px] font-mono font-black transition-all flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer",
+                        (score.accidentalPreference || '#') === '#'
+                          ? (resolvedTheme === 'dark' ? "bg-orange-500/20 border-orange-500/40 text-orange-400 hover:bg-orange-500/30" : "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100")
+                          : (resolvedTheme === 'dark' ? "bg-sky-500/20 border-sky-500/40 text-sky-400 hover:bg-sky-500/30" : "bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100")
+                      )}
+                      title={`Current modifier preference: ${(score.accidentalPreference || '#') === 'b' ? 'Flats (♭)' : 'Sharps (♯)'}. Click to toggle using chord.useModifier()`}
+                    >
+                      <span className="font-bold">{(score.accidentalPreference || '#') === '#' ? '♯ Sharps' : '♭ Flats'}</span>
+                    </button>
+                  </div>
+
+                  {/* Code Editor Toggle Button */}
+                  <button 
+                    onClick={() => onUpdate({ showEditor: !score.showEditor })}
+                    className={cn(
+                      "p-1.5 sm:p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0",
+                      score.showEditor 
+                        ? "bg-orange-500 border-orange-500 text-white font-bold" 
+                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900")
+                    )}
+                    title={score.showEditor ? "Hide Editor" : "Show Source Editor"}
+                  >
+                    <Layout className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{score.showEditor ? 'Hide' : 'Code'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -988,6 +1142,49 @@ function ScoreDisplay({
                     zoom={score.zoom || 1}
                   />
                 </ScoreErrorBoundary>
+              )}
+
+              {score.format === ScoreFormat.ChordSheet && (
+                <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto">
+                  {score.showEditor && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="relative group w-full"
+                    >
+                      <div className={cn("p-4 rounded-2xl border mb-2", resolvedTheme === 'dark' ? "bg-black/40 border-white/10" : "bg-slate-50 border-slate-200")}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-[#FF4E00]">
+                            Chord Sheet Editor
+                          </span>
+                          <span className="text-[9px] font-mono opacity-50 uppercase tracking-widest">
+                            Live Source Code
+                          </span>
+                        </div>
+                        <CodeMirror
+                          value={score.content as string}
+                          height="260px"
+                          theme={resolvedTheme === 'dark' ? vscodeDark : undefined}
+                          onChange={(val) => onUpdate({ content: val })}
+                          className="rounded-xl overflow-hidden border border-black/10 dark:border-white/10 text-xs sm:text-sm font-mono"
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+
+                  <ChordSheetRenderer
+                    content={score.content as string}
+                    enginePreference={score.chordEngine || 'auto'}
+                    formatType={score.chordFormat || 'html'}
+                    transpose={score.transpose || 0}
+                    accidentalPreference={score.accidentalPreference || '#'}
+                    zoom={score.zoom || 1}
+                    onEngineChange={(engine) => onUpdate({ chordEngine: engine })}
+                    onFormatChange={(fmt) => onUpdate({ chordFormat: fmt })}
+                    onAccidentalChange={(acc) => onUpdate({ accidentalPreference: acc })}
+                  />
+                </div>
               )}
 
               {score.format === ScoreFormat.GuitarPro && (

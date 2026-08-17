@@ -17,6 +17,7 @@
         "@vitejs/plugin-react": "^5.0.4",
         "abc2svg": "^1.22.1",
         "abcjs": "^6.6.3",
+        "chordsheetjs": "^15.6.2",
         "clsx": "^2.1.1",
         "dotenv": "^17.2.3",
         "express": "^4.21.2",
@@ -408,6 +409,8 @@
     "call-bound": ["call-bound@1.0.4", "", { "dependencies": { "call-bind-apply-helpers": "^1.0.2", "get-intrinsic": "^1.3.0" } }, "sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001791", "", {}, "sha512-yk0l/YSrOnFZk3UROpDLQD9+kC1l4meK/wed583AXrzoarMGJcbRi2Q4RaUYbKxYAsZ8sWmaSa/DsLmdBeI1vQ=="],
+
+    "chordsheetjs": ["chordsheetjs@15.6.2", "", { "peerDependencies": { "jspdf": "^4.0.0" }, "optionalPeers": ["jspdf"] }, "sha512-12pzwpsesDvpHX+UuNjCfVp7p91NL/7osY43Ix8HlytUq4s8YOgZqWlLGL1EjvfcB0sp2Dgj2jEs/4c4swF6xA=="],
 
     "chownr": ["chownr@3.0.0", "", {}, "sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g=="],
 

@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
 import { parseMxlFile } from '../lib/mxlUtils.ts';
+import { detectChordEngine } from '../lib/chordSheetUtils.ts';
 
 interface GlobalAudio {
   url: string;
@@ -126,6 +127,36 @@ K: D
     pan: { x: 0, y: 0 },
     viewMode: 'scroll',
     selectedTuneIndex: 0
+  },
+  {
+    id: 'hotel-california-chords',
+    title: "Hotel California (Chord Sheet)",
+    format: ScoreFormat.ChordSheet,
+    content: `{title: Hotel California}
+{artist: Eagles}
+{key: Bm}
+
+{comment: Intro}
+[Bm]  [F#7]  [A]  [E]  [G]  [D]  [Em]  [F#7]
+
+{verse: Verse 1}
+On a [Bm]dark desert highway, [F#7]cool wind in my hair
+[A]Warm smell of colitas, [E]rising up through the air
+[G]Up ahead in the distance, I [D]saw a shimmering light
+[Em]My head grew heavy and my sight grew dim, [F#7]I had to stop for the night
+
+{chorus}
+[G]Welcome to the Hotel Cali[D]fornia
+Such a [F#7]lovely place (Such a lovely place), Such a [Bm]lovely face
+[G]Plenty of room at the Hotel Cali[D]fornia
+Any [Em]time of year (Any time of year), You can [F#7]find it here
+`,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    viewMode: 'scroll',
+    chordEngine: 'auto',
+    chordFormat: 'html',
+    transpose: 0
   }
 ];
 
@@ -216,6 +247,19 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
 \\track "Acoustic Guitar" "acoustic_guitar_steel"
 \\tuning e4 b3 g3 d3 a2 e2
 :4. 0.3 2.3 0.2 1.2 | 0.3 2.3 0.2 1.2 | 3.2 1.2 0.2 2.3 | 0.3 2.3 0.2 1.2`;
+    } else if (format === ScoreFormat.ChordSheet) {
+      title = 'New Chord Sheet';
+      initialContent = `{title: New Song}
+{artist: Artist Name}
+{key: C}
+
+{verse: Verse 1}
+[C]Welcome to your [G]new chord sheet!
+[Am]Start typing chords in [F]brackets.
+
+{chorus}
+[C]Singing chords over [G]lyrics
+[Am]Or use chords over [F]words format!`;
     } else if (format === ScoreFormat.Text) {
       title = 'New Text Sheet';
       initialContent = '';
@@ -230,10 +274,13 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       zoom: 1,
       pan: { x: 0, y: 0 },
       viewMode: 'scroll',
-      showEditor: format === ScoreFormat.ABC,
+      showEditor: format === ScoreFormat.ABC || format === ScoreFormat.ChordSheet,
       selectedTuneIndex: 0,
       audioUrl: midiUrl || undefined,
-      audioName: midiUrl ? 'rendering.mid' : undefined
+      audioName: midiUrl ? 'rendering.mid' : undefined,
+      chordEngine: format === ScoreFormat.ChordSheet ? 'auto' : undefined,
+      chordFormat: format === ScoreFormat.ChordSheet ? 'html' : undefined,
+      transpose: 0
     };
 
     setScores(prev => [...prev, newScore]);
@@ -311,9 +358,18 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       } else if (['gp', 'gp3', 'gp4', 'gp5', 'gpx', 'ptb'].includes(ext || '')) {
         format = ScoreFormat.GuitarPro;
         content = URL.createObjectURL(file);
-      } else if (ext === 'txt') {
-        format = ScoreFormat.Text;
+      } else if (['pro', 'chordpro', 'chopro', 'crd', 'cho'].includes(ext || '')) {
+        format = ScoreFormat.ChordSheet;
         content = await file.text();
+      } else if (ext === 'txt') {
+        const text = await file.text();
+        const detected = detectChordEngine(text);
+        if (detected.engine === 'chordpro' || detected.engine === 'ultimateGuitar' || text.includes('[ch]')) {
+          format = ScoreFormat.ChordSheet;
+        } else {
+          format = ScoreFormat.Text;
+        }
+        content = text;
       } else {
         continue;
       }

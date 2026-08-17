@@ -276,9 +276,9 @@ export async function exportScore(score: ScoreData | null | undefined, saveAsMxl
   let mimeType = 'text/plain';
   let fileName = '';
 
-  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text || (score.format === ScoreFormat.GuitarPro && typeof score.content === 'string' && !score.content.startsWith('blob:') && !score.content.startsWith('http'))) {
+  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text || score.format === ScoreFormat.ChordSheet || (score.format === ScoreFormat.GuitarPro && typeof score.content === 'string' && !score.content.startsWith('blob:') && !score.content.startsWith('http'))) {
     content = score.content as string;
-    const ext = score.format === ScoreFormat.ABC ? 'abc' : score.format === ScoreFormat.GuitarPro ? 'gp' : 'txt';
+    const ext = score.format === ScoreFormat.ABC ? 'abc' : score.format === ScoreFormat.ChordSheet ? 'chordpro' : score.format === ScoreFormat.GuitarPro ? 'gp' : 'txt';
     fileName = `${score.title || 'score'}.${ext}`;
   } else {
     const fileUrl = Array.isArray(score.content) ? score.content[0] : (score.content as string);

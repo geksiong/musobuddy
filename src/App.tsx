@@ -188,7 +188,7 @@ export default function App() {
                 ref={fileInputRef} 
                 className="hidden" 
                 multiple 
-                accept=".abc,.txt,.pdf,.xml,.musicxml,.mxl,.gp,.gp3,.gp4,.gp5,.gpx,.ptb,image/*,audio/*"
+                accept=".abc,.txt,.pro,.chordpro,.chopro,.crd,.cho,.pdf,.xml,.musicxml,.mxl,.gp,.gp3,.gp4,.gp5,.gpx,.ptb,image/*,audio/*"
                 onChange={handleHeaderFileChange}
               />
 
@@ -266,6 +266,26 @@ export default function App() {
                         <div>
                           <div className="text-xs font-black uppercase tracking-tight">Guitar Tab</div>
                           <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">AlphaTex / GP</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          createScore(ScoreFormat.ChordSheet);
+                          setCurrentView('score');
+                          setIsNewScoreOpen(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left group",
+                          resolvedTheme === 'dark' ? "hover:bg-white/10" : "hover:bg-slate-100"
+                        )}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-red-500/20 text-[#FF4E00] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-tight">Chord Sheet</div>
+                          <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">ChordPro / Chords</div>
                         </div>
                       </button>
 

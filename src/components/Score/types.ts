@@ -9,7 +9,8 @@ export enum ScoreFormat {
   ABC = 'abc',
   Text = 'text',
   MusicXML = 'musicxml',
-  GuitarPro = 'guitarpro'
+  GuitarPro = 'guitarpro',
+  ChordSheet = 'chordsheet'
 }
 
 export interface ScoreData {
@@ -29,4 +30,7 @@ export interface ScoreData {
   tuning?: string[]; // Array of strings for string tunings e.g. ['E,', 'A,', 'D'...]
   isMxl?: boolean; // Indicates if MusicXML score is/was compressed .mxl format
   abcRenderer?: 'auto' | 'abcjs' | 'abc2svg'; // Renderer preference for ABC scores
+  chordEngine?: 'auto' | 'chordsOverWords' | 'ultimateGuitar' | 'chordpro'; // Renderer/Parser choice for ChordSheet
+  chordFormat?: 'html' | 'text' | 'chordpro'; // Output display format for ChordSheet
+  accidentalPreference?: '#' | 'b'; // Sharp (#) vs Flat (b) preference for ChordSheet
 }
