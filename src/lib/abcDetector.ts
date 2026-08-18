@@ -14,10 +14,11 @@ export interface AbcDetectionResult {
  */
 const ABCM2PS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
   // SVG / Postscript blocks
+  { pattern: /^%%beginps\b/m, description: '%%beginps PostScript block' },
+  { pattern: /^%%endps\b/m, description: '%%endps directive' },
   { pattern: /^%%beginsvg\b/m, description: '%%beginsvg block' },
   { pattern: /^%%endsvg\b/m, description: '%%endsvg block' },
   { pattern: /^%%ps\b/m, description: '%%ps Postscript directive' },
-  { pattern: /^%%endps\b/m, description: '%%endps directive' },
   { pattern: /^%%postscript\b/m, description: '%%postscript block' },
 
   // Text formatting blocks
@@ -86,6 +87,8 @@ const ABCM2PS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
   { pattern: /^%%writefields\b/m, description: '%%writefields directive' },
   { pattern: /^%%format\b/m, description: '%%format directive' },
   { pattern: /^%%jianpu\b/m, description: '%%jianpu notation directive' },
+  { pattern: /^%%tablature\b/m, description: '%%tablature notation directive' },
+  { pattern: /^%%tab\b/m, description: '%%tab notation directive' },
   { pattern: /^%%multicol\b/m, description: '%%multicol layout directive' },
   { pattern: /^%%splittune\b/m, description: '%%splittune directive' },
   { pattern: /^%%repbra\b/m, description: '%%repbra repeat bracket directive' },

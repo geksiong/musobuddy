@@ -116,12 +116,23 @@ function transposeKey(kLine: string, semitones: number): string {
 export function transposeAbc(abc: string, semitones: number): string {
   if (semitones === 0) return abc;
 
+  // Protect raw Postscript blocks (%%beginps ... %%endps) and SVG blocks (%%beginsvg ... %%endsvg) from transposition
+  const rawBlocks: string[] = [];
+  const protectedAbc = abc.replace(/%%beginps[\s\S]*?%%endps/gi, (match) => {
+    rawBlocks.push(match);
+    return `__RAW_PS_BLOCK_${rawBlocks.length - 1}__`;
+  }).replace(/%%beginsvg[\s\S]*?%%endsvg/gi, (match) => {
+    rawBlocks.push(match);
+    return `__RAW_PS_BLOCK_${rawBlocks.length - 1}__`;
+  });
+
   let currentSourceKey = 'C';
-  const initialKeyMatch = abc.match(/^K:\s*([A-G][#b]?m?)/m);
+  const initialKeyMatch = protectedAbc.match(/^K:\s*([A-G][#b]?m?)/m);
   if (initialKeyMatch) currentSourceKey = normalizeKey(initialKeyMatch[1]);
 
-  return abc.split('\n').map(line => {
+  const transposed = protectedAbc.split('\n').map(line => {
     const trimmed = line.trim();
+    if (trimmed.startsWith('__RAW_PS_BLOCK_')) return line;
     // Ignore pure comment lines or directive lines starting with % (e.g. %%jianpu 1, %%scale)
     if (trimmed.startsWith('%')) return line;
     // Ignore header field lines like T:, M:, L:, V:, Q:, P:, I:, etc. (except K:)
@@ -251,4 +262,10 @@ export function transposeAbc(abc: string, semitones: number): string {
 
     return musicPart + commentPart;
   }).join('\n');
+
+  // Restore protected Postscript / SVG blocks intact
+  return transposed.replace(/__RAW_PS_BLOCK_(\d+)__/g, (_, idxStr) => {
+    const idx = parseInt(idxStr, 10);
+    return rawBlocks[idx] || '';
+  });
 }

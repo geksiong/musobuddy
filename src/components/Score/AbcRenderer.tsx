@@ -119,6 +119,14 @@ const AbcjsRenderer: React.FC<Props> = ({
           targetAbc = selectedItem.abc;
         }
 
+        // abcjs does not support PostScript or raw SVG blocks.
+        // Strip them completely so abcjs does not try to parse Postscript code as music notation (which causes infinite loops)
+        targetAbc = targetAbc
+          .replace(/%%beginps[\s\S]*?%%endps/gi, '')
+          .replace(/%%beginsvg[\s\S]*?%%endsvg/gi, '')
+          .replace(/^%%ps\b.*$/gm, '')
+          .replace(/^%%postscript\b.*$/gm, '');
+
         // Clean up any existing %%tablature directives to prevent duplicate or invalid lines
         targetAbc = targetAbc.replace(/^%%tablature[^\n]*\n?/gm, '');
 

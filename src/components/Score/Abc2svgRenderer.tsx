@@ -180,8 +180,21 @@ export const Abc2svgRenderer: React.FC<Props> = ({
       };
 
       (window as any).user = userCallbacks;
-      const abcEngine = new (window as any).abc2svg.Abc(userCallbacks);
-      abcEngine.tosvg('score.abc', targetAbc);
+      let abcEngine = new (window as any).abc2svg.Abc(userCallbacks);
+      
+      try {
+        abcEngine.tosvg('score.abc', targetAbc);
+      } catch (psErr: any) {
+        console.warn('abc2svg PostScript execution failed, falling back to clean ABC notation:', psErr);
+        // Strip PostScript/SVG blocks as a safe fallback
+        const cleanAbc = targetAbc
+          .replace(/%%beginps[\s\S]*?%%endps/gi, '')
+          .replace(/%%beginsvg[\s\S]*?%%endsvg/gi, '');
+        generatedSvg = '';
+        userCallbacks.errmsg(`PostScript Warning: ${psErr?.message || 'Fallback to standard notation'}`, 1, 1);
+        abcEngine = new (window as any).abc2svg.Abc(userCallbacks);
+        abcEngine.tosvg('score.abc', cleanAbc);
+      }
 
       setSvgHtml(generatedSvg);
       setRenderErrors(errors);

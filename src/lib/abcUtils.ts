@@ -31,18 +31,41 @@ export function parseAbcItems(abc: string): AbcItem[] {
     tuneBody = abc.substring(firstXMatch.index);
   }
 
-  // Extract global formatting directives from preamble (e.g. %%scale, %%pageheight, %%pagewidth)
+  // Extract global formatting directives & Postscript blocks (%%beginps ... %%endps) from preamble
   let globalDirectives = '';
   if (preamble) {
-    const cleanedPreamble = preamble.replace(/%%begintext[\s\S]*?%%endtext/gi, '');
-    globalDirectives = cleanedPreamble
+    // Save raw Postscript (%%beginps ... %%endps) and SVG (%%beginsvg ... %%endsvg) blocks intact
+    const rawBlocks: string[] = [];
+    let tempPreamble = preamble.replace(/%%beginps[\s\S]*?%%endps/gi, (match) => {
+      rawBlocks.push(match);
+      return `__RAW_BLOCK_${rawBlocks.length - 1}__`;
+    }).replace(/%%beginsvg[\s\S]*?%%endsvg/gi, (match) => {
+      rawBlocks.push(match);
+      return `__RAW_BLOCK_${rawBlocks.length - 1}__`;
+    });
+
+    // Remove text blocks from preamble so they don't leak into tune header directives
+    tempPreamble = tempPreamble.replace(/%%begintext[\s\S]*?%%endtext/gi, '');
+
+    const directiveLines = tempPreamble
       .split('\n')
       .filter(line => {
         const t = line.trim();
+        if (t.startsWith('__RAW_BLOCK_')) return true;
         if (!t.startsWith('%%')) return false;
-        return !/^%%(begintext|endtext|text|center|title|subtitle|header|footer|eps|ps|postscript|newpage|pagebreak|vskip)\b/i.test(t);
+        return !/^%%(begintext|endtext|text|center|title|subtitle|header|footer|eps|newpage|pagebreak|vskip)\b/i.test(t);
       })
-      .join('\n');
+      .map(line => {
+        const t = line.trim();
+        if (t.startsWith('__RAW_BLOCK_')) {
+          const idx = parseInt(t.replace('__RAW_BLOCK_', '').replace('__', ''), 10);
+          return rawBlocks[idx] || '';
+        }
+        return line;
+      })
+      .filter(Boolean);
+
+    globalDirectives = directiveLines.join('\n');
   }
 
   // Helper to extract a friendly title for prepages
@@ -99,8 +122,14 @@ export function parseAbcItems(abc: string): AbcItem[] {
     const rawPages = preamble.split(/^%%newpage\b|^%%pagebreak\b/m);
 
     const hasVisualContent = (str: string) => {
-      return /%%vskip|%%begintext|%%text|%%center/i.test(str) ||
-        str.split('\n').some(l => {
+      // Strip raw Postscript (%%beginps ... %%endps) and SVG (%%beginsvg ... %%endsvg) blocks
+      // so raw code definitions before the first tune are not misidentified as visual text prepages
+      const cleaned = str
+        .replace(/%%beginps[\s\S]*?%%endps/gi, '')
+        .replace(/%%beginsvg[\s\S]*?%%endsvg/gi, '');
+
+      return /%%vskip|%%begintext|%%text|%%center/i.test(cleaned) ||
+        cleaned.split('\n').some(l => {
           const t = l.trim();
           return t && !t.startsWith('%') && !t.includes(':');
         });
