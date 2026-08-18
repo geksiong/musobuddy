@@ -1,6 +1,6 @@
 # Practice Tools Subsystem
 
-MusoBuddy provides five dedicated musical practice tools accessible via the top navigation header.
+MusoBuddy provides five dedicated musical practice modules and quick-access panels accessible via the top navigation header and bottom status bar.
 
 ---
 
@@ -9,7 +9,7 @@ MusoBuddy provides five dedicated musical practice tools accessible via the top 
 A high-precision timing engine designed for practice, scale work, and tempo training.
 
 ### Key Capabilities
-- **Tempo Range:** 30 BPM to 300 BPM with tap tempo support.
+- **Tempo Range:** 30 BPM to 300 BPM with tap tempo detection.
 - **Time Signatures:** 2/4, 3/4, 4/4, 6/8, 7/8, 9/8, 12/8.
 - **Subdivisions:** Quarter notes, 8ths, 16ths, Triplets, Swing 8ths.
 - **Accent Patterns:** Customizable beat weighting (Accent, Normal, Mute).
@@ -53,11 +53,21 @@ Visual chord reference tool for stringed instruments and piano.
 
 ---
 
-## 5. Accompaniment Player (`AccompanimentView.tsx`)
+## 5. Groove & Backing Accompaniment Engine (`AccompanimentView.tsx` & `GrooveEnginePanel.tsx`)
 
-Interactive backing track player with chord chart synchronization.
+A real-time Web Audio accompaniment synthesizer that generates dynamic drum patterns, basslines, and chord rhythms.
 
 ### Key Capabilities
-- **Backing Track Audio:** Plays custom or preset audio tracks with pitch shifting and tempo scaling.
-- **Chord Progression Tracker:** Highlights the current active bar/chord in real time.
-- **Mix Control:** Separate volume controls for lead score and backing tracks.
+- **Arrangement Styles:** Jazz Swing, Bossa Nova, Pop Rhythm, Hard Rock, Funk Groove, Reggae Bounce, Slow Ballad.
+- **Custom Chord Progressions:** Edit measures, pick root/quality combinations, and explore progression presets (`progressionPresets.ts`).
+- **Chord Suggestions Engine:** Intelligent next-chord recommendation based on harmonic voice leading (`chordSuggestions.ts`).
+- **Song Library:** Pre-loaded standard chord progressions and backing songs (`songLibrary.ts`).
+- **Real-Time Mix & Swing Control:** Adjust tempo (40–240 BPM), swing feel percentage, master volume, and individual stem levels (Drums, Bass, Chords).
+
+---
+
+## 6. Quick Practice Tools Panel & About Modal (`PracticeToolsPanel.tsx` & `AboutModal.tsx`)
+
+- **Practice Tools Panel:** A slide-out side drawer accessible from the header allowing quick parameter adjustments (metronome BPM, drone root, tuner, backing tracks) without navigating away from the active score.
+- **About Modal:** Opened via the "About" button in the footer bar. Displays app metadata ("by Gek S. Low"), version info, a comprehensive breakdown of core practice features, and detailed descriptions of all supported score formats.
+

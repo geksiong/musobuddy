@@ -28,7 +28,8 @@ import {
   ChevronDown,
   Plus,
   FileCode,
-  FileText
+  FileText,
+  Info
 } from 'lucide-react';
 import { cn } from './lib/utils.ts';
 import { useAudio } from './contexts/AudioContext.tsx';
@@ -44,6 +45,7 @@ import DroneView from './components/Drone/DroneView.tsx';
 import ScoreView from './components/Score/ScoreView.tsx';
 import AccompanimentView from './components/Accompaniment/AccompanimentView.tsx';
 import PracticeToolsPanel from './components/Navigation/PracticeToolsPanel.tsx';
+import AboutModal from './components/AboutModal.tsx';
 
 type ViewType = 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment' | 'settings';
 
@@ -55,6 +57,7 @@ export default function App() {
   const { scores, setScores, activeScoreId, setActiveScoreId, loadFiles, createScore, isDistractionFree, setIsDistractionFree } = useScores();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isNewScoreOpen, setIsNewScoreOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const newScoreDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -456,8 +459,8 @@ export default function App() {
             )}
 
             <button
-              onClick={handleHeaderLoadScore}
-              title="Load new score file"
+              onClick={() => setIsAboutOpen(true)}
+              title="About Muso Buddy"
               className={cn(
                 "h-11 px-3 rounded-xl border text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0",
                 resolvedTheme === 'dark'
@@ -465,8 +468,8 @@ export default function App() {
                   : "border-black/10 bg-black text-white hover:bg-slate-800"
               )}
             >
-              <Upload className="w-4 h-4 text-[#FF4E00]" />
-              <span className="text-[10px] uppercase font-bold tracking-wider">Add</span>
+              <Info className="w-4 h-4 text-[#FF4E00]" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">About</span>
             </button>
           </div>
 
@@ -536,25 +539,28 @@ export default function App() {
               )}
             </div>
 
-            {/* Right: Quick Add File button */}
+            {/* Right: About button */}
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={handleHeaderLoadScore}
+                onClick={() => setIsAboutOpen(true)}
                 className={cn(
                   "px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors flex items-center gap-1.5",
                   resolvedTheme === 'dark'
                     ? "border-white/10 hover:bg-white/10 text-slate-300"
                     : "border-black/10 hover:bg-black/5 text-slate-700"
                 )}
-                title="Load new score file"
+                title="About Muso Buddy"
               >
-                <Upload className="w-3.5 h-3.5 text-[#FF4E00]" />
-                <span className="hidden lg:inline text-[10px] uppercase font-bold tracking-wider">Add File</span>
+                <Info className="w-3.5 h-3.5 text-[#FF4E00]" />
+                <span className="text-[10px] uppercase font-bold tracking-wider">About</span>
               </button>
             </div>
           </div>
         </footer>
       )}
+
+      {/* About Modal */}
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </div>
   );
 }

@@ -10,32 +10,69 @@ This document provides developer guidelines for maintaining, extending, and buil
 /
 ├── docs/                      # Documentation suite
 │   ├── README.md              # Documentation entry point
-│   ├── architecture.md        # State management & Web Audio
-│   ├── score-viewer.md        # Notation renderers & ABC parser
-│   ├── practice-tools.md      # Metronome, Tuner, Drone, Chords
+│   ├── architecture.md        # State management, Web Audio, & persistence
+│   ├── score-viewer.md        # Score renderers, ABC parser, ChordPro, & Annotations
+│   ├── practice-tools.md      # Metronome, Tuner, Drone, Chords, Groove, & About Modal
 │   └── development.md         # Developer guide (this file)
+├── public/
+│   ├── alphatab/              # AlphaTab engine & SoundFont soundbanks (`sonivox.sf2`)
+│   └── pdfjs/                 # PDF.js CMaps & WASM decoders
 ├── src/
 │   ├── components/            # UI Components grouped by domain
-│   │   ├── Accompaniment/     # Backing track player components
+│   │   ├── AboutModal.tsx     # App description, feature list, & score formats modal
+│   │   ├── Accompaniment/     # Backing tracks, Groove Engine, & chord progression explorer
+│   │   │   ├── AccompanimentView.tsx
+│   │   │   ├── ChordProgressionsModal.tsx
+│   │   │   ├── GrooveEnginePanel.tsx
+│   │   │   ├── SongLibraryPanel.tsx
+│   │   │   ├── chordProgressionsData.ts
+│   │   │   ├── grooveEngine.ts
+│   │   │   ├── progressionPresets.ts
+│   │   │   └── songLibrary.ts
 │   │   ├── ChordExplorer/     # Fretboard & keyboard chord diagrams
+│   │   │   └── ChordExplorer.tsx
 │   │   ├── Drone/             # Reference tone generator view
+│   │   │   └── DroneView.tsx
 │   │   ├── Metronome/         # Precision metronome interface
-│   │   ├── Score/             # Notation renderers (ABC, MusicXML, PDF, Player)
-│   │   └── Tuner/             # Pitch detection view & needle display
+│   │   │   └── MetronomeView.tsx
+│   │   ├── Navigation/        # Quick practice tools side drawer
+│   │   │   └── PracticeToolsPanel.tsx
+│   │   ├── Score/             # Notation renderers, annotations, & audio player
+│   │   │   ├── Abc2svgRenderer.tsx
+│   │   │   ├── AbcRenderer.tsx
+│   │   │   ├── AnnotationSidebar.tsx
+│   │   │   ├── AnnotationToolbar.tsx
+│   │   │   ├── ChordSheetRenderer.tsx
+│   │   │   ├── GuitarProRenderer.tsx
+│   │   │   ├── MusicXmlRenderer.tsx
+│   │   │   ├── PdfAnnotationLayer.tsx
+│   │   │   ├── PdfRenderer.tsx
+│   │   │   ├── ScoreAudioPlayer.tsx
+│   │   │   ├── ScoreErrorBoundary.tsx
+│   │   │   ├── ScoreView.tsx
+│   │   │   ├── annotationTypes.ts
+│   │   │   └── usePdfAnnotations.ts
+│   │   └── Tuner/             # Pitch detection view & needle gauge
+│   │       └── TunerView.tsx
 │   ├── contexts/              # React Context Providers
 │   │   ├── AccompanimentContext.tsx
 │   │   ├── AudioContext.tsx   # Master Web Audio API engine
-│   │   ├── ScoreContext.tsx   # Score library state & storage
-│   │   └── ThemeContext.tsx   # Light / Dark theme management
+│   │   ├── ScoreContext.tsx   # Score library state & local persistence
+│   │   └── ThemeContext.tsx   # Light / Dark theme switcher
 │   ├── hooks/                 # Reusable audio & tool hooks
 │   │   ├── useDrone.ts
 │   │   ├── useMetronome.ts
 │   │   └── useTuner.ts
 │   ├── lib/                   # Utility functions & parsers
+│   │   ├── abcDetector.ts
 │   │   ├── abcLanguage.ts
 │   │   ├── abcTransposer.ts   # ABC pitch transposition logic
+│   │   ├── chordEngine.ts     # Audio chord voicing synthesizer
+│   │   ├── chordSheetUtils.ts # ChordPro parsing & transposition
+│   │   ├── chordSuggestions.ts# Harmonic suggestion engine
+│   │   ├── mxlUtils.ts        # Compressed MusicXML reader
 │   │   └── utils.ts           # Classnames utility (cn)
-│   ├── App.tsx                # App root & main navigation tab switcher
+│   ├── App.tsx                # App root, header, footer bar, & view switcher
 │   ├── constants.ts          # Default score samples & preset data
 │   ├── index.css              # Global styles & Tailwind imports
 │   ├── main.tsx               # App entry point
@@ -82,4 +119,5 @@ When modifying audio nodes in `AudioContext.tsx` or audio components:
 
 - **Theme Consistency:** Use Tailwind's `dark:` modifier classes paired with `resolvedTheme === 'dark'` conditional checks.
 - **Icon Set:** Always import icons from `lucide-react`.
-- **Animations:** Use `framer-motion` (`AnimatePresence`, `motion.div`) for smooth view transitions, collapsible sidebars, and active state indicators.
+- **Animations:** Use `framer-motion` (`AnimatePresence`, `motion.div`) for smooth view transitions, collapsible sidebars, modals, and active state indicators.
+
