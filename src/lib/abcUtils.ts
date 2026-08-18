@@ -53,7 +53,7 @@ export function parseAbcItems(abc: string): AbcItem[] {
         const t = line.trim();
         if (t.startsWith('__RAW_BLOCK_')) return true;
         if (!t.startsWith('%%')) return false;
-        return !/^%%(begintext|endtext|text|center|title|subtitle|header|footer|eps|newpage|pagebreak|vskip)\b/i.test(t);
+        return !/^%%(begintext|endtext|text|center|title|subtitle|header|footer|eps|newpage|pagebreak|vskip|musicfont)\b/i.test(t);
       })
       .map(line => {
         const t = line.trim();

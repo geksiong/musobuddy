@@ -125,7 +125,8 @@ const AbcjsRenderer: React.FC<Props> = ({
           .replace(/%%beginps[\s\S]*?%%endps/gi, '')
           .replace(/%%beginsvg[\s\S]*?%%endsvg/gi, '')
           .replace(/^%%ps\b.*$/gm, '')
-          .replace(/^%%postscript\b.*$/gm, '');
+          .replace(/^%%postscript\b.*$/gm, '')
+          .replace(/^%%musicfont\b.*$/gm, '');
 
         // Clean up any existing %%tablature directives to prevent duplicate or invalid lines
         targetAbc = targetAbc.replace(/^%%tablature[^\n]*\n?/gm, '');

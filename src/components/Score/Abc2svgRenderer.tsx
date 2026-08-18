@@ -17,6 +17,13 @@ import pedline1Script from 'abc2svg/pedline-1.js?raw';
 import psvg1Script from 'abc2svg/psvg-1.js?raw';
 import roman1Script from 'abc2svg/roman-1.js?raw';
 import nns1Script from 'abc2svg/nns-1.js?raw';
+import mdnn1Script from 'abc2svg/mdnn-1.js?raw';
+import clair1Script from 'abc2svg/clair-1.js?raw';
+import equalbars1Script from 'abc2svg/equalbars-1.js?raw';
+import jazzchord1Script from 'abc2svg/jazzchord-1.js?raw';
+import temper1Script from 'abc2svg/temper-1.js?raw';
+import diag1Script from 'abc2svg/diag-1.js?raw';
+import chordnames1Script from 'abc2svg/chordnames-1.js?raw';
 import { parseAbcItems } from '../../lib/abcUtils.ts';
 
 interface Props {
@@ -55,7 +62,7 @@ function ensureAbc2svgEngine() {
     `);
     initFn(window, window);
 
-    // Evaluate extension modules for directives like %%page, %%jianpu, %%tab, %%grid, etc.
+    // Evaluate extension modules for directives like %%page, %%jianpu, %%tab, %%grid, %%mdnn, %%clairnote, etc.
     const modules = [
       page1Script,
       jianpu1Script,
@@ -68,7 +75,14 @@ function ensureAbc2svgEngine() {
       pedline1Script,
       psvg1Script,
       roman1Script,
-      nns1Script
+      nns1Script,
+      mdnn1Script,
+      clair1Script,
+      equalbars1Script,
+      jazzchord1Script,
+      temper1Script,
+      diag1Script,
+      chordnames1Script
     ];
 
     for (const modScript of modules) {
@@ -127,6 +141,10 @@ export const Abc2svgRenderer: React.FC<Props> = ({
         const selectedItem = items[Math.min(tuneIndex, items.length - 1)] || items[0];
         targetAbc = selectedItem.abc;
       }
+
+      // Strip %%musicfont directives (e.g. %%musicfont url(../js/abc2svg.ttf))
+      // so abc2svg embeds native vector path shapes for all music symbols instead of relying on missing external web font files
+      targetAbc = targetAbc.replace(/^%%musicfont\b.*$/gm, '');
 
       // Add transpose directive if needed
       if (transpose !== 0) {
