@@ -1,0 +1,73 @@
+{
+  "short_name": "MusoBuddy",
+  "name": "MusoBuddy - Music Practice Suite",
+  "description": "Comprehensive music practice tools featuring precision Metronome, Chromatic Tuner, Drone Patterns, Accompaniment Generator, and Score Viewer.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.jpg",
+      "type": "image/jpeg",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "com.musobuddy.app",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["music", "utilities", "education", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
+  "shortcuts": [
+    {
+      "name": "Score Viewer",
+      "short_name": "Scores",
+      "description": "Open Music Score & Sheet Music Viewer",
+      "url": "./?view=score",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Metronome",
+      "short_name": "Metronome",
+      "description": "Launch Precision Metronome",
+      "url": "./?view=metronome",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Chromatic Tuner",
+      "short_name": "Tuner",
+      "description": "Launch Chromatic Instrument Tuner",
+      "url": "./?view=tuner",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Accompaniment & Grooves",
+      "short_name": "Grooves",
+      "description": "Launch Accompaniment Track Generator",
+      "url": "./?view=accompaniment",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Drone Generator",
+      "short_name": "Drone",
+      "description": "Launch Reference Pitch Drone",
+      "url": "./?view=drone",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

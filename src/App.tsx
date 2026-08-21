@@ -29,7 +29,11 @@ import {
   Plus,
   FileCode,
   FileText,
-  Info
+  Info,
+  Download,
+  WifiOff,
+  RefreshCw,
+  Smartphone
 } from 'lucide-react';
 import { cn } from './lib/utils.ts';
 import { useAudio } from './contexts/AudioContext.tsx';
@@ -37,6 +41,7 @@ import { useAccompaniment } from './contexts/AccompanimentContext.tsx';
 import { useTheme } from './contexts/ThemeContext.tsx';
 import { useScores } from './contexts/ScoreContext.tsx';
 import { ScoreFormat } from './components/Score/types.ts';
+import { usePWA } from './hooks/usePWA.ts';
 
 // Components
 import MetronomeView from './components/Metronome/MetronomeView.tsx';
@@ -55,10 +60,21 @@ export default function App() {
   const { isPlaying: isAccompanimentPlaying } = useAccompaniment();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { scores, setScores, activeScoreId, setActiveScoreId, loadFiles, createScore, isDistractionFree, setIsDistractionFree } = useScores();
+  const { isInstallable, isInstalled, isOffline, hasUpdate, promptInstall, updateApp } = usePWA();
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isNewScoreOpen, setIsNewScoreOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const newScoreDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check URL query params for view (PWA shortcuts support)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view');
+    if (viewParam && ['metronome', 'tuner', 'drone', 'score', 'accompaniment'].includes(viewParam)) {
+      setCurrentView(viewParam as ViewType);
+    }
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,6 +202,18 @@ export default function App() {
             </div>
 
             <div className="flex gap-1.5 sm:gap-2.5 items-center shrink-0">
+              {/* Install PWA Button */}
+              {isInstallable && (
+                <button
+                  onClick={() => promptInstall()}
+                  title="Install MusoBuddy App"
+                  className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full border border-indigo-500/30 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-extrabold tracking-wider transition-all uppercase flex items-center gap-1.5 shrink-0 shadow-lg shadow-indigo-600/25 animate-pulse"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Install App</span>
+                </button>
+              )}
+
               <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -340,6 +368,14 @@ export default function App() {
           onNavigate={(view) => setCurrentView(view)} 
           fileInputRef={fileInputRef} 
         />
+      )}
+
+      {/* Offline Status Bar */}
+      {isOffline && !isDistractionFree && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-500 px-4 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shrink-0">
+          <WifiOff className="w-3.5 h-3.5 animate-pulse" />
+          <span>Offline Mode Active • Practice tools, tuner &amp; scores remain fully functional</span>
+        </div>
       )}
 
       {/* Main Content */}
@@ -561,6 +597,32 @@ export default function App() {
 
       {/* About Modal */}
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+
+      {/* Service Worker Update Toast Notification */}
+      <AnimatePresence>
+        {hasUpdate && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-16 sm:bottom-6 right-4 z-50 p-4 rounded-2xl border bg-[#121214] border-indigo-500/40 text-white shadow-2xl backdrop-blur-xl flex items-center gap-3 max-w-md"
+          >
+            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 shrink-0">
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-300">App Update Available</h4>
+              <p className="text-[11px] text-slate-300 leading-tight">A new version of MusoBuddy is ready to install.</p>
+            </div>
+            <button
+              onClick={updateApp}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-[10px] uppercase tracking-wider transition-all shrink-0 shadow-md shadow-indigo-600/30"
+            >
+              Update
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
