@@ -20,6 +20,7 @@ import GrooveEnginePanel from './GrooveEnginePanel.tsx';
 import SongLibraryPanel from './SongLibraryPanel.tsx';
 import ChordProgressionsModal from './ChordProgressionsModal.tsx';
 import ImportAbcChordsModal from './ImportAbcChordsModal.tsx';
+import VoicingInspectorPanel, { VOICING_STYLES } from './VoicingInspectorPanel.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
   CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, ARPEGGIO_RATES,
@@ -72,13 +73,17 @@ export default function AccompanimentView() {
     isPendingStart,
     currentIndex,
     accompanimentVolume,
-    setAccompanimentVolume
+    setAccompanimentVolume,
+    voicingStyle,
+    setVoicingStyle,
+    progressionVoicings
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
   const [activeRightTab, setActiveRightTab] = useState<'library' | 'songs' | 'explorer'>('library');
   const [isChordModalOpen, setIsChordModalOpen] = useState(false);
   const [isImportAbcModalOpen, setIsImportAbcModalOpen] = useState(false);
+  const [isVoicingInspectorOpen, setIsVoicingInspectorOpen] = useState(true);
 
   const handleLoadChordProgression = (
     chordsPerBeat: string[],
@@ -456,6 +461,44 @@ export default function AccompanimentView() {
               <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")} />
             </div>
 
+            {/* Keyboard Voicing Style Selector */}
+            <div className="relative group shrink-0">
+              <select
+                value={voicingStyle}
+                onChange={(e) => {
+                  setVoicingStyle(e.target.value as any);
+                  e.target.blur();
+                }}
+                className={cn(
+                  "appearance-none border px-3 pr-8 py-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer outline-none focus:border-emerald-500/50",
+                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-emerald-400 hover:text-emerald-300" : "bg-white border-slate-200 text-emerald-700 hover:bg-slate-100"
+                )}
+                title="Select keyboard chord voicing style (Smooth voice leading, Jazz drop-2, Pop open spread, etc.)"
+              >
+                {VOICING_STYLES.map(style => (
+                  <option key={style.id} value={style.id} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
+                    Voicing: {style.shortLabel}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className={cn("absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none", resolvedTheme === 'dark' ? "text-white/30" : "text-slate-400")} />
+            </div>
+
+            {/* Voicing Inspector Toggle Button */}
+            <button
+              onClick={() => setIsVoicingInspectorOpen(!isVoicingInspectorOpen)}
+              className={cn(
+                "px-2.5 py-2 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all border shrink-0",
+                isVoicingInspectorOpen
+                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-500 dark:text-emerald-400"
+                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+              )}
+              title="Toggle Piano Voicing Inspector & Voice-Leading Visualizer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Voice Leading</span>
+            </button>
+
             {/* Volume Control */}
             <div className="flex items-center gap-2 shrink-0 min-w-[120px]">
               <Volume2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -473,6 +516,13 @@ export default function AccompanimentView() {
               </span>
             </div>
           </div>
+
+          {/* Piano Voicing & Voice Leading Inspector Panel */}
+          {isVoicingInspectorOpen && (
+            <div className="mb-4">
+              <VoicingInspectorPanel />
+            </div>
+          )}
 
           {/* Groove & Syncopation Engine Panel */}
           <div className="mb-4">
@@ -839,9 +889,16 @@ export default function AccompanimentView() {
                                 b.{bIdx + 1}
                               </span>
 
-                              {!isExplicit && (
+                              {progressionVoicings[globalBeatIndex] && targetChordName ? (
+                                <span className={cn(
+                                  "text-[6.5px] font-mono font-bold truncate max-w-[48px] px-0.5 rounded",
+                                  isCellPlaying ? "bg-white/20 text-white" : (resolvedTheme === 'dark' ? "text-emerald-400/80" : "text-emerald-700/80")
+                                )} title={progressionVoicings[globalBeatIndex]?.description}>
+                                  {progressionVoicings[globalBeatIndex]?.inversionName}
+                                </span>
+                              ) : !isExplicit ? (
                                 <span className="text-[6px] font-bold uppercase tracking-tight opacity-50">sus</span>
-                              )}
+                              ) : null}
                             </div>
 
                             {/* Center Chord Name Display */}

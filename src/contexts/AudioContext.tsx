@@ -4,6 +4,18 @@ import { DEFAULT_PRESETS } from '../components/Metronome/constants.ts';
 import { DroneTone } from '../components/Drone/types.ts';
 import { InstrumentType } from '../types.ts';
 import { NOTES, getIntervalsForChord } from '../constants.ts';
+import { getVoicedMidiNotes, PianoVoicing, PianoVoicingStyle } from '../lib/pianoVoicingEngine.ts';
+
+export interface PlayChordOptions {
+  prevChord?: string | null;
+  nextChord?: string | null;
+  prevVoicing?: PianoVoicing | null;
+  customMidiNotes?: number[];
+  customIntervals?: number[];
+  duration?: number;
+  voicingStyle?: PianoVoicingStyle;
+  isStrummed?: boolean;
+}
 
 interface AudioContextType {
   // Metronome
@@ -44,7 +56,7 @@ interface AudioContextType {
   stopRefNote: () => void;
 
   // Chord Player
-  playChord: (chord: string, instrument?: InstrumentType, volume?: number) => void;
+  playChord: (chord: string, instrument?: InstrumentType, volume?: number, options?: PlayChordOptions) => void;
   playNote: (noteIndex: number, duration?: number, instrument?: InstrumentType, volume?: number) => void;
   playPercussion: (sound: MetronomeSound, isAccent?: boolean, volume?: number) => void;
 }
@@ -1490,23 +1502,81 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const playChord = (chord: string, instrument: InstrumentType = InstrumentType.Piano, volume: number = 1.0) => {
+  const playChord = (
+    chord: string,
+    instrument: InstrumentType = InstrumentType.Piano,
+    volume: number = 1.0,
+    options?: PlayChordOptions
+  ) => {
     const ctx = initAudio();
-    const intervals = getIntervalsForChord(chord);
-    if (!intervals) return;
-
-    const rootFreq = 261.63; // C4
+    const duration = options?.duration || 1.6;
     const now = ctx.currentTime;
-    const duration = 1.6;
 
-    // Determine if we should stagger strum times (e.g. guitar or block chord strumming)
-    const isStrummed = instrument === InstrumentType.Guitar || instrument === InstrumentType.Piano || instrument === InstrumentType.ElectricPiano;
-    const staggerStepMs = isStrummed ? 22 : 0; // 22ms per string stagger for realistic strum
+    // Determine frequencies to play:
+    // 1. If custom MIDI notes provided (e.g. from Progression Voice Leading Engine), use them directly!
+    // 2. Else if custom intervals provided, calculate relative to C4
+    // 3. Else calculate optimal piano voicing (context-aware if prev/next chord given)
+    let frequencies: { freq: number; isBass: boolean; idx: number }[] = [];
+
+    if (options?.customMidiNotes && options.customMidiNotes.length > 0) {
+      const sorted = [...options.customMidiNotes].sort((a, b) => a - b);
+      frequencies = sorted.map((midi, idx) => ({
+        freq: 440 * Math.pow(2, (midi - 69) / 12),
+        isBass: idx === 0 && sorted.length > 2 && midi < 54,
+        idx
+      }));
+    } else if (options?.customIntervals && options.customIntervals.length > 0) {
+      const rootFreq = 261.63; // C4
+      frequencies = options.customIntervals.map((interval, idx) => ({
+        freq: rootFreq * Math.pow(2, interval / 12),
+        isBass: idx === 0,
+        idx
+      }));
+    } else if (chord && chord.trim() !== '') {
+      // Generate rich keyboard voicing (context-aware if prev/next chord provided)
+      const midiNotes = getVoicedMidiNotes(chord, {
+        prevChord: options?.prevChord,
+        nextChord: options?.nextChord,
+        prevVoicing: options?.prevVoicing,
+        style: options?.voicingStyle
+      });
+
+      frequencies = midiNotes.map((midi, idx) => ({
+        freq: 440 * Math.pow(2, (midi - 69) / 12),
+        isBass: idx === 0 && midi < 54,
+        idx
+      }));
+    } else {
+      const intervals = getIntervalsForChord(chord);
+      if (!intervals) return;
+      const rootFreq = 261.63;
+      frequencies = intervals.map((interval, idx) => ({
+        freq: rootFreq * Math.pow(2, interval / 12),
+        isBass: idx === 0,
+        idx
+      }));
+    }
+
+    if (frequencies.length === 0) return;
+
+    // Determine realistic strum / hand spread timing
+    // - Guitar: 22ms per string
+    // - Piano / Electric Piano: subtle 12ms natural hand spread
+    // - Organ / Strings / Brass / Marimba: tight sync (0-4ms)
+    let staggerStepMs = 0;
+    if (options?.isStrummed !== false) {
+      if (instrument === InstrumentType.Guitar) {
+        staggerStepMs = 22;
+      } else if (instrument === InstrumentType.Piano || instrument === InstrumentType.ElectricPiano) {
+        staggerStepMs = 12;
+      } else if (instrument === InstrumentType.Marimba) {
+        staggerStepMs = 8;
+      }
+    }
 
     const outputTarget = compressorRef.current || ctx.destination;
 
-    intervals.forEach((interval, idx) => {
-      const freq = rootFreq * Math.pow(2, interval / 12);
+    frequencies.forEach(({ freq, isBass, idx }) => {
       const noteStartTime = now + (idx * staggerStepMs / 1000);
 
       const osc = ctx.createOscillator();
@@ -1516,8 +1586,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       osc.frequency.setValueAtTime(freq, noteStartTime);
       applyTone(osc, voiceGain, instrument, freq, noteStartTime, duration);
 
-      // Apply volume scaling via a dedicated gain node with subtle humanized velocity
-      const humanVelocity = 0.92 + (Math.random() * 0.16); // 92% to 108%
+      // Acoustic keyboard velocity curve:
+      // Bass gets solid foundation velocity (1.05), inner voices slightly softer for transparency (0.90),
+      // top voice gets clear melody presence (1.02), with subtle human micro-variance.
+      let noteVelocity = 0.95;
+      if (isBass) {
+        noteVelocity = 1.05;
+      } else if (idx === frequencies.length - 1) {
+        noteVelocity = 1.02; // top melody voice
+      } else {
+        noteVelocity = 0.90; // inner harmonic filler
+      }
+
+      const humanVelocity = noteVelocity * (0.94 + Math.random() * 0.12);
       volumeGain.gain.setValueAtTime(volume * humanVelocity, noteStartTime);
 
       voiceGain.connect(volumeGain);
