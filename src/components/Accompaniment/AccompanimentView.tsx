@@ -835,7 +835,6 @@ export default function AccompanimentView() {
                               onClick={() => {
                                 addBeat('');
                                 setSelectedBeatIndex(progression.length);
-                                setActiveRightTab('library');
                               }}
                               className={cn(
                                 "h-14 sm:h-16 rounded-xl border border-dashed flex flex-col items-center justify-center transition-all opacity-40 hover:opacity-100",
@@ -860,7 +859,6 @@ export default function AccompanimentView() {
                             key={chordSlot.id}
                             onClick={() => {
                               setSelectedBeatIndex(globalBeatIndex);
-                              setActiveRightTab('library');
                               const playTarget = isExplicit ? chordSlot.name : effective?.chord;
                               if (playTarget) {
                                 playChord(playTarget, selectedInstrument, accompanimentVolume);
