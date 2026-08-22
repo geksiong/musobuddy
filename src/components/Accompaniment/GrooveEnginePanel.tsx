@@ -49,20 +49,16 @@ export default function GrooveEnginePanel() {
   const [selectedGenre, setSelectedGenre] = useState<string>('ALL');
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
-  const [newPresetGenre, setNewPresetGenre] = useState<GrooveGenre>('Latin');
+  const [newPresetGenre, setNewPresetGenre] = useState<GrooveGenre>('Rock');
   const [newPresetDesc, setNewPresetDesc] = useState('');
 
-  const genres = ['ALL', 'Flamenco', 'Latin', 'Jazz', 'Rock / Pop', 'Funk / Soul', 'World / Other', 'CUSTOM'];
+  const genres = ['ALL', 'Rock', 'Pop', 'Funk', 'Jazz', 'Latin', 'World', 'Flamenco', 'CUSTOM'];
 
   const allPresets = [...GROOVE_PRESETS, ...customGroovePresets];
 
   const filteredPresets = allPresets.filter(preset => {
     if (selectedGenre === 'ALL') return true;
     if (selectedGenre === 'CUSTOM') return customGroovePresets.some(c => c.id === preset.id);
-    if (selectedGenre === 'Flamenco') return preset.genre === 'Flamenco';
-    if (selectedGenre === 'Rock / Pop') return preset.genre === 'Rock' || preset.genre === 'Pop';
-    if (selectedGenre === 'Funk / Soul') return preset.genre === 'Funk';
-    if (selectedGenre === 'World / Other') return preset.genre === 'World';
     return preset.genre === selectedGenre;
   });
 
@@ -467,13 +463,13 @@ export default function GrooveEnginePanel() {
                       resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200"
                     )}
                   >
-                    <option value="Latin">Latin</option>
-                    <option value="Jazz">Jazz</option>
                     <option value="Rock">Rock</option>
                     <option value="Pop">Pop</option>
                     <option value="Funk">Funk</option>
-                    <option value="Flamenco">Flamenco</option>
+                    <option value="Jazz">Jazz</option>
+                    <option value="Latin">Latin</option>
                     <option value="World">World</option>
+                    <option value="Flamenco">Flamenco</option>
                   </select>
                 </div>
 

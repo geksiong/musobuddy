@@ -172,7 +172,21 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
       ? true
       : selectedGenre === '★ Custom'
         ? song.isCustom
-        : song.genre.toLowerCase().includes(selectedGenre.toLowerCase());
+        : selectedGenre === 'Rock'
+          ? song.genre.toLowerCase().includes('rock') || song.genre.toLowerCase().includes('blues')
+          : selectedGenre === 'Pop'
+            ? song.genre.toLowerCase().includes('pop') || song.genre.toLowerCase().includes('anime')
+            : selectedGenre === 'Funk'
+              ? song.genre.toLowerCase().includes('funk') || song.genre.toLowerCase().includes('soul') || song.genre.toLowerCase().includes('r&b')
+              : selectedGenre === 'Jazz'
+                ? song.genre.toLowerCase().includes('jazz')
+                : selectedGenre === 'Latin'
+                  ? song.genre.toLowerCase().includes('latin') || song.genre.toLowerCase().includes('bossa')
+                  : selectedGenre === 'World'
+                    ? song.genre.toLowerCase().includes('folk') || song.genre.toLowerCase().includes('country') || song.genre.toLowerCase().includes('reggae')
+                    : selectedGenre === 'Flamenco'
+                      ? song.genre.toLowerCase().includes('flamenco')
+                      : song.genre.toLowerCase().includes(selectedGenre.toLowerCase());
 
     // Time Sig Filter
     const matchesTs = selectedTimeSigFilter === 'ALL'
@@ -194,7 +208,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
     return matchesGenre && matchesTs && (matchTitle || matchArtist || matchGenre || matchKey || matchDesc || matchTag || matchChords);
   });
 
-  const genresList = ['ALL', '★ Custom', 'Jazz', 'Bossa Nova', 'Blues', 'R&B / Soul', 'Funk', 'Rock', 'Pop', 'Reggae', 'Flamenco / Latin', 'Country / Folk', 'J-Pop / Anime'];
+  const genresList = ['ALL', '★ Custom', 'Rock', 'Pop', 'Funk', 'Jazz', 'Latin', 'World', 'Flamenco'];
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative">

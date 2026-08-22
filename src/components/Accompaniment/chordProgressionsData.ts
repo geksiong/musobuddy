@@ -22,7 +22,136 @@ export interface DetailedProgression {
 }
 
 export const CHORD_PROGRESSIONS_LIBRARY: DetailedProgression[] = [
-  // --- J-POP & ANIME ---
+  // --- ROCK ---
+  {
+    id: 'rock-alternative-creep',
+    name: 'Alternative Rock Minor IV (I–III–IV–iv)',
+    genre: 'Rock',
+    timeSignature: '4/4',
+    bpm: 92,
+    description: 'Moody, dramatic chromatic progression featuring major III and the melancholic borrowing of minor iv.',
+    popularSongs: [
+      'Creep - Radiohead',
+      'Desperado - Eagles',
+      'Wake Me Up When September Ends - Green Day',
+      'Don\'t Look Back in Anger - Oasis'
+    ],
+    variations: [
+      {
+        id: 'creep-basic',
+        name: 'Radiohead Creep Progression (G–B–C–Cm)',
+        description: 'Chromatic major to minor IV resolution',
+        chordsPerBeat: ['G', '', '', '', 'B', '', '', '', 'C', '', '', '', 'Cm', '', '', '']
+      },
+      {
+        id: 'creep-7th-extensions',
+        name: '7th Extensions (Gmaj7–B7–Cmaj7–Cm6)',
+        description: 'Rich atmospheric guitar voicings',
+        chordsPerBeat: ['Gmaj7', '', '', '', 'B7', '', '', '', 'Cmaj7', '', '', '', 'Cm', '', '', '']
+      }
+    ]
+  },
+  {
+    id: 'blues-12-bar',
+    name: '12-Bar Quick-Change Blues',
+    genre: 'Blues',
+    timeSignature: '4/4',
+    bpm: 110,
+    description: 'The foundation of blues, rock-and-roll, and jazz jams. A 12-measure dominant 7th quick-change cycle.',
+    popularSongs: [
+      'Sweet Home Chicago - Robert Johnson',
+      'Johnny B. Goode - Chuck Berry',
+      'Pride and Joy - Stevie Ray Vaughan',
+      'Stormy Monday - T-Bone Walker'
+    ],
+    variations: [
+      {
+        id: 'blues-12bar-dominant',
+        name: '12-Bar Dominant 7th Quick-Change',
+        description: '12-bar form in C Major with bar 2 quick change to F7',
+        chordsPerBeat: [
+          'C7', '', '', '', 'F7', '', '', '', 'C7', '', '', '', 'C7', '', '', '',
+          'F7', '', '', '', 'F7', '', '', '', 'C7', '', '', '', 'C7', '', '', '',
+          'G7', '', '', '', 'F7', '', '', '', 'C7', '', '', '', 'G7', '', '', ''
+        ]
+      },
+      {
+        id: 'blues-12bar-minor',
+        name: '12-Bar Minor Blues (Cm7–Fm7)',
+        description: 'Deep minor blues in C Minor featuring Ab7 to G7 turnaround',
+        chordsPerBeat: [
+          'Cm7', '', '', '', 'Fm7', '', '', '', 'Cm7', '', '', '', 'Cm7', '', '', '',
+          'Fm7', '', '', '', 'Fm7', '', '', '', 'Cm7', '', '', '', 'Cm7', '', '', '',
+          'Ab7', '', '', '', 'G7', '', '', '', 'Cm7', '', '', '', 'G7', '', '', ''
+        ]
+      }
+    ]
+  },
+
+  // --- POP ---
+  {
+    id: 'pop-axis-of-awesome',
+    name: 'Axis of Awesome (I–V–vi–IV)',
+    genre: 'Pop',
+    timeSignature: '4/4',
+    bpm: 120,
+    description: 'The most famous 4-chord progression in modern popular music, powering hundreds of top-40 chart toppers.',
+    popularSongs: [
+      'Don\'t Stop Believin\' - Journey',
+      'Let It Be - The Beatles',
+      'With or Without You - U2',
+      'Poker Face - Lady Gaga',
+      'Where Is the Love? - Black Eyed Peas'
+    ],
+    variations: [
+      {
+        id: 'axis-basic',
+        name: 'Standard 4-Chord Pop (C–G–Am–F)',
+        description: 'Clear, versatile major pop progression',
+        chordsPerBeat: ['C', '', '', '', 'G', '', '', '', 'Am', '', '', '', 'F', '', '', '']
+      },
+      {
+        id: 'axis-add9-modern',
+        name: 'Modern Acoustic Add9 (Cadd9–G/B–Am7–Fadd9)',
+        description: 'Resonant acoustic guitar open voicings',
+        chordsPerBeat: ['C', '', '', '', 'G', '', '', '', 'Am7', '', '', '', 'F', '', '', '']
+      },
+      {
+        id: 'axis-fast-2chords',
+        name: 'Fast Pop Push (2 Chords/Bar: C–G | Am–F)',
+        description: 'Doubled pace changing chords twice per measure',
+        chordsPerBeat: ['C', '', 'G', '', 'Am', '', 'F', '']
+      }
+    ]
+  },
+  {
+    id: 'pop-50s-doo-wop',
+    name: '50s Doo-Wop / Stand by Me (I–vi–IV–V)',
+    genre: 'Pop',
+    timeSignature: '4/4',
+    bpm: 110,
+    description: 'Golden era 1950s rock-and-roll ballad progression that laid the foundation for modern pop and R&B.',
+    popularSongs: [
+      'Stand by Me - Ben E. King',
+      'Heart and Soul - Hoagy Carmichael',
+      'Earth Angel - The Penguins',
+      'Blue Moon - The Marcels'
+    ],
+    variations: [
+      {
+        id: 'doowop-basic',
+        name: 'Classic 50s Ballad (C–Am–F–G)',
+        description: 'Authentic mid-century pop loop',
+        chordsPerBeat: ['C', '', '', '', 'Am', '', '', '', 'F', '', '', '', 'G', '', '', '']
+      },
+      {
+        id: 'doowop-7th-extensions',
+        name: 'Smooth Jazz-Pop 7ths (Cmaj7–Am7–Dm7–G7)',
+        description: 'Sophisticated 7ths replacing IV with ii7 for smooth bass leading',
+        chordsPerBeat: ['Cmaj7', '', '', '', 'Am7', '', '', '', 'Dm7', '', '', '', 'G7', '', '', '']
+      }
+    ]
+  },
   {
     id: 'jpop-royal-road',
     name: 'Royal Road / Oudou (王道進行)',
@@ -188,128 +317,37 @@ export const CHORD_PROGRESSIONS_LIBRARY: DetailedProgression[] = [
     ]
   },
 
-  // --- POP & ROCK ---
+  // --- FUNK / SOUL ---
   {
-    id: 'pop-axis-of-awesome',
-    name: 'Axis of Awesome (I–V–vi–IV)',
-    genre: 'Pop',
+    id: 'neosoul-9th-extensions',
+    name: 'Neo-Soul Smooth 9th Extensions',
+    genre: 'R&B / Soul',
     timeSignature: '4/4',
-    bpm: 120,
-    description: 'The most famous 4-chord progression in modern popular music, powering hundreds of top-40 chart toppers.',
+    bpm: 85,
+    description: 'Modern R&B and Neo-Soul chord loop utilizing extended 9ths, 13ths, and altered dominant tension.',
     popularSongs: [
-      'Don\'t Stop Believin\' - Journey',
-      'Let It Be - The Beatles',
-      'With or Without You - U2',
-      'Poker Face - Lady Gaga',
-      'Where Is the Love? - Black Eyed Peas'
+      'Redbone - Childish Gambino',
+      'Best Part - Daniel Caesar & H.E.R.',
+      'Unaware - Allen Stone',
+      'Untitled (How Does It Feel) - D\'Angelo'
     ],
     variations: [
       {
-        id: 'axis-basic',
-        name: 'Standard 4-Chord Pop (C–G–Am–F)',
-        description: 'Clear, versatile major pop progression',
-        chordsPerBeat: ['C', '', '', '', 'G', '', '', '', 'Am', '', '', '', 'F', '', '', '']
+        id: 'neosoul-smooth',
+        name: 'Smooth Neo-Soul Loop (Dm9–G13–Cmaj9–A7#9)',
+        description: 'Classic lay-back groove with hendrix/soul altered A7#9 chord',
+        chordsPerBeat: ['Dm9', '', '', '', 'G13', '', '', '', 'Cmaj9', '', '', '', 'A7#9', '', '', '']
       },
       {
-        id: 'axis-add9-modern',
-        name: 'Modern Acoustic Add9 (Cadd9–G/B–Am7–Fadd9)',
-        description: 'Resonant acoustic guitar open voicings',
-        chordsPerBeat: ['C', '', '', '', 'G', '', '', '', 'Am7', '', '', '', 'F', '', '', '']
-      },
-      {
-        id: 'axis-fast-2chords',
-        name: 'Fast Pop Push (2 Chords/Bar: C–G | Am–F)',
-        description: 'Doubled pace changing chords twice per measure',
-        chordsPerBeat: ['C', '', 'G', '', 'Am', '', 'F', '']
-      }
-    ]
-  },
-  {
-    id: 'pop-50s-doo-wop',
-    name: '50s Doo-Wop / Stand by Me (I–vi–IV–V)',
-    genre: 'Pop',
-    timeSignature: '4/4',
-    bpm: 110,
-    description: 'Golden era 1950s rock-and-roll ballad progression that laid the foundation for modern pop and R&B.',
-    popularSongs: [
-      'Stand by Me - Ben E. King',
-      'Heart and Soul - Hoagy Carmichael',
-      'Earth Angel - The Penguins',
-      'Blue Moon - The Marcels'
-    ],
-    variations: [
-      {
-        id: 'doowop-basic',
-        name: 'Classic 50s Ballad (C–Am–F–G)',
-        description: 'Authentic mid-century pop loop',
-        chordsPerBeat: ['C', '', '', '', 'Am', '', '', '', 'F', '', '', '', 'G', '', '', '']
-      },
-      {
-        id: 'doowop-7th-extensions',
-        name: 'Smooth Jazz-Pop 7ths (Cmaj7–Am7–Dm7–G7)',
-        description: 'Sophisticated 7ths replacing IV with ii7 for smooth bass leading',
-        chordsPerBeat: ['Cmaj7', '', '', '', 'Am7', '', '', '', 'Dm7', '', '', '', 'G7', '', '', '']
-      }
-    ]
-  },
-  {
-    id: 'rock-alternative-creep',
-    name: 'Alternative Rock Minor IV (I–III–IV–iv)',
-    genre: 'Rock',
-    timeSignature: '4/4',
-    bpm: 92,
-    description: 'Moody, dramatic chromatic progression featuring major III and the melancholic borrowing of minor iv.',
-    popularSongs: [
-      'Creep - Radiohead',
-      'Desperado - Eagles',
-      'Wake Me Up When September Ends - Green Day',
-      'Don\'t Look Back in Anger - Oasis'
-    ],
-    variations: [
-      {
-        id: 'creep-basic',
-        name: 'Radiohead Creep Progression (G–B–C–Cm)',
-        description: 'Chromatic major to minor IV resolution',
-        chordsPerBeat: ['G', '', '', '', 'B', '', '', '', 'C', '', '', '', 'Cm', '', '', '']
-      },
-      {
-        id: 'creep-7th-extensions',
-        name: '7th Extensions (Gmaj7–B7–Cmaj7–Cm6)',
-        description: 'Rich atmospheric guitar voicings',
-        chordsPerBeat: ['Gmaj7', '', '', '', 'B7', '', '', '', 'Cmaj7', '', '', '', 'Cm', '', '', '']
-      }
-    ]
-  },
-  {
-    id: 'rock-flamenco-andalusian',
-    name: 'Andalusian Cadence (i–♭VII–♭VI–V)',
-    genre: 'Flamenco',
-    timeSignature: '4/4',
-    bpm: 115,
-    description: 'Dramatic descending Phrygian minor cadence found in Spanish Flamenco, classic rock solos, and cinematic themes.',
-    popularSongs: [
-      'Sultans of Swing - Dire Straits',
-      'Smooth - Santana',
-      'Habanera - Bizet (Carmen)',
-      'Generique - Cowboy Bebop'
-    ],
-    variations: [
-      {
-        id: 'andalusian-basic',
-        name: 'Classic Descending Minor (Am–G–F–E)',
-        description: 'Fundamental 4-measure descending Phrygian cadence',
-        chordsPerBeat: ['Am', '', '', '', 'G', '', '', '', 'F', '', '', '', 'E', '', '', '']
-      },
-      {
-        id: 'andalusian-flamenco-open',
-        name: 'Flamenco Por Arriba (Am9–G6–Fmaj7#11–E7b9)',
-        description: 'Authentic Spanish guitar open string voicings',
-        chordsPerBeat: ['Am9', '', '', '', 'G6', '', '', '', 'Fmaj7#11', '', '', '', 'E7b9', '', '', '']
+        id: 'neosoul-passing-dim',
+        name: 'Passing Diminished (Dm9–G13–Cmaj9–C#dim7)',
+        description: 'Features chromatic passing diminished 7th back into Dm9',
+        chordsPerBeat: ['Dm9', '', '', '', 'G13', '', '', '', 'Cmaj9', '', '', '', 'C#dim7', '', '', '']
       }
     ]
   },
 
-  // --- JAZZ & BOSSA NOVA ---
+  // --- JAZZ ---
   {
     id: 'jazz-ii-v-i-vi',
     name: 'Jazz ii–V–I–VI Turnaround',
@@ -345,6 +383,29 @@ export const CHORD_PROGRESSIONS_LIBRARY: DetailedProgression[] = [
     ]
   },
   {
+    id: '54-take-five-vamp',
+    name: '5/4 Cool Jazz Vamp (Take Five)',
+    genre: 'Jazz',
+    timeSignature: '5/4',
+    bpm: 140,
+    description: 'Iconic asymmetric 5-beat cool jazz groove inspired by Paul Desmond & Dave Brubeck.',
+    popularSongs: [
+      'Take Five - Dave Brubeck Quartet',
+      'Mission Impossible Theme (5/4 adaptation)',
+      '15 Step - Radiohead'
+    ],
+    variations: [
+      {
+        id: '54-take-five-standard',
+        name: 'Take Five Minor 7th Vamp (Ebm7–Bbm7)',
+        description: 'Hypnotic 5-beat swing vamp in Eb minor',
+        chordsPerBeat: ['Ebm7', '', '', '', '', 'Bbm7', '', '', '', '', 'Ebm7', '', '', '', '', 'Bbm7', '', '', '', '']
+      }
+    ]
+  },
+
+  // --- LATIN ---
+  {
     id: 'jazz-bossa-nova-cycle',
     name: 'Bossa Nova Standard Cycle',
     genre: 'Bossa Nova',
@@ -373,73 +434,7 @@ export const CHORD_PROGRESSIONS_LIBRARY: DetailedProgression[] = [
     ]
   },
 
-  // --- NEO-SOUL & BLUES ---
-  {
-    id: 'neosoul-9th-extensions',
-    name: 'Neo-Soul Smooth 9th Extensions',
-    genre: 'R&B / Soul',
-    timeSignature: '4/4',
-    bpm: 85,
-    description: 'Modern R&B and Neo-Soul chord loop utilizing extended 9ths, 13ths, and altered dominant tension.',
-    popularSongs: [
-      'Redbone - Childish Gambino',
-      'Best Part - Daniel Caesar & H.E.R.',
-      'Unaware - Allen Stone',
-      'Untitled (How Does It Feel) - D\'Angelo'
-    ],
-    variations: [
-      {
-        id: 'neosoul-smooth',
-        name: 'Smooth Neo-Soul Loop (Dm9–G13–Cmaj9–A7#9)',
-        description: 'Classic lay-back groove with hendrix/soul altered A7#9 chord',
-        chordsPerBeat: ['Dm9', '', '', '', 'G13', '', '', '', 'Cmaj9', '', '', '', 'A7#9', '', '', '']
-      },
-      {
-        id: 'neosoul-passing-dim',
-        name: 'Passing Diminished (Dm9–G13–Cmaj9–C#dim7)',
-        description: 'Features chromatic passing diminished 7th back into Dm9',
-        chordsPerBeat: ['Dm9', '', '', '', 'G13', '', '', '', 'Cmaj9', '', '', '', 'C#dim7', '', '', '']
-      }
-    ]
-  },
-  {
-    id: 'blues-12-bar',
-    name: '12-Bar Quick-Change Blues',
-    genre: 'Blues',
-    timeSignature: '4/4',
-    bpm: 110,
-    description: 'The foundation of blues, rock-and-roll, and jazz jams. A 12-measure dominant 7th quick-change cycle.',
-    popularSongs: [
-      'Sweet Home Chicago - Robert Johnson',
-      'Johnny B. Goode - Chuck Berry',
-      'Pride and Joy - Stevie Ray Vaughan',
-      'Stormy Monday - T-Bone Walker'
-    ],
-    variations: [
-      {
-        id: 'blues-12bar-dominant',
-        name: '12-Bar Dominant 7th Quick-Change',
-        description: '12-bar form in C Major with bar 2 quick change to F7',
-        chordsPerBeat: [
-          'C7', '', '', '', 'F7', '', '', '', 'C7', '', '', '', 'C7', '', '', '',
-          'F7', '', '', '', 'F7', '', '', '', 'C7', '', '', '', 'C7', '', '', '',
-          'G7', '', '', '', 'F7', '', '', '', 'C7', '', '', '', 'G7', '', '', ''
-        ]
-      },
-      {
-        id: 'blues-12bar-minor',
-        name: '12-Bar Minor Blues (Cm7–Fm7)',
-        description: 'Deep minor blues in C Minor featuring Ab7 to G7 turnaround',
-        chordsPerBeat: [
-          'Cm7', '', '', '', 'Fm7', '', '', '', 'Cm7', '', '', '', 'Cm7', '', '', '',
-          'Fm7', '', '', '', 'Fm7', '', '', '', 'Cm7', '', '', '', 'Cm7', '', '', '',
-          'Ab7', '', '', '', 'G7', '', '', '', 'Cm7', '', '', '', 'G7', '', '', ''
-        ]
-      }
-    ]
-  },
-
-  // --- 6/8 BALLADS & 5/4 ODD METER ---
+  // --- WORLD ---
   {
     id: '68-compound-ballad',
     name: '6/8 Compound Power Ballad',
@@ -468,24 +463,33 @@ export const CHORD_PROGRESSIONS_LIBRARY: DetailedProgression[] = [
       }
     ]
   },
+
+  // --- FLAMENCO ---
   {
-    id: '54-take-five-vamp',
-    name: '5/4 Cool Jazz Vamp (Take Five)',
-    genre: 'Jazz',
-    timeSignature: '5/4',
-    bpm: 140,
-    description: 'Iconic asymmetric 5-beat cool jazz groove inspired by Paul Desmond & Dave Brubeck.',
+    id: 'rock-flamenco-andalusian',
+    name: 'Andalusian Cadence (i–♭VII–♭VI–V)',
+    genre: 'Flamenco',
+    timeSignature: '4/4',
+    bpm: 115,
+    description: 'Dramatic descending Phrygian minor cadence found in Spanish Flamenco, classic rock solos, and cinematic themes.',
     popularSongs: [
-      'Take Five - Dave Brubeck Quartet',
-      'Mission Impossible Theme (5/4 adaptation)',
-      '15 Step - Radiohead'
+      'Sultans of Swing - Dire Straits',
+      'Smooth - Santana',
+      'Habanera - Bizet (Carmen)',
+      'Generique - Cowboy Bebop'
     ],
     variations: [
       {
-        id: '54-take-five-standard',
-        name: 'Take Five Minor 7th Vamp (Ebm7–Bbm7)',
-        description: 'Hypnotic 5-beat swing vamp in Eb minor',
-        chordsPerBeat: ['Ebm7', '', '', '', '', 'Bbm7', '', '', '', '', 'Ebm7', '', '', '', '', 'Bbm7', '', '', '', '']
+        id: 'andalusian-basic',
+        name: 'Classic Descending Minor (Am–G–F–E)',
+        description: 'Fundamental 4-measure descending Phrygian cadence',
+        chordsPerBeat: ['Am', '', '', '', 'G', '', '', '', 'F', '', '', '', 'E', '', '', '']
+      },
+      {
+        id: 'andalusian-flamenco-open',
+        name: 'Flamenco Por Arriba (Am9–G6–Fmaj7#11–E7b9)',
+        description: 'Authentic Spanish guitar open string voicings',
+        chordsPerBeat: ['Am9', '', '', '', 'G6', '', '', '', 'Fmaj7#11', '', '', '', 'E7b9', '', '', '']
       }
     ]
   }

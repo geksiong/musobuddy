@@ -117,7 +117,21 @@ export default function ChordProgressionsModal({
     // Genre filter
     const matchesGenre = selectedGenre === 'ALL'
       ? true
-      : p.genre.toLowerCase().includes(selectedGenre.toLowerCase());
+      : selectedGenre === 'Rock'
+        ? p.genre.toLowerCase().includes('rock') || p.genre.toLowerCase().includes('blues')
+        : selectedGenre === 'Pop'
+          ? p.genre.toLowerCase().includes('pop') || p.genre.toLowerCase().includes('anime')
+          : selectedGenre === 'Funk'
+            ? p.genre.toLowerCase().includes('soul') || p.genre.toLowerCase().includes('r&b') || p.genre.toLowerCase().includes('funk')
+            : selectedGenre === 'Jazz'
+              ? p.genre.toLowerCase().includes('jazz')
+              : selectedGenre === 'Latin'
+                ? p.genre.toLowerCase().includes('bossa') || p.genre.toLowerCase().includes('latin')
+                : selectedGenre === 'World'
+                  ? p.genre.toLowerCase().includes('folk') || p.genre.toLowerCase().includes('country') || p.genre.toLowerCase().includes('classical')
+                  : selectedGenre === 'Flamenco'
+                    ? p.genre.toLowerCase().includes('flamenco')
+                    : p.genre.toLowerCase().includes(selectedGenre.toLowerCase());
 
     // Time Sig filter
     const matchesTimeSig = selectedTimeSigFilter === 'ALL'
@@ -142,15 +156,13 @@ export default function ChordProgressionsModal({
 
   const genresList = [
     'ALL',
-    'J-Pop / Anime',
-    'Pop',
-    'Jazz',
     'Rock',
-    'Blues',
-    'R&B / Soul',
-    'Bossa Nova',
+    'Pop',
+    'Funk',
+    'Jazz',
+    'Latin',
+    'World',
     'Flamenco',
-    'Country / Folk'
   ];
 
   return (

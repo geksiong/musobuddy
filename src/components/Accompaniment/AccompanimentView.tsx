@@ -142,7 +142,7 @@ export default function AccompanimentView() {
   const [userPresets, setUserPresets] = useState<ProgressionPreset[]>(() => getUserPresets());
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [presetNameInput, setPresetNameInput] = useState('');
-  const [presetGenreInput, setPresetGenreInput] = useState('Pop');
+  const [presetGenreInput, setPresetGenreInput] = useState('Rock');
   const [presetDescInput, setPresetDescInput] = useState('');
 
   const { isPlaying: isMetronomeRunning, start: startMetronome, stop: stopMetronome, activePattern, setActivePattern, setBpm } = useMetronome();
@@ -1291,7 +1291,7 @@ export default function AccompanimentView() {
                       resolvedTheme === 'dark' ? "bg-slate-800 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
                     )}
                   >
-                    {['Pop', 'Rock', 'Jazz', 'J-Pop', 'Bossa Nova', 'Blues', 'R&B', 'Acoustic', 'Custom'].map(g => (
+                    {['Rock', 'Pop', 'Funk', 'Jazz', 'Latin', 'World', 'Flamenco', 'Custom'].map(g => (
                       <option key={g} value={g}>{g}</option>
                     ))}
                   </select>
