@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { 
   Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
   Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles,
-  ArrowLeftRight, BookmarkPlus, Save, Hash, Search, Tag, LayoutGrid, Rows, Edit2, FileCode
+  ArrowLeftRight, BookmarkPlus, Save, Hash, Search, Tag, LayoutGrid, Rows, Edit2, FileCode, Timer
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useMetronome } from '../../hooks/useMetronome.ts';
@@ -76,7 +76,11 @@ export default function AccompanimentView() {
     setAccompanimentVolume,
     voicingStyle,
     setVoicingStyle,
-    progressionVoicings
+    progressionVoicings,
+    isCountInEnabled,
+    setIsCountInEnabled,
+    isCountingIn,
+    countInBeat
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
@@ -310,25 +314,38 @@ export default function AccompanimentView() {
 
             {/* Beat Dots Visualizer */}
             <div className="flex items-center gap-1.5">
+              {isCountingIn && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-500 font-extrabold text-[9px] uppercase tracking-wider animate-pulse">
+                  <Timer className="w-2.5 h-2.5" />
+                  <span>Count-In</span>
+                </div>
+              )}
               <div className="flex gap-1.5 items-center">
                 {Array.from({ length: masterLength }).map((_, i) => {
-                  const isCurrentBeat = isPlaying && (currentIndex % masterLength === i);
+                  const isCurrentBeat = isPlaying && (
+                    isCountingIn 
+                      ? (countInBeat - 1 === i)
+                      : (currentIndex % masterLength === i)
+                  );
+                  const isCountInDot = isCountingIn && isCurrentBeat;
                   return (
                     <motion.div
                       key={i}
                       initial={false}
                       animate={{
                         scale: isCurrentBeat ? 1.3 : 1,
-                        backgroundColor: isCurrentBeat ? '#10B981' : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'),
-                        boxShadow: isCurrentBeat ? '0 0 8px rgba(16,185,129,0.7)' : 'none'
+                        backgroundColor: isCountInDot ? '#F59E0B' : (isCurrentBeat ? '#10B981' : (resolvedTheme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)')),
+                        boxShadow: isCountInDot ? '0 0 8px rgba(245,158,11,0.8)' : (isCurrentBeat ? '0 0 8px rgba(16,185,129,0.7)' : 'none')
                       }}
                       className="w-2 h-2 rounded-full"
                     />
                   );
                 })}
               </div>
-              <span className={cn("text-[9px] font-mono font-bold ml-1.5 min-w-[70px] text-right inline-block", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-                {isPlaying ? `Beat ${(currentIndex % masterLength) + 1}/${masterLength}` : `${masterLength} Beats`}
+              <span className={cn("text-[9px] font-mono font-bold ml-1.5 min-w-[70px] text-right inline-block", isCountingIn ? "text-amber-500 font-black" : (resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400"))}>
+                {isCountingIn 
+                  ? `Count ${countInBeat}/${masterLength}`
+                  : (isPlaying ? `Beat ${(currentIndex % masterLength) + 1}/${masterLength}` : `${masterLength} Beats`)}
               </span>
             </div>
           </div>
@@ -347,7 +364,7 @@ export default function AccompanimentView() {
               className={cn(
                 "px-4 py-2 rounded-lg font-black uppercase tracking-wider text-[10px] flex items-center justify-center min-w-[84px] gap-2 transition-all shadow-md active:scale-95 shrink-0",
                 isPlaying 
-                  ? "bg-red-500 text-white shadow-red-500/20" 
+                  ? (isCountingIn ? "bg-amber-600 text-white shadow-amber-600/30 animate-pulse" : "bg-red-500 text-white shadow-red-500/20")
                   : (progression.length > 0 ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-600/20" : (resolvedTheme === 'dark' ? "bg-white/10 text-white/20 cursor-not-allowed" : "bg-slate-200 text-slate-400 cursor-not-allowed"))
               )}
               disabled={progression.length === 0}
@@ -357,12 +374,33 @@ export default function AccompanimentView() {
                   <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Syncing...</span>
                 </div>
+              ) : isCountingIn ? (
+                <div className="flex items-center gap-1.5">
+                  <Timer className="w-3.5 h-3.5 animate-spin" />
+                  <span>Count: {countInBeat}/{masterLength}</span>
+                </div>
               ) : (
                 <>
                   {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                   <span>{isPlaying ? 'Stop' : 'Play'}</span>
                 </>
               )}
+            </button>
+
+            {/* 1-Bar Count-In Toggle */}
+            <button
+              onClick={() => setIsCountInEnabled(!isCountInEnabled)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0",
+                isCountInEnabled 
+                  ? "bg-amber-500/20 border-amber-500 text-amber-500" 
+                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+              )}
+              title="Toggle 1-measure count-in clicks before accompaniment playback begins"
+            >
+              <Timer className="w-3.5 h-3.5" />
+              <span>Count-In</span>
+              <div className={cn("w-1.5 h-1.5 rounded-full ml-0.5", isCountInEnabled ? "bg-amber-500 animate-pulse" : "bg-slate-400")} />
             </button>
 
             {/* Metronome Toggle */}
@@ -785,6 +823,13 @@ export default function AccompanimentView() {
                         <span className="text-[10px] font-black font-mono text-slate-500 dark:text-slate-400">
                           m.{mIdx + 1}
                         </span>
+
+                        {isCountingIn && mIdx === 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 text-[8px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1 border border-amber-500/30">
+                            <Timer className="w-2.5 h-2.5" />
+                            <span>Lead-in: Beat {countInBeat}/{masterLength}</span>
+                          </span>
+                        )}
 
                         {currentLabel ? (
                           <button

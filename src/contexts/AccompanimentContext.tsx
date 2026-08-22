@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useMemo } from 'react';
-import { InstrumentType, ProgressionChord } from '../types.ts';
+import { InstrumentType, ProgressionChord, MetronomeSound } from '../types.ts';
 import { useMetronome } from '../hooks/useMetronome.ts';
 import { useAudio } from './AudioContext.tsx';
 import { getIntervalsForChord } from '../constants.ts';
@@ -88,6 +88,14 @@ interface AccompanimentContextType {
   currentIndex: number;
   setCurrentIndex: React.Dispatch<React.SetStateAction<number>>;
 
+  // 1-Bar Count-In
+  isCountInEnabled: boolean;
+  setIsCountInEnabled: (enabled: boolean) => void;
+  isCountingIn: boolean;
+  setIsCountingIn: React.Dispatch<React.SetStateAction<boolean>>;
+  countInBeat: number;
+  setCountInBeat: React.Dispatch<React.SetStateAction<number>>;
+
   // Keyboard Voicing & Voice Leading Engine
   voicingStyle: PianoVoicingStyle;
   setVoicingStyle: (style: PianoVoicingStyle) => void;
@@ -136,12 +144,15 @@ interface AccompanimentContextType {
 
 const AccompanimentContext = createContext<AccompanimentContextType | null>(null);
 
+const COUNT_IN_STORAGE_KEY = 'musobuddy_accompaniment_count_in_v1';
+
 const SyncEngine: React.FC = () => {
   const { 
     isPlaying, progression, arpeggioPreset, arpeggioRate, selectedInstrument, isBassEnabled,
     setCurrentIndex, setIsPendingStart, accompanimentVolume,
     isRhythmEngineEnabled, activeRhythmPattern, setCurrentSubStepIndex, setEarlyPushEvent,
-    progressionVoicings, voicingStyle
+    progressionVoicings, voicingStyle,
+    isCountInEnabled, isCountingIn, setIsCountingIn, countInBeat, setCountInBeat
   } = useAccompaniment();
   const { currentBeat, activePattern, bpm } = useMetronome();
   const { playChord, playNote, playPercussion, setIsAccompanimentPlaying, isMetronomePlaying, getAudioContext } = useAudio();
@@ -169,21 +180,29 @@ const SyncEngine: React.FC = () => {
         if (isMetronomePlaying && currentBeat % masterLength !== 0) {
           pendingStartRef.current = true;
           setIsPendingStart(true);
+          setIsCountingIn(false);
+          setCountInBeat(0);
         } else {
           playbackStartBeatRef.current = currentBeat;
           pendingStartRef.current = false;
           setIsPendingStart(false);
+          if (isCountInEnabled) {
+            setIsCountingIn(true);
+            setCountInBeat(1);
+          }
         }
       }
     } else {
       pendingStartRef.current = false;
       setIsPendingStart(false);
+      setIsCountingIn(false);
+      setCountInBeat(0);
       lastBeatRef.current = -1;
       clearSubBeatTimers();
       setCurrentSubStepIndex(0);
       setEarlyPushEvent(null);
     }
-  }, [isPlaying, isMetronomePlaying, masterLength, setIsPendingStart, setCurrentSubStepIndex, setEarlyPushEvent]); 
+  }, [isPlaying, isMetronomePlaying, masterLength, isCountInEnabled, setIsPendingStart, setIsCountingIn, setCountInBeat, setCurrentSubStepIndex, setEarlyPushEvent]); 
 
   useEffect(() => {
     if (isPlaying) {
@@ -192,14 +211,55 @@ const SyncEngine: React.FC = () => {
           playbackStartBeatRef.current = currentBeat;
           pendingStartRef.current = false;
           setIsPendingStart(false);
+          if (isCountInEnabled) {
+            setIsCountingIn(true);
+            setCountInBeat(1);
+          }
         } else {
           return;
         }
       }
 
-      const effectiveBeat = currentBeat - playbackStartBeatRef.current;
-      if (effectiveBeat < 0) return;
+      const rawEffectiveBeat = currentBeat - playbackStartBeatRef.current;
+      if (rawEffectiveBeat < 0) return;
 
+      const isCountInActive = isCountInEnabled && rawEffectiveBeat < masterLength;
+
+      // --- 1-MEASURE COUNT-IN LOGIC ---
+      if (isCountInActive) {
+        const currentCountBeat = (rawEffectiveBeat % masterLength) + 1;
+        setIsCountingIn(true);
+        setCountInBeat(currentCountBeat);
+        setCurrentIndex(0);
+
+        if (currentBeat !== lastBeatRef.current) {
+          clearSubBeatTimers();
+
+          const ctx = getAudioContext?.() || null;
+          const baseAudioTime = ctx ? ctx.currentTime : 0;
+
+          // Sound the count-in click if metronome isn't already sounding clicks
+          if (!isMetronomePlaying) {
+            const isAccent = rawEffectiveBeat === 0;
+            const clickSound = masterVoice?.sound || MetronomeSound.Woodblock;
+            const countInVol = Math.max(0.85, accompanimentVolume);
+            playPercussion(clickSound, isAccent, countInVol, baseAudioTime);
+          }
+        }
+
+        lastBeatRef.current = currentBeat;
+        return;
+      }
+
+      // Count-in finished or disabled
+      setIsCountingIn(false);
+      setCountInBeat(0);
+
+      const effectiveBeat = isCountInEnabled 
+        ? (rawEffectiveBeat - masterLength) 
+        : rawEffectiveBeat;
+
+      if (effectiveBeat < 0) return;
       if (progression.length === 0) return;
 
       const beatIndex = effectiveBeat % progression.length;
@@ -434,7 +494,8 @@ const SyncEngine: React.FC = () => {
     currentBeat, isPlaying, progression, arpeggioPreset, arpeggioRate, masterLength,
     selectedInstrument, isBassEnabled, setCurrentIndex, playChord, playNote, playPercussion,
     accompanimentVolume, setIsPendingStart, bpm, isRhythmEngineEnabled, activeRhythmPattern,
-    setCurrentSubStepIndex, setEarlyPushEvent, progressionVoicings, voicingStyle, getAudioContext
+    setCurrentSubStepIndex, setEarlyPushEvent, progressionVoicings, voicingStyle, getAudioContext,
+    isCountInEnabled, isCountingIn, setIsCountingIn, countInBeat, setCountInBeat, isMetronomePlaying
   ]);
 
   return null;
@@ -458,6 +519,26 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
   const [accompanimentVolume, setAccompanimentVolume] = useState(0.8);
   const [isPendingStart, setIsPendingStart] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // 1-Bar Count-In State
+  const [isCountInEnabled, setIsCountInEnabledState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(COUNT_IN_STORAGE_KEY);
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const setIsCountInEnabled = (enabled: boolean) => {
+    setIsCountInEnabledState(enabled);
+    try {
+      localStorage.setItem(COUNT_IN_STORAGE_KEY, String(enabled));
+    } catch {}
+  };
+
+  const [isCountingIn, setIsCountingIn] = useState<boolean>(false);
+  const [countInBeat, setCountInBeat] = useState<number>(0);
 
   // Keyboard Voicing & Voice Leading Engine State
   const [voicingStyle, setVoicingStyle] = useState<PianoVoicingStyle>('smooth_voice_leading');
@@ -654,6 +735,11 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     accompanimentVolume, setAccompanimentVolume,
     isPendingStart, setIsPendingStart,
     currentIndex, setCurrentIndex,
+
+    // 1-Bar Count-In
+    isCountInEnabled, setIsCountInEnabled,
+    isCountingIn, setIsCountingIn,
+    countInBeat, setCountInBeat,
 
     // Keyboard Voicing & Voice Leading Engine
     voicingStyle, setVoicingStyle,
