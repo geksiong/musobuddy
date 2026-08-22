@@ -21,6 +21,8 @@ import {
   Music,
   RefreshCw,
   Upload,
+  Globe,
+  ExternalLink,
   ChevronLeft,
   ChevronRight,
   Columns,
@@ -45,6 +47,7 @@ import { useMetronome } from '../../hooks/useMetronome.ts';
 import { useDrone } from '../../hooks/useDrone.ts';
 import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
 import ScoreAudioPlayer from './ScoreAudioPlayer.tsx';
+import LoadUrlModal from './LoadUrlModal.tsx';
 import * as abcjs from 'abcjs';
 import CodeMirror from '@uiw/react-codemirror';
 import { abc } from '../../lib/abcLanguage.ts';
@@ -62,10 +65,21 @@ const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer'));
 const GuitarProRenderer = React.lazy(() => import('./GuitarProRenderer'));
 
 export default function ScoreView() {
-  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, exportActiveScore, playbackTime, isDistractionFree, toggleDistractionFree } = useScores();
+  const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, loadFromUrl, exportActiveScore, playbackTime, isDistractionFree, toggleDistractionFree } = useScores();
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoadUrlOpen, setIsLoadUrlOpen] = useState(false);
+  const [isReloadingUrl, setIsReloadingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { resolvedTheme } = useTheme();
+
+  const handleReloadFromUrl = async (sourceUrl: string, title?: string) => {
+    setIsReloadingUrl(true);
+    try {
+      await loadFromUrl(sourceUrl, title);
+    } finally {
+      setIsReloadingUrl(false);
+    }
+  };
 
   const handleTransposeInternal = (semitones: number) => {
     const score = scores.find(s => s.id === activeScoreId);
@@ -297,6 +311,9 @@ export default function ScoreView() {
               onTranspose={handleTransposeInternal}
               getAbcTuneTitles={getAbcTuneTitles}
               playbackTime={playbackTime}
+              onOpenLoadUrl={() => setIsLoadUrlOpen(true)}
+              onReloadFromUrl={handleReloadFromUrl}
+              isReloadingUrl={isReloadingUrl}
               onReloadMidi={() => {
                 if (activeScore && activeScore.format === ScoreFormat.ABC) {
                   const midiUrl = generateMidiForAbc(
@@ -316,6 +333,12 @@ export default function ScoreView() {
           )}
         </div>
       </div>
+
+      {/* Score View URL Loading Modal */}
+      <LoadUrlModal 
+        isOpen={isLoadUrlOpen} 
+        onClose={() => setIsLoadUrlOpen(false)} 
+      />
     </div>
   );
 }
@@ -338,6 +361,9 @@ function ScoreDisplay({
   onTranspose,
   getAbcTuneTitles,
   onReloadMidi,
+  onOpenLoadUrl,
+  onReloadFromUrl,
+  isReloadingUrl,
   playbackTime
 }: { 
   score?: ScoreData, 
@@ -347,17 +373,42 @@ function ScoreDisplay({
   onTranspose: (semitones: number) => void,
   getAbcTuneTitles: (abc: string) => string[],
   onReloadMidi: () => void,
+  onOpenLoadUrl?: () => void,
+  onReloadFromUrl?: (url: string, title?: string) => Promise<void>,
+  isReloadingUrl?: boolean,
   playbackTime: number
 }) {
   const { resolvedTheme } = useTheme();
   const { exportActiveScore, isDistractionFree, toggleDistractionFree } = useScores();
   
   if (!score) return (
-    <div className={cn("flex-1 flex flex-col items-center justify-center gap-4 transition-colors", resolvedTheme === 'dark' ? "text-white/10" : "text-slate-200")}>
-      <Library className="w-16 h-16 opacity-5 mb-4" />
-      <div className="text-center">
-        <p className="text-xs uppercase font-black tracking-[0.4em] opacity-40">No Score Selected</p>
-        <p className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-20 mt-2">Create a new score or load a file from top nav</p>
+    <div className={cn("flex-1 flex flex-col items-center justify-center gap-4 transition-colors p-8", resolvedTheme === 'dark' ? "text-slate-400" : "text-slate-600")}>
+      <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-2", resolvedTheme === 'dark' ? "bg-white/5 text-white/20" : "bg-slate-100 text-slate-400")}>
+        <Library className="w-8 h-8" />
+      </div>
+      <div className="text-center space-y-1 max-w-sm">
+        <p className="text-sm uppercase font-black tracking-wider text-slate-800 dark:text-slate-200">No Score Selected</p>
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+          Open sheet music from your files, load any score directly from a web URL, or create a new score.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 pt-4">
+        {onOpenLoadUrl && (
+          <button
+            onClick={onOpenLoadUrl}
+            className="px-4 py-2 rounded-xl bg-[#FF4E00] hover:bg-[#e04500] text-white text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-[#FF4E00]/20 cursor-pointer"
+          >
+            <Globe className="w-4 h-4" />
+            <span>Load from URL</span>
+          </button>
+        )}
+        <button
+          onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
+          className="px-4 py-2 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <Upload className="w-4 h-4 text-[#FF4E00]" />
+          <span>Upload File</span>
+        </button>
       </div>
     </div>
   );
@@ -661,6 +712,51 @@ function ScoreDisplay({
                         : `${score.format} MODE`}
                 </span>
               </div>
+
+              {/* Source URL Badge / Reload Link */}
+              {score.sourceUrl && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <a
+                    href={score.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Original Web Source: ${score.sourceUrl}`}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-mono border transition-all hover:scale-102",
+                      resolvedTheme === 'dark'
+                        ? "bg-white/5 border-white/10 text-slate-300 hover:text-orange-400 hover:border-orange-500/40"
+                        : "bg-slate-100 border-black/5 text-slate-600 hover:text-orange-600 hover:border-orange-500/40"
+                    )}
+                  >
+                    <Globe className="w-3 h-3 text-[#FF4E00] shrink-0" />
+                    <span className="max-w-[120px] sm:max-w-[200px] truncate">
+                      {(() => {
+                        try {
+                          const u = new URL(score.sourceUrl);
+                          return u.hostname + (u.pathname.length > 1 ? u.pathname : '');
+                        } catch {
+                          return score.sourceUrl;
+                        }
+                      })()}
+                    </span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                  </a>
+
+                  {onReloadFromUrl && (
+                    <button
+                      onClick={() => onReloadFromUrl(score.sourceUrl!, score.title)}
+                      disabled={isReloadingUrl}
+                      title="Refetch / Refresh score from original URL"
+                      className={cn(
+                        "p-1 rounded-lg border transition-all cursor-pointer",
+                        resolvedTheme === 'dark' ? "border-white/10 hover:bg-white/10 text-slate-400 hover:text-white" : "border-black/5 hover:bg-black/5 text-slate-500 hover:text-slate-900"
+                      )}
+                    >
+                      <RefreshCw className={cn("w-3 h-3 text-[#FF4E00]", isReloadingUrl && "animate-spin")} />
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Sidebar Toggle for PDF */}
               {score.format === ScoreFormat.PDF && sidebarState && (
@@ -1025,18 +1121,42 @@ function ScoreDisplay({
         {((score.format === ScoreFormat.PDF || score.format === ScoreFormat.Image || (score.format === ScoreFormat.GuitarPro && !score.content)) && !score.content) ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-12">
             <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-6", resolvedTheme === 'dark' ? "bg-white/5 text-white/20" : "bg-slate-100 text-slate-300")}>
-              <Upload className="w-8 h-8" />
+              {score.sourceUrl ? <Globe className="w-8 h-8 text-[#FF4E00]" /> : <Upload className="w-8 h-8" />}
             </div>
             <h2 className={cn("text-xl font-black uppercase tracking-tighter italic mb-2", resolvedTheme === 'dark' ? "text-white" : "text-slate-900")}>File session expired</h2>
             <p className={cn("text-xs uppercase font-bold tracking-widest max-w-xs leading-relaxed", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-              Cloud-less sessions expire on reload for PDF, Image, and uploaded binary files. Please re-upload your document.
+              {score.sourceUrl
+                ? "This document was loaded from the web. Click below to reload it from its original URL or choose another file."
+                : "Cloud-less sessions expire on reload for PDF, Image, and uploaded binary files. Please re-upload your document."}
             </p>
-            <button 
-              className="mt-8 px-6 py-3 bg-orange-500 text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-orange-400 transition-colors"
-              onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-            >
-              Re-upload File
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
+              {score.sourceUrl && onReloadFromUrl && (
+                <button 
+                  disabled={isReloadingUrl}
+                  className="px-6 py-3 bg-[#FF4E00] text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#e04500] transition-colors flex items-center gap-2 cursor-pointer shadow-lg shadow-[#FF4E00]/20"
+                  onClick={() => onReloadFromUrl(score.sourceUrl!, score.title)}
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", isReloadingUrl && "animate-spin")} />
+                  <span>{isReloadingUrl ? 'Reloading...' : 'Reload from Web'}</span>
+                </button>
+              )}
+              {onOpenLoadUrl && (
+                <button 
+                  className="px-5 py-3 border border-black/10 dark:border-white/10 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  onClick={onOpenLoadUrl}
+                >
+                  <Globe className="w-3.5 h-3.5 text-[#FF4E00]" />
+                  <span>Load from URL</span>
+                </button>
+              )}
+              <button 
+                className="px-5 py-3 border border-black/10 dark:border-white/10 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-1.5 cursor-pointer"
+                onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
+              >
+                <Upload className="w-3.5 h-3.5 text-[#FF4E00]" />
+                <span>Re-upload File</span>
+              </button>
+            </div>
           </div>
         ) : (
           <React.Suspense fallback={<div className="flex items-center justify-center p-20 animate-pulse text-[10px] uppercase font-black tracking-widest">Initialising Renderer...</div>}>

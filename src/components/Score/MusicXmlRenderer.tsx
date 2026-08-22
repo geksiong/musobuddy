@@ -19,6 +19,11 @@ export default function MusicXmlRenderer({ xml, zoom = 1 }: MusicXmlRendererProp
   useEffect(() => {
     if (!containerRef.current) return;
 
+    if (!xml || typeof xml !== 'string' || !xml.trim()) {
+      setError('MusicXML score content is empty.');
+      return;
+    }
+
     if (!osmdRef.current) {
       osmdRef.current = new OpenSheetMusicDisplay(containerRef.current, {
         autoResize: true,
@@ -33,24 +38,43 @@ export default function MusicXmlRenderer({ xml, zoom = 1 }: MusicXmlRendererProp
       });
     }
 
+    let isMounted = true;
+
     const renderXml = async () => {
       try {
-        if (osmdRef.current) {
-          osmdRef.current.Zoom = zoom;
+        if (!osmdRef.current || !containerRef.current) return;
+        osmdRef.current.Zoom = zoom;
+
+        const trimmed = xml.trim();
+        // If it starts with XML declaration or tags, parse to XMLDocument to avoid OSMD trying to fetch it as a URL
+        if (trimmed.startsWith('<')) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(trimmed, 'application/xml');
+          const parserError = doc.querySelector('parsererror');
+          if (parserError) {
+            throw new Error(`XML Parse Error: ${parserError.textContent}`);
+          }
+          await osmdRef.current.load(doc);
+        } else {
+          await osmdRef.current.load(trimmed);
         }
-        await osmdRef.current?.load(xml);
-        osmdRef.current?.render();
-        setError(null);
+
+        if (isMounted && osmdRef.current) {
+          osmdRef.current.render();
+          setError(null);
+        }
       } catch (err) {
-        console.error('OSMD Error:', err);
-        setError('Failed to render MusicXML. Please ensure the file is valid.');
+        if (isMounted) {
+          console.error('OSMD Error:', err);
+          setError(`Failed to render MusicXML: ${err instanceof Error ? err.message : 'Invalid MusicXML document'}`);
+        }
       }
     };
 
     renderXml();
 
     return () => {
-      // osmd clean up if necessary (OSMD doesn't have an explicit destroy, but we can clear the container)
+      isMounted = false;
       if (containerRef.current) containerRef.current.innerHTML = '';
       osmdRef.current = null;
     };

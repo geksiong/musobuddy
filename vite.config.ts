@@ -68,11 +68,59 @@ function staticAssetsPlugin(): Plugin {
   };
 }
 
+function scoreProxyPlugin(): Plugin {
+  return {
+    name: 'score-proxy-plugin',
+    configureServer(server) {
+      server.middlewares.use('/api/proxy-score', async (req, res) => {
+        try {
+          const reqUrl = req.url || '';
+          const urlParam = new URL(reqUrl, 'http://localhost').searchParams.get('url');
+          if (!urlParam) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Missing "url" query parameter.' }));
+            return;
+          }
+
+          const targetUrl = decodeURIComponent(urlParam);
+          const upstreamRes = await fetch(targetUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MusoBuddy/1.0',
+              'Accept': '*/*',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          });
+
+          if (!upstreamRes.ok) {
+            res.statusCode = upstreamRes.status;
+            res.setHeader('Content-Type', 'text/plain');
+            res.end(`Upstream server responded with HTTP ${upstreamRes.status}: ${upstreamRes.statusText}`);
+            return;
+          }
+
+          const contentType = upstreamRes.headers.get('content-type') || 'application/octet-stream';
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Access-Control-Allow-Origin', '*');
+
+          const arrayBuffer = await upstreamRes.arrayBuffer();
+          res.statusCode = 200;
+          res.end(Buffer.from(arrayBuffer));
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: err?.message || String(err) }));
+        }
+      });
+    }
+  };
+}
+
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     base: './',
-    plugins: [react(), tailwindcss(), staticAssetsPlugin()],
+    plugins: [react(), tailwindcss(), staticAssetsPlugin(), scoreProxyPlugin()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

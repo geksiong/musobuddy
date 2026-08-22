@@ -8,6 +8,7 @@ import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
 import { parseMxlFile } from '../lib/mxlUtils.ts';
 import { detectChordEngine } from '../lib/chordSheetUtils.ts';
+import { loadScoreFromUrl, LoadScoreUrlResult } from '../lib/urlScoreLoader.ts';
 
 interface GlobalAudio {
   url: string;
@@ -23,6 +24,7 @@ interface ScoreContextType {
   globalAudio: GlobalAudio | null;
   setGlobalAudio: React.Dispatch<React.SetStateAction<GlobalAudio | null>>;
   loadFiles: (files: FileList | File[]) => Promise<string | null>;
+  loadFromUrl: (url: string, customTitle?: string) => Promise<LoadScoreUrlResult>;
   createScore: (format: ScoreFormat) => string;
   exportActiveScore: (asMxl?: boolean) => void;
   playbackTime: number;
@@ -436,6 +438,41 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
     return targetScoreId;
   }, [scores, activeScoreId, setActiveScoreId, setScores, setGlobalAudio]);
 
+  const loadFromUrl = useCallback(async (url: string, customTitle?: string): Promise<LoadScoreUrlResult> => {
+    const result = await loadScoreFromUrl(url, customTitle);
+    if (!result.success) {
+      return result;
+    }
+
+    if (result.audioOnly) {
+      setGlobalAudio(result.audioOnly);
+      if (activeScoreId) {
+        setScores(prev => prev.map(s => s.id === activeScoreId ? {
+          ...s,
+          audioUrl: result.audioOnly!.url,
+          audioName: result.audioOnly!.name
+        } : s));
+      }
+      return result;
+    }
+
+    if (result.score) {
+      const newScore = result.score;
+      setScores(prev => {
+        const existingIdx = prev.findIndex(s => (newScore.sourceUrl && s.sourceUrl === newScore.sourceUrl) || s.title === newScore.title);
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = { ...updated[existingIdx], ...newScore, id: updated[existingIdx].id };
+          return updated;
+        }
+        return [...prev, newScore];
+      });
+      setActiveScoreId(newScore.id);
+    }
+
+    return result;
+  }, [activeScoreId, setActiveScoreId, setScores, setGlobalAudio]);
+
   useEffect(() => {
     // Persist scores and active ID to localStorage
     // Note: We avoid persisting blob URLs as they die on refresh, 
@@ -467,6 +504,7 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       globalAudio,
       setGlobalAudio,
       loadFiles,
+      loadFromUrl,
       createScore,
       exportActiveScore,
       playbackTime,

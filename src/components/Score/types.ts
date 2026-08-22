@@ -33,4 +33,5 @@ export interface ScoreData {
   chordEngine?: 'auto' | 'chordsOverWords' | 'ultimateGuitar' | 'chordpro'; // Renderer/Parser choice for ChordSheet
   chordFormat?: 'html' | 'text' | 'chordpro'; // Output display format for ChordSheet
   accidentalPreference?: '#' | 'b'; // Sharp (#) vs Flat (b) preference for ChordSheet
+  sourceUrl?: string; // Original URL if loaded from a URL
 }

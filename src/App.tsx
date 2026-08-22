@@ -23,6 +23,7 @@ import {
   Moon,
   Monitor,
   Upload,
+  Globe,
   X,
   FileMusic,
   ChevronDown,
@@ -51,6 +52,7 @@ import ScoreView from './components/Score/ScoreView.tsx';
 import AccompanimentView from './components/Accompaniment/AccompanimentView.tsx';
 import PracticeToolsPanel from './components/Navigation/PracticeToolsPanel.tsx';
 import AboutModal from './components/AboutModal.tsx';
+import LoadUrlModal from './components/Score/LoadUrlModal.tsx';
 
 type ViewType = 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment' | 'settings';
 
@@ -59,22 +61,32 @@ export default function App() {
   const { isMetronomePlaying, isDronePlaying, playingRefNote } = useAudio();
   const { isPlaying: isAccompanimentPlaying } = useAccompaniment();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { scores, setScores, activeScoreId, setActiveScoreId, loadFiles, createScore, isDistractionFree, setIsDistractionFree } = useScores();
+  const { scores, setScores, activeScoreId, setActiveScoreId, loadFiles, loadFromUrl, createScore, isDistractionFree, setIsDistractionFree } = useScores();
   const { isInstallable, isInstalled, isOffline, hasUpdate, promptInstall, updateApp } = usePWA();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isNewScoreOpen, setIsNewScoreOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isLoadUrlOpen, setIsLoadUrlOpen] = useState(false);
   const newScoreDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Check URL query params for view (PWA shortcuts support)
+  // Check URL query params for view or direct score loading
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
     if (viewParam && ['metronome', 'tuner', 'drone', 'score', 'accompaniment'].includes(viewParam)) {
       setCurrentView(viewParam as ViewType);
     }
-  }, []);
+
+    const scoreUrlParam = params.get('url') || params.get('scoreUrl') || params.get('score');
+    if (scoreUrlParam) {
+      loadFromUrl(scoreUrlParam).then(res => {
+        if (res.success) {
+          setCurrentView('score');
+        }
+      });
+    }
+  }, [loadFromUrl]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -339,10 +351,44 @@ export default function App() {
                           <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">Lyrics / Chords</div>
                         </div>
                       </button>
+
+                      <button
+                        onClick={() => {
+                          setIsNewScoreOpen(false);
+                          setIsLoadUrlOpen(true);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left group cursor-pointer border-t border-black/5 dark:border-white/5 mt-1",
+                          resolvedTheme === 'dark' ? "hover:bg-white/10" : "hover:bg-slate-100"
+                        )}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-orange-500/20 text-[#FF4E00] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                          <Globe className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-tight text-[#FF4E00]">From Web URL...</div>
+                          <div className="text-[9px] font-bold uppercase tracking-widest opacity-50">Web / Cloud Import</div>
+                        </div>
+                      </button>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Load from URL Button */}
+              <button 
+                onClick={() => setIsLoadUrlOpen(true)}
+                title="Load Score from web URL"
+                className={cn(
+                  "px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border text-[10px] font-extrabold tracking-wider transition-all uppercase flex items-center gap-1 sm:gap-1.5 shrink-0 min-h-[36px] cursor-pointer",
+                  resolvedTheme === 'dark'
+                    ? "border-white/20 bg-white/5 hover:bg-white/10 text-slate-200"
+                    : "border-black/10 bg-slate-100 hover:bg-slate-200 text-slate-800"
+                )}
+              >
+                <Globe className="w-3.5 h-3.5 text-[#FF4E00] shrink-0" />
+                <span>Load <span className="hidden sm:inline">from </span>URL</span>
+              </button>
 
               <button 
                 onClick={handleHeaderLoadScore}
@@ -597,6 +643,13 @@ export default function App() {
 
       {/* About Modal */}
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+
+      {/* Load Score from URL Modal */}
+      <LoadUrlModal 
+        isOpen={isLoadUrlOpen} 
+        onClose={() => setIsLoadUrlOpen(false)} 
+        onSuccess={() => setCurrentView('score')}
+      />
 
       {/* Service Worker Update Toast Notification */}
       <AnimatePresence>
