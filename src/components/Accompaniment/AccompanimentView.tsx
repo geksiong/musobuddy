@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { 
   Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
   Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles,
-  ArrowLeftRight, BookmarkPlus, Save, Hash, Search, Tag, LayoutGrid, Rows, Edit2
+  ArrowLeftRight, BookmarkPlus, Save, Hash, Search, Tag, LayoutGrid, Rows, Edit2, FileCode
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useMetronome } from '../../hooks/useMetronome.ts';
@@ -19,6 +19,7 @@ import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
 import GrooveEnginePanel from './GrooveEnginePanel.tsx';
 import SongLibraryPanel from './SongLibraryPanel.tsx';
 import ChordProgressionsModal from './ChordProgressionsModal.tsx';
+import ImportAbcChordsModal from './ImportAbcChordsModal.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
   CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, ARPEGGIO_RATES,
@@ -77,6 +78,7 @@ export default function AccompanimentView() {
 
   const [activeRightTab, setActiveRightTab] = useState<'library' | 'songs' | 'explorer'>('library');
   const [isChordModalOpen, setIsChordModalOpen] = useState(false);
+  const [isImportAbcModalOpen, setIsImportAbcModalOpen] = useState(false);
 
   const handleLoadChordProgression = (
     chordsPerBeat: string[],
@@ -553,20 +555,34 @@ export default function AccompanimentView() {
               </div>
             </div>
 
-            <button
-              onClick={() => setIsSaveModalOpen(true)}
-              disabled={progression.every(p => !p.name || p.name.trim() === '')}
-              className={cn(
-                "px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all text-[9px] font-bold shadow-xs",
-                progression.some(p => p.name && p.name.trim() !== '')
-                  ? (resolvedTheme === 'dark' ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30" : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700")
-                  : "opacity-40 cursor-not-allowed"
-              )}
-              title="Save current progression as a custom preset"
-            >
-              <BookmarkPlus className="w-3.5 h-3.5" />
-              <span>Save as Preset</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsImportAbcModalOpen(true)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all text-[9px] font-bold shadow-xs cursor-pointer",
+                  resolvedTheme === 'dark' ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30" : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
+                )}
+                title="Import chord progression from a loaded ABC score or chord sheet (overwrites progression)"
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>Import ABC score or chord sheet</span>
+              </button>
+
+              <button
+                onClick={() => setIsSaveModalOpen(true)}
+                disabled={progression.every(p => !p.name || p.name.trim() === '')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all text-[9px] font-bold shadow-xs cursor-pointer",
+                  progression.some(p => p.name && p.name.trim() !== '')
+                    ? (resolvedTheme === 'dark' ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30" : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700")
+                    : "opacity-40 cursor-not-allowed"
+                )}
+                title="Save current progression as a custom preset"
+              >
+                <BookmarkPlus className="w-3.5 h-3.5" />
+                <span>Save as Preset</span>
+              </button>
+            </div>
           </div>
 
           {/* Quick Actions & Selection Banner */}
@@ -1361,6 +1377,12 @@ export default function AccompanimentView() {
         onClose={() => setIsChordModalOpen(false)}
         onLoadProgression={handleLoadChordProgression}
         hasExistingChords={progression.some(p => p.name && p.name.trim() !== '')}
+      />
+
+      {/* Import Chords from ABC Score Modal */}
+      <ImportAbcChordsModal
+        isOpen={isImportAbcModalOpen}
+        onClose={() => setIsImportAbcModalOpen(false)}
       />
     </div>
   );
