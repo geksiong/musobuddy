@@ -55,16 +55,17 @@ interface AudioContextType {
   playRefNote: (note: string) => void;
   stopRefNote: () => void;
 
-  // Chord Player
-  playChord: (chord: string, instrument?: InstrumentType, volume?: number, options?: PlayChordOptions) => void;
-  playNote: (noteIndex: number, duration?: number, instrument?: InstrumentType, volume?: number) => void;
-  playPercussion: (sound: MetronomeSound, isAccent?: boolean, volume?: number) => void;
+  // Chord & Instrument Player
+  playChord: (chord: string, instrument?: InstrumentType, volume?: number, options?: PlayChordOptions, time?: number) => void;
+  playNote: (noteIndex: number, duration?: number, instrument?: InstrumentType, volume?: number, time?: number) => void;
+  playPercussion: (sound: MetronomeSound, isAccent?: boolean, volume?: number, time?: number) => void;
+  getAudioContext: () => AudioContext;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
 
 const LOOKAHEAD = 25.0;
-const SCHEDULE_AHEAD_TIME = 0.1;
+const SCHEDULE_AHEAD_TIME = 0.12;
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -111,20 +112,42 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const refOscRef = useRef<OscillatorNode | null>(null);
   const refGainRef = useRef<GainNode | null>(null);
 
+  // Master Gain & Limiter Bus (prevents digital clipping/distortion across all voices)
+  const masterBusGainRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+
+  // Cached Audio Buffers & Periodic Waves to avoid constant heap allocations & GC stutter
+  const cachedBuffersRef = useRef<{
+    hammer?: AudioBuffer;
+    pluck?: AudioBuffer;
+    hiHat?: AudioBuffer;
+    clap?: AudioBuffer;
+    snare?: AudioBuffer;
+  }>({});
+  const cachedPeriodicWavesRef = useRef<{
+    piano?: PeriodicWave;
+  }>({});
 
   const initAudio = () => {
     if (!audioCtxRef.current) {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtxClass({ latencyHint: 'interactive' });
       audioCtxRef.current = ctx;
 
-      // Dynamics Compressor to prevent digital clipping when multiple chords/notes play simultaneously
+      // Master Bus Gain
+      const masterBus = ctx.createGain();
+      masterBus.gain.setValueAtTime(0.85, ctx.currentTime);
+      masterBusGainRef.current = masterBus;
+
+      // Transparent Dynamics Compressor / Limiter
       const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.setValueAtTime(-14, ctx.currentTime);
-      compressor.knee.setValueAtTime(12, ctx.currentTime);
-      compressor.ratio.setValueAtTime(5, ctx.currentTime);
-      compressor.attack.setValueAtTime(0.004, ctx.currentTime);
+      compressor.threshold.setValueAtTime(-6.0, ctx.currentTime);
+      compressor.knee.setValueAtTime(18.0, ctx.currentTime);
+      compressor.ratio.setValueAtTime(3.5, ctx.currentTime);
+      compressor.attack.setValueAtTime(0.005, ctx.currentTime);
       compressor.release.setValueAtTime(0.20, ctx.currentTime);
+
+      masterBus.connect(compressor);
       compressor.connect(ctx.destination);
       compressorRef.current = compressor;
     }
@@ -134,6 +157,71 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return audioCtxRef.current;
   };
 
+  const getAudioContext = useCallback(() => {
+    return initAudio();
+  }, []);
+
+  const getMasterOutput = (ctx: AudioContext): AudioNode => {
+    if (masterBusGainRef.current) return masterBusGainRef.current;
+    if (compressorRef.current) return compressorRef.current;
+    return ctx.destination;
+  };
+
+  // Buffer caching helpers
+  const getHammerBuffer = (ctx: AudioContext): AudioBuffer => {
+    if (cachedBuffersRef.current.hammer) return cachedBuffersRef.current.hammer;
+    const bufferSize = Math.max(128, Math.floor(ctx.sampleRate * 0.012));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.25));
+    }
+    cachedBuffersRef.current.hammer = buffer;
+    return buffer;
+  };
+
+  const getPluckBuffer = (ctx: AudioContext): AudioBuffer => {
+    if (cachedBuffersRef.current.pluck) return cachedBuffersRef.current.pluck;
+    const bufferSize = Math.max(128, Math.floor(ctx.sampleRate * 0.008));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+    }
+    cachedBuffersRef.current.pluck = buffer;
+    return buffer;
+  };
+
+  const getPercussionNoiseBuffer = (ctx: AudioContext, type: 'hiHat' | 'clap' | 'snare', durationSec: number): AudioBuffer => {
+    if (cachedBuffersRef.current[type]) return cachedBuffersRef.current[type]!;
+    const bufferSize = Math.max(256, Math.floor(ctx.sampleRate * durationSec));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    cachedBuffersRef.current[type] = buffer;
+    return buffer;
+  };
+
+  const getPianoPeriodicWave = (ctx: AudioContext): PeriodicWave => {
+    if (cachedPeriodicWavesRef.current.piano) return cachedPeriodicWavesRef.current.piano;
+    const realHarmonics = new Float32Array([0, 1.0, 0.62, 0.42, 0.28, 0.16, 0.09, 0.04, 0.02, 0.01]);
+    const imagHarmonics = new Float32Array(realHarmonics.length);
+    const wave = ctx.createPeriodicWave(realHarmonics, imagHarmonics);
+    cachedPeriodicWavesRef.current.piano = wave;
+    return wave;
+  };
+
+  // Safe disconnection helper to prevent memory leaks and graph degradation
+  const scheduleNodeCleanup = (nodes: { disconnect: () => void }[], delayMs: number) => {
+    setTimeout(() => {
+      nodes.forEach(n => {
+        try { n.disconnect(); } catch (e) {}
+      });
+    }, delayMs);
+  };
+
   // --- Metronome Logic ---
   const playClick = (time: number, sound: MetronomeSound, volume: number, isAccent: boolean) => {
     const ctx = audioCtxRef.current;
@@ -141,10 +229,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Accents are full volume (1.0), non-accented beats are softer (0.30 amplitude)
     const amplitude = isAccent ? 1.0 : 0.30;
-    const startVol = Math.max(0.0001, volume * amplitude);
+    const startVol = Math.max(0.0001, volume * amplitude * 0.7);
     const masterGain = ctx.createGain();
 
-    const outputTarget = compressorRef.current || ctx.destination;
+    const outputTarget = getMasterOutput(ctx);
     masterGain.connect(outputTarget);
 
     // Keep duration uniform for a sound type so decay is clean
@@ -159,6 +247,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     masterGain.gain.setValueAtTime(startVol, time);
     masterGain.gain.exponentialRampToValueAtTime(0.0001, time + clickDuration);
+
+    const nodesToCleanup: { disconnect: () => void }[] = [masterGain];
 
     switch (sound) {
       case MetronomeSound.Woodblock: {
@@ -183,6 +273,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.stop(time + clickDuration);
         crack.start(time);
         crack.stop(time + 0.012);
+        nodesToCleanup.push(osc, crack, crackGain);
         break;
       }
       case MetronomeSound.Cowbell: {
@@ -206,6 +297,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc1.stop(time + clickDuration);
         osc2.start(time);
         osc2.stop(time + clickDuration);
+        nodesToCleanup.push(osc1, osc2, filter);
         break;
       }
       case MetronomeSound.Kick: {
@@ -216,16 +308,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.connect(masterGain);
         osc.start(time);
         osc.stop(time + clickDuration);
+        nodesToCleanup.push(osc);
         break;
       }
       case MetronomeSound.HiHat: {
-        const bufferSize = Math.floor(ctx.sampleRate * clickDuration);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-        
         const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
+        noise.buffer = getPercussionNoiseBuffer(ctx, 'hiHat', clickDuration);
         const filter = ctx.createBiquadFilter();
         filter.type = 'highpass';
         filter.frequency.setValueAtTime(isAccent ? 8500 : 5500, time);
@@ -233,16 +321,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         noise.connect(filter);
         filter.connect(masterGain);
         noise.start(time);
+        noise.stop(time + clickDuration);
+        nodesToCleanup.push(noise, filter);
         break;
       }
       case MetronomeSound.Clap: {
-        const bufferSize = Math.floor(ctx.sampleRate * clickDuration);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
         const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
+        noise.buffer = getPercussionNoiseBuffer(ctx, 'clap', clickDuration);
         const filter = ctx.createBiquadFilter();
         filter.type = 'bandpass';
         filter.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
@@ -251,6 +336,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         noise.connect(filter);
         filter.connect(masterGain);
         noise.start(time);
+        noise.stop(time + clickDuration);
+        nodesToCleanup.push(noise, filter);
         break;
       }
       case MetronomeSound.Snare: {
@@ -259,13 +346,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.frequency.setValueAtTime(isAccent ? 220 : 150, time);
         osc.frequency.exponentialRampToValueAtTime(70, time + 0.06);
 
-        const bufferSize = Math.floor(ctx.sampleRate * clickDuration);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
         const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
+        noise.buffer = getPercussionNoiseBuffer(ctx, 'snare', clickDuration);
         const noiseFilter = ctx.createBiquadFilter();
         noiseFilter.type = 'highpass';
         noiseFilter.frequency.setValueAtTime(isAccent ? 1800 : 1100, time);
@@ -277,6 +359,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.start(time);
         osc.stop(time + clickDuration);
         noise.start(time);
+        noise.stop(time + clickDuration);
+        nodesToCleanup.push(osc, noise, noiseFilter);
         break;
       }
       case MetronomeSound.ClockTick: {
@@ -287,6 +371,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.connect(masterGain);
         osc.start(time);
         osc.stop(time + clickDuration);
+        nodesToCleanup.push(osc);
         break;
       }
       case MetronomeSound.Bodhran:
@@ -298,6 +383,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.connect(masterGain);
         osc.start(time);
         osc.stop(time + clickDuration);
+        nodesToCleanup.push(osc);
         break;
       }
       default: {
@@ -307,8 +393,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.connect(masterGain);
         osc.start(time);
         osc.stop(time + clickDuration);
+        nodesToCleanup.push(osc);
       }
     }
+
+    const cleanupDelayMs = Math.max(100, Math.ceil((time - ctx.currentTime + clickDuration + 0.05) * 1000));
+    scheduleNodeCleanup(nodesToCleanup, cleanupDelayMs);
   };
 
   useEffect(() => {
@@ -547,7 +637,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(0.0001, now);
     masterGain.gain.linearRampToValueAtTime(volume * 0.35, now + 0.25);
-    masterGain.connect(ctx.destination);
+    masterGain.connect(getMasterOutput(ctx));
 
     // Modulation Gain (for pulse BPM slider LFO)
     const modGain = ctx.createGain();
@@ -1029,7 +1119,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     gain.gain.setValueAtTime(0, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.1);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getMasterOutput(ctx));
     osc.start();
     refOscRef.current = osc;
     refGainRef.current = gain;
@@ -1041,17 +1131,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const ctx = audioCtxRef.current;
     if (!ctx) return;
 
+    const cleanupNodes: { disconnect: () => void }[] = [];
+
     switch (instrument) {
       case InstrumentType.Piano: {
         // --- Acoustic Concert Grand Piano ---
-        // 1. Felt Hammer Attack Transient (Percussive Thump & Felt Impact)
-        const hammerBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.012), ctx.sampleRate);
-        const hammerData = hammerBuffer.getChannelData(0);
-        for (let i = 0; i < hammerData.length; i++) {
-          hammerData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (hammerData.length * 0.25));
-        }
+        // 1. Felt Hammer Attack Transient (Reuses cached buffer)
         const hammerSource = ctx.createBufferSource();
-        hammerSource.buffer = hammerBuffer;
+        hammerSource.buffer = getHammerBuffer(ctx);
 
         const hammerFilter = ctx.createBiquadFilter();
         hammerFilter.type = 'bandpass';
@@ -1059,61 +1146,55 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         hammerFilter.Q.setValueAtTime(1.8, now);
 
         const hammerGain = ctx.createGain();
-        hammerGain.gain.setValueAtTime(0.025, now);
+        hammerGain.gain.setValueAtTime(0.02, now);
 
         hammerSource.connect(hammerFilter);
         hammerFilter.connect(hammerGain);
         hammerGain.connect(gain);
         hammerSource.start(now);
+        hammerSource.stop(now + 0.02);
+        cleanupNodes.push(hammerSource, hammerFilter, hammerGain);
 
         // Low frequency wooden body thump
         const thumpOsc = ctx.createOscillator();
         const thumpGain = ctx.createGain();
         thumpOsc.type = 'sine';
         thumpOsc.frequency.setValueAtTime(110, now);
-        thumpGain.gain.setValueAtTime(0.02, now);
+        thumpGain.gain.setValueAtTime(0.015, now);
         thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.018);
         thumpOsc.connect(thumpGain);
         thumpGain.connect(gain);
         thumpOsc.start(now);
         thumpOsc.stop(now + 0.02);
+        cleanupNodes.push(thumpOsc, thumpGain);
 
         // 2. Soundboard Body Resonators & Dynamic Lowpass Filter
         const soundboardFilter1 = ctx.createBiquadFilter();
         soundboardFilter1.type = 'peaking';
         soundboardFilter1.frequency.setValueAtTime(280, now);
         soundboardFilter1.Q.setValueAtTime(1.2, now);
-        soundboardFilter1.gain.setValueAtTime(3.5, now);
-
-        const soundboardFilter2 = ctx.createBiquadFilter();
-        soundboardFilter2.type = 'peaking';
-        soundboardFilter2.frequency.setValueAtTime(950, now);
-        soundboardFilter2.Q.setValueAtTime(0.9, now);
-        soundboardFilter2.gain.setValueAtTime(2.0, now);
+        soundboardFilter1.gain.setValueAtTime(2.5, now);
 
         const lpFilter = ctx.createBiquadFilter();
         lpFilter.type = 'lowpass';
-        // Dynamic cutoff: Bright initial strike decaying to warm fundamental sustain
-        const initialCutoff = Math.min(8500, Math.max(2400, freq * 5.5));
-        const sustainCutoff = Math.min(3000, Math.max(950, freq * 2.2));
+        const initialCutoff = Math.min(8000, Math.max(2400, freq * 5.0));
+        const sustainCutoff = Math.min(2800, Math.max(950, freq * 2.0));
         lpFilter.frequency.setValueAtTime(initialCutoff, now);
         lpFilter.frequency.exponentialRampToValueAtTime(sustainCutoff, now + 0.16);
 
-        soundboardFilter1.connect(soundboardFilter2);
-        soundboardFilter2.connect(lpFilter);
+        soundboardFilter1.connect(lpFilter);
         lpFilter.connect(gain);
+        cleanupNodes.push(soundboardFilter1, lpFilter);
 
-        // 3. Realistic Piano Fourier Harmonic PeriodicWave
-        const realHarmonics = new Float32Array([0, 1.0, 0.62, 0.42, 0.28, 0.16, 0.09, 0.04, 0.02, 0.01]);
-        const imagHarmonics = new Float32Array(realHarmonics.length);
-        const pianoWave = ctx.createPeriodicWave(realHarmonics, imagHarmonics);
+        // 3. Reusable Realistic Piano Harmonic PeriodicWave
+        const pianoWave = getPianoPeriodicWave(ctx);
 
-        // 4. 3-String Chorused Unison (Center, -1.5 cents, +1.5 cents for natural piano depth)
+        // 4. 2-String Chorused Unison (Center & Detuned) for warmth & CPU efficiency
         const mainGain = ctx.createGain();
         mainGain.gain.setValueAtTime(0.0001, now);
-        mainGain.gain.linearRampToValueAtTime(0.12, now + 0.0025); // Fast responsive attack
-        mainGain.gain.exponentialRampToValueAtTime(0.065, now + 0.14);  // Initial hammer drop
-        mainGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.1); // Natural sustain decay
+        mainGain.gain.linearRampToValueAtTime(0.12, now + 0.003);
+        mainGain.gain.exponentialRampToValueAtTime(0.065, now + 0.14);
+        mainGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.05);
 
         // Primary string
         osc.setPeriodicWave(pianoWave);
@@ -1128,52 +1209,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         uOsc1.connect(mainGain);
         uOsc1.start(now);
         uOsc1.stop(now + duration);
-
-        // Detuned unison string 3
-        const uOsc2 = ctx.createOscillator();
-        uOsc2.setPeriodicWave(pianoWave);
-        uOsc2.frequency.setValueAtTime(freq, now);
-        uOsc2.detune.setValueAtTime(1.5, now);
-        uOsc2.connect(mainGain);
-        uOsc2.start(now);
-        uOsc2.stop(now + duration);
+        cleanupNodes.push(uOsc1, mainGain);
 
         mainGain.connect(soundboardFilter1);
-
-        // 5. Inharmonic Stiffness Partials (Crystalline acoustic ring)
-        const inharmonicPartials = [
-          { ratio: 2.002, amp: 0.025, decay: 0.55 },
-          { ratio: 3.006, amp: 0.012, decay: 0.35 },
-          { ratio: 4.012, amp: 0.005, decay: 0.20 },
-        ];
-
-        inharmonicPartials.forEach(p => {
-          const pOsc = ctx.createOscillator();
-          const pGain = ctx.createGain();
-          pOsc.type = 'sine';
-          pOsc.frequency.setValueAtTime(freq * p.ratio, now);
-
-          pGain.gain.setValueAtTime(0.0001, now);
-          pGain.gain.linearRampToValueAtTime(p.amp, now + 0.003);
-          pGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * p.decay);
-
-          pOsc.connect(pGain);
-          pGain.connect(soundboardFilter1);
-          pOsc.start(now);
-          pOsc.stop(now + duration);
-        });
         break;
       }
 
       case InstrumentType.ElectricPiano: {
         // --- Vintage Rhodes Electric Piano ---
-        // FM Synthesis: Sine carrier + Sine modulator for signature metallic tine bell
         const modOsc = ctx.createOscillator();
         const modGain = ctx.createGain();
         modOsc.type = 'sine';
-        modOsc.frequency.setValueAtTime(freq * 14, now); // Tine harmonic
+        modOsc.frequency.setValueAtTime(freq * 14, now);
         modGain.gain.setValueAtTime(freq * 1.5, now);
-        modGain.gain.exponentialRampToValueAtTime(0.05, now + 0.035); // Fast tine decay
+        modGain.gain.exponentialRampToValueAtTime(0.05, now + 0.035);
 
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
@@ -1205,19 +1254,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         h2Osc.stop(now + duration);
         modOsc.start(now);
         modOsc.stop(now + 0.05);
+        cleanupNodes.push(modOsc, modGain, h2Osc, h2Gain, filter);
         break;
       }
 
       case InstrumentType.Guitar: {
-        // --- Acoustic Guitar (Plucked String Physical Modeling) ---
-        // Pick/Fingernail Attack Noise Burst
-        const pluckBuffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.008), ctx.sampleRate);
-        const pluckData = pluckBuffer.getChannelData(0);
-        for (let i = 0; i < pluckData.length; i++) {
-          pluckData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (pluckData.length * 0.3));
-        }
+        // --- Acoustic Guitar (Plucked String Modeling) ---
         const pluckSource = ctx.createBufferSource();
-        pluckSource.buffer = pluckBuffer;
+        pluckSource.buffer = getPluckBuffer(ctx);
 
         const pluckFilter = ctx.createBiquadFilter();
         pluckFilter.type = 'bandpass';
@@ -1231,14 +1275,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         pluckFilter.connect(pluckGain);
         pluckGain.connect(gain);
         pluckSource.start(now);
+        pluckSource.stop(now + 0.02);
 
         // Guitar Body Cavity Resonant Filters
-        const bodyAirFilter = ctx.createBiquadFilter();
-        bodyAirFilter.type = 'peaking';
-        bodyAirFilter.frequency.setValueAtTime(105, now);
-        bodyAirFilter.Q.setValueAtTime(2.5, now);
-        bodyAirFilter.gain.setValueAtTime(4, now);
-
         const bodyWoodFilter = ctx.createBiquadFilter();
         bodyWoodFilter.type = 'peaking';
         bodyWoodFilter.frequency.setValueAtTime(220, now);
@@ -1249,7 +1288,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         guitarLP.type = 'lowpass';
         guitarLP.frequency.setValueAtTime(3400, now);
 
-        bodyAirFilter.connect(bodyWoodFilter);
         bodyWoodFilter.connect(guitarLP);
         guitarLP.connect(gain);
 
@@ -1271,11 +1309,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         oGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.3);
 
         overtone.connect(oGain);
-        oGain.connect(bodyAirFilter);
-        osc.connect(bodyAirFilter);
+        oGain.connect(bodyWoodFilter);
+        osc.connect(bodyWoodFilter);
 
         overtone.start(now);
         overtone.stop(now + duration);
+        cleanupNodes.push(pluckSource, pluckFilter, pluckGain, bodyWoodFilter, guitarLP, overtone, oGain);
         break;
       }
 
@@ -1284,7 +1323,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
 
-        // Dynamic Lowpass Filter
         const bassFilter = ctx.createBiquadFilter();
         bassFilter.type = 'lowpass';
         bassFilter.frequency.setValueAtTime(1200, now);
@@ -1310,6 +1348,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         gain.gain.setValueAtTime(0.0001, now);
         gain.gain.linearRampToValueAtTime(0.14, now + 0.01);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        cleanupNodes.push(bassFilter, subOsc, subGain);
         break;
       }
 
@@ -1339,21 +1378,23 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         gain.gain.linearRampToValueAtTime(0.07, now + duration - 0.15);
         gain.gain.linearRampToValueAtTime(0.0001, now + duration);
 
-        const detuneCents = [-8, -3, 0, 3, 8];
-        detuneCents.forEach((cents, idx) => {
+        const detuneCents = [-6, 6];
+        detuneCents.forEach((cents) => {
           const sOsc = ctx.createOscillator();
           const sGain = ctx.createGain();
-          sOsc.type = idx === 2 ? 'triangle' : 'sawtooth';
-          sOsc.frequency.setValueAtTime(freq * (idx === 4 ? 0.5 : 1.0), now);
+          sOsc.type = 'sawtooth';
+          sOsc.frequency.setValueAtTime(freq, now);
           sOsc.detune.setValueAtTime(cents, now);
 
-          sGain.gain.setValueAtTime(0.02, now);
+          sGain.gain.setValueAtTime(0.03, now);
           sOsc.connect(sGain);
           sGain.connect(stringFilter1);
 
           sOsc.start(now);
           sOsc.stop(now + duration);
+          cleanupNodes.push(sOsc, sGain);
         });
+        cleanupNodes.push(stringFilter1, stringLP);
         break;
       }
 
@@ -1368,9 +1409,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.frequency.setValueAtTime(freq, now);
         osc.connect(gain);
 
-        // Hammond Drawbars
-        const drawbarRatios = [0.5, 1.498, 1.0, 2.0, 2.996, 4.0];
-        const drawbarGains  = [0.04, 0.02,  0.06, 0.03, 0.015, 0.01];
+        const drawbarRatios = [0.5, 1.0, 2.0, 3.0];
+        const drawbarGains  = [0.04, 0.06, 0.03, 0.015];
 
         drawbarRatios.forEach((ratio, i) => {
           const dOsc = ctx.createOscillator();
@@ -1383,6 +1423,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           dGain.connect(gain);
           dOsc.start(now);
           dOsc.stop(now + duration);
+          cleanupNodes.push(dOsc, dGain);
         });
         break;
       }
@@ -1403,67 +1444,47 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         vibLfo.connect(vibGain);
         vibGain.connect(osc.frequency);
 
-        // 2nd harmonic
-        const h2 = ctx.createOscillator();
-        const h2G = ctx.createGain();
-        h2.type = 'sine';
-        h2.frequency.setValueAtTime(freq * 2, now);
-        h2G.gain.setValueAtTime(0.012, now);
-
         gain.gain.setValueAtTime(0, now);
         gain.gain.linearRampToValueAtTime(0.09, now + 0.04);
         gain.gain.linearRampToValueAtTime(0.08, now + duration - 0.06);
         gain.gain.linearRampToValueAtTime(0, now + duration);
 
-        h2.connect(h2G);
-        h2G.connect(gain);
-
         vibLfo.start(now);
-        h2.start(now);
         vibLfo.stop(now + duration);
-        h2.stop(now + duration);
+        cleanupNodes.push(vibLfo, vibGain);
         break;
       }
 
       case InstrumentType.Brass: {
         // --- Acoustic Brass Horn Section ---
-        // Smooth lowpass filter without high Q resonance spike (Q = 0.8)
         const brassFilter = ctx.createBiquadFilter();
         brassFilter.type = 'lowpass';
-        brassFilter.Q.setValueAtTime(0.8, now); // Smooth Butterworth response (no harsh whistle)
+        brassFilter.Q.setValueAtTime(0.8, now);
         brassFilter.frequency.setValueAtTime(freq * 1.5, now);
-        brassFilter.frequency.exponentialRampToValueAtTime(Math.min(2200, freq * 3.2), now + 0.045); // Warm lip swell
+        brassFilter.frequency.exponentialRampToValueAtTime(Math.min(2200, freq * 3.2), now + 0.045);
         brassFilter.frequency.exponentialRampToValueAtTime(Math.min(1400, freq * 2.0), now + duration);
 
-        // Acoustic Formant Warmth Filter
-        const bodyFilter = ctx.createBiquadFilter();
-        bodyFilter.type = 'peaking';
-        bodyFilter.frequency.setValueAtTime(480, now); // Warm horn cup resonance
-        bodyFilter.Q.setValueAtTime(1.2, now);
-        bodyFilter.gain.setValueAtTime(2.0, now);
-
-        bodyFilter.connect(brassFilter);
         brassFilter.connect(gain);
 
-        // Mix 1 Sawtooth (-3 cents) + 1 Triangle (+4 cents) for warm acoustic brass body
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(freq, now);
         osc.detune.setValueAtTime(-3, now);
-        osc.connect(bodyFilter);
+        osc.connect(brassFilter);
 
         const bOsc2 = ctx.createOscillator();
         bOsc2.type = 'triangle';
         bOsc2.frequency.setValueAtTime(freq, now);
         bOsc2.detune.setValueAtTime(4, now);
-        bOsc2.connect(bodyFilter);
+        bOsc2.connect(brassFilter);
 
         gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.08, now + 0.03); // Lip swell attack
+        gain.gain.linearRampToValueAtTime(0.08, now + 0.03);
         gain.gain.linearRampToValueAtTime(0.07, now + duration - 0.05);
         gain.gain.linearRampToValueAtTime(0, now + duration);
 
         bOsc2.start(now);
         bOsc2.stop(now + duration);
+        cleanupNodes.push(brassFilter, bOsc2);
         break;
       }
 
@@ -1473,7 +1494,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.frequency.setValueAtTime(freq, now);
         osc.connect(gain);
 
-        // Inharmonic rosewood bar overtone
         const overtone = ctx.createOscillator();
         const oGain = ctx.createGain();
         overtone.type = 'sine';
@@ -1490,6 +1510,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         overtone.start(now);
         overtone.stop(now + 0.1);
+        cleanupNodes.push(overtone, oGain);
         break;
       }
 
@@ -1500,22 +1521,24 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         gain.gain.linearRampToValueAtTime(0.08, now + 0.1);
         gain.gain.linearRampToValueAtTime(0, now + duration);
     }
+
+    if (cleanupNodes.length > 0) {
+      const cleanupDelayMs = Math.max(100, Math.ceil((now - ctx.currentTime + duration + 0.1) * 1000));
+      scheduleNodeCleanup(cleanupNodes, cleanupDelayMs);
+    }
   };
 
   const playChord = (
     chord: string,
     instrument: InstrumentType = InstrumentType.Piano,
     volume: number = 1.0,
-    options?: PlayChordOptions
+    options?: PlayChordOptions,
+    time?: number
   ) => {
     const ctx = initAudio();
     const duration = options?.duration || 1.6;
-    const now = ctx.currentTime;
+    const now = time ?? ctx.currentTime;
 
-    // Determine frequencies to play:
-    // 1. If custom MIDI notes provided (e.g. from Progression Voice Leading Engine), use them directly!
-    // 2. Else if custom intervals provided, calculate relative to C4
-    // 3. Else calculate optimal piano voicing (context-aware if prev/next chord given)
     let frequencies: { freq: number; isBass: boolean; idx: number }[] = [];
 
     if (options?.customMidiNotes && options.customMidiNotes.length > 0) {
@@ -1526,14 +1549,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         idx
       }));
     } else if (options?.customIntervals && options.customIntervals.length > 0) {
-      const rootFreq = 261.63; // C4
+      const rootFreq = 261.63;
       frequencies = options.customIntervals.map((interval, idx) => ({
         freq: rootFreq * Math.pow(2, interval / 12),
         isBass: idx === 0,
         idx
       }));
     } else if (chord && chord.trim() !== '') {
-      // Generate rich keyboard voicing (context-aware if prev/next chord provided)
       const midiNotes = getVoicedMidiNotes(chord, {
         prevChord: options?.prevChord,
         nextChord: options?.nextChord,
@@ -1559,10 +1581,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (frequencies.length === 0) return;
 
-    // Determine realistic strum / hand spread timing
-    // - Guitar: 22ms per string
-    // - Piano / Electric Piano: subtle 12ms natural hand spread
-    // - Organ / Strings / Brass / Marimba: tight sync (0-4ms)
     let staggerStepMs = 0;
     if (options?.isStrummed !== false) {
       if (instrument === InstrumentType.Guitar) {
@@ -1574,7 +1592,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    const outputTarget = compressorRef.current || ctx.destination;
+    const outputTarget = getMasterOutput(ctx);
+    const nodesToCleanup: { disconnect: () => void }[] = [];
 
     frequencies.forEach(({ freq, isBass, idx }) => {
       const noteStartTime = now + (idx * staggerStepMs / 1000);
@@ -1586,16 +1605,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       osc.frequency.setValueAtTime(freq, noteStartTime);
       applyTone(osc, voiceGain, instrument, freq, noteStartTime, duration);
 
-      // Acoustic keyboard velocity curve:
-      // Bass gets solid foundation velocity (1.05), inner voices slightly softer for transparency (0.90),
-      // top voice gets clear melody presence (1.02), with subtle human micro-variance.
       let noteVelocity = 0.95;
       if (isBass) {
         noteVelocity = 1.05;
       } else if (idx === frequencies.length - 1) {
-        noteVelocity = 1.02; // top melody voice
+        noteVelocity = 1.02;
       } else {
-        noteVelocity = 0.90; // inner harmonic filler
+        noteVelocity = 0.90;
       }
 
       const humanVelocity = noteVelocity * (0.94 + Math.random() * 0.12);
@@ -1606,26 +1622,36 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       osc.start(noteStartTime);
       osc.stop(noteStartTime + duration);
+
+      nodesToCleanup.push(osc, voiceGain, volumeGain);
     });
+
+    const cleanupDelayMs = Math.max(100, Math.ceil((now - ctx.currentTime + duration + 0.1) * 1000));
+    scheduleNodeCleanup(nodesToCleanup, cleanupDelayMs);
   };
 
   // --- Note Logic ---
-  const playNote = (interval: number, duration: number = 0.8, instrument: InstrumentType = InstrumentType.Piano, volume: number = 1.0) => {
+  const playNote = (
+    interval: number,
+    duration: number = 0.8,
+    instrument: InstrumentType = InstrumentType.Piano,
+    volume: number = 1.0,
+    time?: number
+  ) => {
     const ctx = initAudio();
-    const rootFreq = 261.63; // C4
-    const now = ctx.currentTime;
+    const rootFreq = 261.63;
+    const now = time ?? ctx.currentTime;
     const freq = rootFreq * Math.pow(2, interval / 12);
     
     const osc = ctx.createOscillator();
     const voiceGain = ctx.createGain();
     const volumeGain = ctx.createGain();
     
-    const outputTarget = compressorRef.current || ctx.destination;
+    const outputTarget = getMasterOutput(ctx);
 
     osc.frequency.setValueAtTime(freq, now);
     applyTone(osc, voiceGain, instrument, freq, now, duration);
     
-    // Apply volume scaling via a dedicated gain node
     volumeGain.gain.setValueAtTime(volume, now);
     
     voiceGain.connect(volumeGain);
@@ -1633,6 +1659,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     osc.start(now);
     osc.stop(now + duration);
+
+    const cleanupDelayMs = Math.max(100, Math.ceil((now - ctx.currentTime + duration + 0.1) * 1000));
+    scheduleNodeCleanup([osc, voiceGain, volumeGain], cleanupDelayMs);
   };
 
   const playPercussion = useCallback((sound: MetronomeSound, isAccent: boolean = false, volume: number = 0.8, time?: number) => {
@@ -1654,7 +1683,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     playingRefNote, playRefNote, stopRefNote,
     playChord,
     playNote,
-    playPercussion
+    playPercussion,
+    getAudioContext
   };
 
   return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;
