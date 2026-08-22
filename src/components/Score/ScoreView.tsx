@@ -35,7 +35,8 @@ import {
   Piano,
   Download,
   Sliders,
-  Compass
+  Compass,
+  AudioWaveform
 } from 'lucide-react';
 import { ScoreFormat, ScoreData } from './types.ts';
 import { TUNINGS } from './constants.ts';
@@ -48,6 +49,7 @@ import { useDrone } from '../../hooks/useDrone.ts';
 import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
 import ScoreAudioPlayer from './ScoreAudioPlayer.tsx';
 import LoadUrlModal from './LoadUrlModal.tsx';
+import TranscribeMelodyModal from './TranscribeMelodyModal.tsx';
 import * as abcjs from 'abcjs';
 import CodeMirror from '@uiw/react-codemirror';
 import { abc } from '../../lib/abcLanguage.ts';
@@ -68,6 +70,7 @@ export default function ScoreView() {
   const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, loadFromUrl, exportActiveScore, playbackTime, isDistractionFree, toggleDistractionFree } = useScores();
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadUrlOpen, setIsLoadUrlOpen] = useState(false);
+  const [isTranscribeModalOpen, setIsTranscribeModalOpen] = useState(false);
   const [isReloadingUrl, setIsReloadingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { resolvedTheme } = useTheme();
@@ -312,6 +315,7 @@ export default function ScoreView() {
               getAbcTuneTitles={getAbcTuneTitles}
               playbackTime={playbackTime}
               onOpenLoadUrl={() => setIsLoadUrlOpen(true)}
+              onOpenTranscribeModal={() => setIsTranscribeModalOpen(true)}
               onReloadFromUrl={handleReloadFromUrl}
               isReloadingUrl={isReloadingUrl}
               onReloadMidi={() => {
@@ -339,6 +343,12 @@ export default function ScoreView() {
         isOpen={isLoadUrlOpen} 
         onClose={() => setIsLoadUrlOpen(false)} 
       />
+
+      {/* Melody Transcriber Modal */}
+      <TranscribeMelodyModal
+        isOpen={isTranscribeModalOpen}
+        onClose={() => setIsTranscribeModalOpen(false)}
+      />
     </div>
   );
 }
@@ -362,6 +372,7 @@ function ScoreDisplay({
   getAbcTuneTitles,
   onReloadMidi,
   onOpenLoadUrl,
+  onOpenTranscribeModal,
   onReloadFromUrl,
   isReloadingUrl,
   playbackTime
@@ -374,6 +385,7 @@ function ScoreDisplay({
   getAbcTuneTitles: (abc: string) => string[],
   onReloadMidi: () => void,
   onOpenLoadUrl?: () => void,
+  onOpenTranscribeModal?: () => void,
   onReloadFromUrl?: (url: string, title?: string) => Promise<void>,
   isReloadingUrl?: boolean,
   playbackTime: number
@@ -389,16 +401,25 @@ function ScoreDisplay({
       <div className="text-center space-y-1 max-w-sm">
         <p className="text-sm uppercase font-black tracking-wider text-slate-800 dark:text-slate-200">No Score Selected</p>
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
-          Open sheet music from your files, load any score directly from a web URL, or create a new score.
+          Open sheet music from your files, record a melody with your microphone, load from web URL, or create a score.
         </p>
       </div>
-      <div className="flex items-center gap-3 pt-4">
+      <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+        {onOpenTranscribeModal && (
+          <button
+            onClick={onOpenTranscribeModal}
+            className="px-4 py-2 rounded-xl bg-[#FF4E00] hover:bg-[#e04500] text-white text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-[#FF4E00]/20 cursor-pointer"
+          >
+            <AudioWaveform className="w-4 h-4" />
+            <span>Transcribe Melody (Mic)</span>
+          </button>
+        )}
         {onOpenLoadUrl && (
           <button
             onClick={onOpenLoadUrl}
-            className="px-4 py-2 rounded-xl bg-[#FF4E00] hover:bg-[#e04500] text-white text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-[#FF4E00]/20 cursor-pointer"
+            className="px-4 py-2 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <Globe className="w-4 h-4" />
+            <Globe className="w-4 h-4 text-[#FF4E00]" />
             <span>Load from URL</span>
           </button>
         )}
@@ -969,6 +990,20 @@ function ScoreDisplay({
                     <Layout className="w-4 h-4 group-hover:scale-110 transition-transform" />
                     <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{score.showEditor ? 'Hide' : 'Code'}</span>
                   </button>
+
+                  {/* Transcribe Mic Button */}
+                  {onOpenTranscribeModal && (
+                    <button 
+                      onClick={onOpenTranscribeModal}
+                      className={cn(
+                        "p-1.5 sm:p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0 bg-[#FF4E00]/10 border-[#FF4E00]/30 hover:bg-[#FF4E00]/20 text-[#FF4E00]"
+                      )}
+                      title="Transcribe melody from microphone into ABC"
+                    >
+                      <AudioWaveform className="w-4 h-4 group-hover:scale-110 transition-transform text-[#FF4E00]" />
+                      <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Transcribe Mic</span>
+                    </button>
+                  )}
                 </div>
               )}
 

@@ -34,7 +34,8 @@ import {
   Download,
   WifiOff,
   RefreshCw,
-  Smartphone
+  Smartphone,
+  AudioWaveform
 } from 'lucide-react';
 import { cn } from './lib/utils.ts';
 import { useAudio } from './contexts/AudioContext.tsx';
@@ -53,6 +54,7 @@ import AccompanimentView from './components/Accompaniment/AccompanimentView.tsx'
 import PracticeToolsPanel from './components/Navigation/PracticeToolsPanel.tsx';
 import AboutModal from './components/AboutModal.tsx';
 import LoadUrlModal from './components/Score/LoadUrlModal.tsx';
+import TranscribeMelodyModal from './components/Score/TranscribeMelodyModal.tsx';
 
 type ViewType = 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment' | 'settings';
 
@@ -68,6 +70,7 @@ export default function App() {
   const [isNewScoreOpen, setIsNewScoreOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isLoadUrlOpen, setIsLoadUrlOpen] = useState(false);
+  const [isTranscribeModalOpen, setIsTranscribeModalOpen] = useState(false);
   const newScoreDropdownRef = useRef<HTMLDivElement>(null);
 
   // Check URL query params for view or direct score loading
@@ -271,6 +274,27 @@ export default function App() {
                       <div className="text-[9px] uppercase font-black tracking-widest px-3 py-1.5 text-slate-400 border-b border-black/5 dark:border-white/5 mb-1">
                         Create Editable Sheet
                       </div>
+
+                      <button
+                        onClick={() => {
+                          setIsNewScoreOpen(false);
+                          setIsTranscribeModalOpen(true);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left group bg-[#FF4E00]/10 hover:bg-[#FF4E00]/20 border border-[#FF4E00]/30 mb-1.5"
+                        )}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-[#FF4E00] text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-md shadow-[#FF4E00]/30">
+                          <AudioWaveform className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-tight text-[#FF4E00] flex items-center gap-1.5">
+                            <span>Transcribe Melody</span>
+                            <span className="text-[8px] px-1.5 py-0.2 bg-[#FF4E00] text-white rounded-full font-extrabold">MIC</span>
+                          </div>
+                          <div className="text-[9px] font-bold uppercase tracking-widest opacity-70">Sing / Play into Mic to ABC</div>
+                        </div>
+                      </button>
 
                       <button
                         onClick={() => {
@@ -649,6 +673,12 @@ export default function App() {
         isOpen={isLoadUrlOpen} 
         onClose={() => setIsLoadUrlOpen(false)} 
         onSuccess={() => setCurrentView('score')}
+      />
+
+      {/* Melody Transcriber (Mic to ABC Score) Modal */}
+      <TranscribeMelodyModal
+        isOpen={isTranscribeModalOpen}
+        onClose={() => setIsTranscribeModalOpen(false)}
       />
 
       {/* Service Worker Update Toast Notification */}

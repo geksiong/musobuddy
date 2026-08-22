@@ -1,6 +1,6 @@
 {
   "name": "MusoBuddy",
-  "description": "A comprehensive music practice tool featuring a high-precision metronome, chromatic tuner, drone patterns, accompaniment, and music score viewer supporting Guitar Pro, ABC, MusicXML, PDF, and text sheets.",
+  "description": "A comprehensive music practice tool featuring a high-precision metronome, chromatic tuner, drone patterns, accompaniment, microphone melody-to-ABC transcription with automatic quantization, and music score viewer supporting Guitar Pro, ABC, MusicXML, PDF, and text sheets.",
   "requestFramePermissions": [
     "microphone"
   ],
