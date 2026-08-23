@@ -155,14 +155,66 @@ const SyncEngine: React.FC = () => {
     isCountInEnabled, isCountingIn, setIsCountingIn, countInBeat, setCountInBeat
   } = useAccompaniment();
   const { currentBeat, activePattern, bpm } = useMetronome();
-  const { playChord, playNote, playPercussion, setIsAccompanimentPlaying, isMetronomePlaying, getAudioContext } = useAudio();
-  const lastBeatRef = useRef<number>(-1);
-  const playbackStartBeatRef = useRef<number>(0);
-  const pendingStartRef = useRef<boolean>(false);
-  const subBeatTimersRef = useRef<NodeJS.Timeout[]>([]);
+  const { 
+    playChord, playNote, playPercussion, setIsAccompanimentPlaying, 
+    isMetronomePlaying, getAudioContext, registerBeatScheduler 
+  } = useAudio();
+
+  // Fresh refs to prevent audio scheduler from resetting or using stale closures
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+
+  const progressionRef = useRef(progression);
+  progressionRef.current = progression;
+
+  const progressionVoicingsRef = useRef(progressionVoicings);
+  progressionVoicingsRef.current = progressionVoicings;
+
+  const voicingStyleRef = useRef(voicingStyle);
+  voicingStyleRef.current = voicingStyle;
+
+  const activeRhythmPatternRef = useRef(activeRhythmPattern);
+  activeRhythmPatternRef.current = activeRhythmPattern;
+
+  const isRhythmEngineEnabledRef = useRef(isRhythmEngineEnabled);
+  isRhythmEngineEnabledRef.current = isRhythmEngineEnabled;
+
+  const arpeggioPresetRef = useRef(arpeggioPreset);
+  arpeggioPresetRef.current = arpeggioPreset;
+
+  const arpeggioRateRef = useRef(arpeggioRate);
+  arpeggioRateRef.current = arpeggioRate;
+
+  const selectedInstrumentRef = useRef(selectedInstrument);
+  selectedInstrumentRef.current = selectedInstrument;
+
+  const isBassEnabledRef = useRef(isBassEnabled);
+  isBassEnabledRef.current = isBassEnabled;
+
+  const accompanimentVolumeRef = useRef(accompanimentVolume);
+  accompanimentVolumeRef.current = accompanimentVolume;
+
+  const isCountInEnabledRef = useRef(isCountInEnabled);
+  isCountInEnabledRef.current = isCountInEnabled;
+
+  const activePatternRef = useRef(activePattern);
+  activePatternRef.current = activePattern;
+
+  const isMetronomePlayingRef = useRef(isMetronomePlaying);
+  isMetronomePlayingRef.current = isMetronomePlaying;
+
+  const bpmRef = useRef(bpm);
+  bpmRef.current = bpm;
 
   const masterVoice = activePattern?.voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
+  const masterLengthRef = useRef(masterLength);
+  masterLengthRef.current = masterLength;
+
+  const lastScheduledBeatRef = useRef<number>(-1);
+  const playbackStartBeatRef = useRef<number>(0);
+  const pendingStartRef = useRef<boolean>(false);
+  const subBeatTimersRef = useRef<NodeJS.Timeout[]>([]);
 
   const clearSubBeatTimers = () => {
     subBeatTimersRef.current.forEach(t => clearTimeout(t));
@@ -171,13 +223,19 @@ const SyncEngine: React.FC = () => {
 
   useEffect(() => {
     setIsAccompanimentPlaying(isPlaying);
-    if (!isPlaying) clearSubBeatTimers();
-  }, [isPlaying, setIsAccompanimentPlaying]);
-
-  useEffect(() => {
-    if (isPlaying) {
-      if (lastBeatRef.current === -1) {
-        if (isMetronomePlaying && currentBeat % masterLength !== 0) {
+    if (!isPlaying) {
+      clearSubBeatTimers();
+      pendingStartRef.current = false;
+      setIsPendingStart(false);
+      setIsCountingIn(false);
+      setCountInBeat(0);
+      lastScheduledBeatRef.current = -1;
+      setCurrentSubStepIndex(0);
+      setEarlyPushEvent(null);
+    } else {
+      // Initialize start state
+      if (lastScheduledBeatRef.current === -1) {
+        if (isMetronomePlayingRef.current && currentBeat % masterLengthRef.current !== 0) {
           pendingStartRef.current = true;
           setIsPendingStart(true);
           setIsCountingIn(false);
@@ -186,32 +244,34 @@ const SyncEngine: React.FC = () => {
           playbackStartBeatRef.current = currentBeat;
           pendingStartRef.current = false;
           setIsPendingStart(false);
-          if (isCountInEnabled) {
+          if (isCountInEnabledRef.current) {
             setIsCountingIn(true);
             setCountInBeat(1);
           }
         }
       }
-    } else {
-      pendingStartRef.current = false;
-      setIsPendingStart(false);
-      setIsCountingIn(false);
-      setCountInBeat(0);
-      lastBeatRef.current = -1;
-      clearSubBeatTimers();
-      setCurrentSubStepIndex(0);
-      setEarlyPushEvent(null);
     }
-  }, [isPlaying, isMetronomePlaying, masterLength, isCountInEnabled, setIsPendingStart, setIsCountingIn, setCountInBeat, setCurrentSubStepIndex, setEarlyPushEvent]); 
+  }, [isPlaying, setIsAccompanimentPlaying, currentBeat, setIsPendingStart, setIsCountingIn, setCountInBeat, setCurrentSubStepIndex, setEarlyPushEvent]);
 
   useEffect(() => {
-    if (isPlaying) {
+    if (!isPlaying) {
+      registerBeatScheduler(null);
+      return;
+    }
+
+    const scheduleBeat = (stepIndex: number, audioTime: number, baseBeatDurationSec: number) => {
+      if (!isPlayingRef.current) return;
+      if (stepIndex === lastScheduledBeatRef.current) return;
+      lastScheduledBeatRef.current = stepIndex;
+
+      const mLength = masterLengthRef.current || 4;
+
       if (pendingStartRef.current) {
-        if (currentBeat % masterLength === 0) {
-          playbackStartBeatRef.current = currentBeat;
+        if (stepIndex % mLength === 0) {
+          playbackStartBeatRef.current = stepIndex;
           pendingStartRef.current = false;
           setIsPendingStart(false);
-          if (isCountInEnabled) {
+          if (isCountInEnabledRef.current) {
             setIsCountingIn(true);
             setCountInBeat(1);
           }
@@ -220,177 +280,175 @@ const SyncEngine: React.FC = () => {
         }
       }
 
-      const rawEffectiveBeat = currentBeat - playbackStartBeatRef.current;
+      const rawEffectiveBeat = stepIndex - playbackStartBeatRef.current;
       if (rawEffectiveBeat < 0) return;
 
-      const isCountInActive = isCountInEnabled && rawEffectiveBeat < masterLength;
+      const isCountInActive = isCountInEnabledRef.current && rawEffectiveBeat < mLength;
+      const ctx = getAudioContext?.() || null;
+      const now = ctx ? ctx.currentTime : 0;
 
-      // --- 1-MEASURE COUNT-IN LOGIC ---
+      // 1-MEASURE COUNT-IN LOGIC (Ahead-of-time audio + synced UI)
       if (isCountInActive) {
-        const currentCountBeat = (rawEffectiveBeat % masterLength) + 1;
-        setIsCountingIn(true);
-        setCountInBeat(currentCountBeat);
-        setCurrentIndex(0);
-
-        if (currentBeat !== lastBeatRef.current) {
-          clearSubBeatTimers();
-
-          const ctx = getAudioContext?.() || null;
-          const baseAudioTime = ctx ? ctx.currentTime : 0;
-
-          // Sound the count-in click if metronome isn't already sounding clicks
-          if (!isMetronomePlaying) {
-            const isAccent = rawEffectiveBeat === 0;
-            const clickSound = masterVoice?.sound || MetronomeSound.Woodblock;
-            const countInVol = Math.max(0.85, accompanimentVolume);
-            playPercussion(clickSound, isAccent, countInVol, baseAudioTime);
+        const currentCountBeat = (rawEffectiveBeat % mLength) + 1;
+        const uiDelayMs = Math.max(0, (audioTime - now) * 1000);
+        const timer = setTimeout(() => {
+          if (isPlayingRef.current) {
+            setIsCountingIn(true);
+            setCountInBeat(currentCountBeat);
+            setCurrentIndex(0);
           }
-        }
+        }, uiDelayMs);
+        subBeatTimersRef.current.push(timer);
 
-        lastBeatRef.current = currentBeat;
+        // Sound count-in click if metronome is not already sounding clicks
+        if (!isMetronomePlayingRef.current) {
+          const isAccent = rawEffectiveBeat === 0;
+          const clickSound = activePatternRef.current?.voices[0]?.sound || MetronomeSound.Woodblock;
+          const countInVol = Math.max(0.85, accompanimentVolumeRef.current);
+          playPercussion(clickSound, isAccent, countInVol, audioTime);
+        }
         return;
       }
 
-      // Count-in finished or disabled
-      setIsCountingIn(false);
-      setCountInBeat(0);
-
-      const effectiveBeat = isCountInEnabled 
-        ? (rawEffectiveBeat - masterLength) 
+      // Count-in finished or disabled -> Play progression
+      const effectiveBeat = isCountInEnabledRef.current
+        ? (rawEffectiveBeat - mLength)
         : rawEffectiveBeat;
 
       if (effectiveBeat < 0) return;
-      if (progression.length === 0) return;
+      const prog = progressionRef.current;
+      if (!prog || prog.length === 0) return;
 
-      const beatIndex = effectiveBeat % progression.length;
-      setCurrentIndex(beatIndex);
-
-      const effectiveInfo = getEffectiveChord(progression, beatIndex);
+      const beatIndex = effectiveBeat % prog.length;
+      const effectiveInfo = getEffectiveChord(prog, beatIndex);
       if (!effectiveInfo) return;
 
       const currentChord = effectiveInfo.chord;
       const isExplicit = effectiveInfo.isExplicit;
-      const currentVoicing = progressionVoicings[beatIndex];
+      const progVoicings = progressionVoicingsRef.current;
+      const currentVoicing = progVoicings?.[beatIndex] || null;
       const baseIntervals = getIntervalsForChord(currentChord) || [0, 4, 7];
-      const beatInMeasure = effectiveBeat % masterLength;
+      const beatInMeasure = effectiveBeat % mLength;
 
-      // Voiced notes from voice leading engine:
       const voicedMidiNotes = currentVoicing ? currentVoicing.allNotes : baseIntervals.map(i => i + 60);
       const voicedIntervals = voicedMidiNotes.map(m => m - 60);
 
-      if (currentBeat !== lastBeatRef.current) {
-        clearSubBeatTimers();
+      const isRhythmOn = isRhythmEngineEnabledRef.current;
+      const activeGroove = activeRhythmPatternRef.current;
+      const currentInstrument = selectedInstrumentRef.current;
+      const currentAccompVol = accompanimentVolumeRef.current;
+      const currentVoicingStyle = voicingStyleRef.current;
+      const currentBassEnabled = isBassEnabledRef.current;
+      const beatDurationSec = baseBeatDurationSec || (60 / Math.max(30, bpmRef.current || 120));
 
-        const ctx = getAudioContext?.() || null;
-        const currentBpm = Math.max(30, bpm || 120);
-        const beatDurationSec = 60 / currentBpm;
-        const baseAudioTime = ctx ? ctx.currentTime : 0;
+      if (isRhythmOn && activeGroove) {
+        const subsPerBeat = activeGroove.subdivisionsPerBeat || 2;
+        const totalPatternSteps = activeGroove.chordPattern?.length || (mLength * subsPerBeat);
+        const subStepDurationSec = beatDurationSec / subsPerBeat;
+        const swingRatio = activeGroove.swingRatio;
 
-        // Check if Rhythm Engine is active
-        if (isRhythmEngineEnabled && activeRhythmPattern) {
-          const subsPerBeat = activeRhythmPattern.subdivisionsPerBeat || 2;
-          const totalPatternSteps = activeRhythmPattern.chordPattern?.length || (masterLength * subsPerBeat);
-          const subStepDurationSec = beatDurationSec / subsPerBeat;
-          const swingRatio = activeRhythmPattern.swingRatio;
+        for (let s = 0; s < subsPerBeat; s++) {
+          let offsetSec = s * subStepDurationSec;
+          if (swingRatio && subsPerBeat === 2 && s === 1) {
+            offsetSec = beatDurationSec * swingRatio;
+          }
 
-          for (let s = 0; s < subsPerBeat; s++) {
-            let offsetSec = s * subStepDurationSec;
-            if (swingRatio && subsPerBeat === 2) {
-              if (s === 1) {
-                offsetSec = beatDurationSec * swingRatio;
-              }
-            }
+          const eventTime = audioTime + offsetSec;
+          const stepIdx = (beatInMeasure * subsPerBeat + s) % totalPatternSteps;
 
-            const eventTime = baseAudioTime + offsetSec;
-            const stepIndex = (beatInMeasure * subsPerBeat + s) % totalPatternSteps;
+          // 1. CHORD LAYER (Scheduled in Web Audio)
+          const chordTrigger = activeGroove.chordPattern?.[stepIdx] || 'OFF';
+          if (chordTrigger !== 'OFF') {
+            if (chordTrigger === 'PUSH_NEXT_CHORD' || chordTrigger === 'PUSH_NEXT_ACCENT' || chordTrigger === 'PUSH_NEXT_ROOT') {
+              const targetBeatIndex = (beatIndex + 1) % prog.length;
+              const nextInfo = getEffectiveChord(prog, targetBeatIndex);
+              if (nextInfo) {
+                const nextChord = nextInfo.chord;
+                const nextVoicing = progVoicings?.[targetBeatIndex] || null;
+                const isAccent = chordTrigger === 'PUSH_NEXT_ACCENT';
+                const vol = currentAccompVol * (isAccent ? 1.15 : 0.95);
 
-            // 1. CHORD LAYER (Scheduled with precise eventTime)
-            const chordTrigger = activeRhythmPattern.chordPattern?.[stepIndex] || 'OFF';
-            if (chordTrigger !== 'OFF') {
-              if (chordTrigger === 'PUSH_NEXT_CHORD' || chordTrigger === 'PUSH_NEXT_ACCENT' || chordTrigger === 'PUSH_NEXT_ROOT') {
-                // Early anticipation of NEXT beat's chord with its voice-led notes!
-                const targetBeatIndex = (beatIndex + 1) % progression.length;
-                const nextInfo = getEffectiveChord(progression, targetBeatIndex);
-                if (nextInfo) {
-                  const nextChord = nextInfo.chord;
-                  const nextVoicing = progressionVoicings[targetBeatIndex];
-                  const isAccent = chordTrigger === 'PUSH_NEXT_ACCENT';
-                  const vol = accompanimentVolume * (isAccent ? 1.15 : 0.95);
-
-                  if (chordTrigger === 'PUSH_NEXT_ROOT') {
-                    const rootMidi = nextVoicing?.bassNote ?? (baseIntervals[0] + 36);
-                    playNote(rootMidi - 60, 0.8, selectedInstrument, vol, eventTime);
-                  } else {
-                    playChord(nextChord, selectedInstrument, vol, {
-                      customMidiNotes: nextVoicing?.allNotes,
-                      voicingStyle
-                    }, eventTime);
-                  }
+                if (chordTrigger === 'PUSH_NEXT_ROOT') {
+                  const rootMidi = nextVoicing?.bassNote ?? (baseIntervals[0] + 36);
+                  playNote(rootMidi - 60, 0.8, currentInstrument, vol, eventTime);
+                } else {
+                  playChord(nextChord, currentInstrument, vol, {
+                    customMidiNotes: nextVoicing?.allNotes,
+                    voicingStyle: currentVoicingStyle
+                  }, eventTime);
                 }
-              } else if (chordTrigger === 'CHORD' || chordTrigger === 'CHORD_ACCENT') {
-                const isAccent = chordTrigger === 'CHORD_ACCENT';
-                const vol = accompanimentVolume * (isAccent ? 1.15 : 0.95);
-                playChord(currentChord, selectedInstrument, vol, {
-                  customMidiNotes: currentVoicing?.allNotes,
-                  voicingStyle
-                }, eventTime);
-              } else if (chordTrigger === 'ROOT' || chordTrigger === 'ROOT_ACCENT') {
-                const isAccent = chordTrigger === 'ROOT_ACCENT';
-                const vol = accompanimentVolume * (isAccent ? 1.15 : 0.95);
-                const rootMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
-                playNote(rootMidi - 60, 0.8, selectedInstrument, vol, eventTime);
-              } else if (chordTrigger === 'ARPEGGIO') {
-                const arpInterval = voicedIntervals[s % voicedIntervals.length];
-                playNote(arpInterval, 0.6, selectedInstrument, accompanimentVolume, eventTime);
               }
+            } else if (chordTrigger === 'CHORD' || chordTrigger === 'CHORD_ACCENT') {
+              const isAccent = chordTrigger === 'CHORD_ACCENT';
+              const vol = currentAccompVol * (isAccent ? 1.15 : 0.95);
+              playChord(currentChord, currentInstrument, vol, {
+                customMidiNotes: currentVoicing?.allNotes,
+                voicingStyle: currentVoicingStyle
+              }, eventTime);
+            } else if (chordTrigger === 'ROOT' || chordTrigger === 'ROOT_ACCENT') {
+              const isAccent = chordTrigger === 'ROOT_ACCENT';
+              const vol = currentAccompVol * (isAccent ? 1.15 : 0.95);
+              const rootMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
+              playNote(rootMidi - 60, 0.8, currentInstrument, vol, eventTime);
+            } else if (chordTrigger === 'ARPEGGIO') {
+              const arpInterval = voicedIntervals[s % voicedIntervals.length];
+              playNote(arpInterval, 0.6, currentInstrument, currentAccompVol, eventTime);
             }
+          }
 
-            // 2. BASS LAYER (Scheduled with precise eventTime)
-            const bassTrigger = activeRhythmPattern.bassPattern?.[stepIndex] || 'OFF';
-            if (bassTrigger !== 'OFF' && isBassEnabled) {
-              if (bassTrigger === 'PUSH_NEXT_ROOT' || bassTrigger === 'PUSH_NEXT_FIFTH') {
-                const targetBeatIndex = (beatIndex + 1) % progression.length;
-                const nextInfo = getEffectiveChord(progression, targetBeatIndex);
-                if (nextInfo) {
-                  const nextVoicing = progressionVoicings[targetBeatIndex];
-                  const nextBassMidi = nextVoicing?.bassNote ?? (baseIntervals[0] + 36);
-                  const noteMidi = bassTrigger === 'PUSH_NEXT_ROOT' ? nextBassMidi : (nextBassMidi + 7);
-                  playNote(noteMidi - 60, 1.2, InstrumentType.Bass, accompanimentVolume * 1.05, eventTime);
-                }
-              } else if (bassTrigger === 'ROOT' || bassTrigger === 'ROOT_ACCENT') {
-                const isAccent = bassTrigger === 'ROOT_ACCENT';
-                const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
-                playNote(bassMidi - 60, 1.2, InstrumentType.Bass, accompanimentVolume * (isAccent ? 1.1 : 0.9), eventTime);
-              } else if (bassTrigger === 'FIFTH') {
-                const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
-                playNote((bassMidi + 7) - 60, 1.2, InstrumentType.Bass, accompanimentVolume * 0.9, eventTime);
-              } else if (bassTrigger === 'WALKING') {
-                const targetBeatIndex = (beatIndex + 1) % progression.length;
-                const nextInfo = getEffectiveChord(progression, targetBeatIndex);
-                const nextVoicing = progressionVoicings[targetBeatIndex];
+          // 2. BASS LAYER (Scheduled in Web Audio)
+          const bassTrigger = activeGroove.bassPattern?.[stepIdx] || 'OFF';
+          if (bassTrigger !== 'OFF' && currentBassEnabled) {
+            if (bassTrigger === 'PUSH_NEXT_ROOT' || bassTrigger === 'PUSH_NEXT_FIFTH') {
+              const targetBeatIndex = (beatIndex + 1) % prog.length;
+              const nextInfo = getEffectiveChord(prog, targetBeatIndex);
+              if (nextInfo) {
+                const nextVoicing = progVoicings?.[targetBeatIndex] || null;
                 const nextBassMidi = nextVoicing?.bassNote ?? (baseIntervals[0] + 36);
-                playNote((nextBassMidi - 1) - 60, 0.8, InstrumentType.Bass, accompanimentVolume * 0.85, eventTime);
+                const noteMidi = bassTrigger === 'PUSH_NEXT_ROOT' ? nextBassMidi : (nextBassMidi + 7);
+                playNote(noteMidi - 60, 1.2, InstrumentType.Bass, currentAccompVol * 1.05, eventTime);
               }
+            } else if (bassTrigger === 'ROOT' || bassTrigger === 'ROOT_ACCENT') {
+              const isAccent = bassTrigger === 'ROOT_ACCENT';
+              const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
+              playNote(bassMidi - 60, 1.2, InstrumentType.Bass, currentAccompVol * (isAccent ? 1.1 : 0.9), eventTime);
+            } else if (bassTrigger === 'FIFTH') {
+              const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
+              playNote((bassMidi + 7) - 60, 1.2, InstrumentType.Bass, currentAccompVol * 0.9, eventTime);
+            } else if (bassTrigger === 'WALKING') {
+              const targetBeatIndex = (beatIndex + 1) % prog.length;
+              const nextInfo = getEffectiveChord(prog, targetBeatIndex);
+              const nextVoicing = progVoicings?.[targetBeatIndex] || null;
+              const nextBassMidi = nextVoicing?.bassNote ?? (baseIntervals[0] + 36);
+              playNote((nextBassMidi - 1) - 60, 0.8, InstrumentType.Bass, currentAccompVol * 0.85, eventTime);
             }
+          }
 
-            // 3. PERCUSSION LAYERS (Scheduled with precise eventTime)
-            if (activeRhythmPattern.percussionLayers) {
-              activeRhythmPattern.percussionLayers.forEach(layer => {
-                if (layer.muted) return;
-                const patValue = layer.pattern?.[stepIndex] || 0;
-                if (patValue > 0) {
-                  const isAccent = patValue === 2;
-                  playPercussion(layer.sound, isAccent, layer.volume * accompanimentVolume, eventTime);
-                }
-              });
-            }
+          // 3. PERCUSSION LAYERS (Scheduled in Web Audio)
+          if (activeGroove.percussionLayers) {
+            activeGroove.percussionLayers.forEach(layer => {
+              if (layer.muted) return;
+              const patValue = layer.pattern?.[stepIdx] || 0;
+              if (patValue > 0) {
+                const isAccent = patValue === 2;
+                playPercussion(layer.sound, isAccent, layer.volume * currentAccompVol, eventTime);
+              }
+            });
+          }
 
-            // 4. Lightweight UI state update (Decoupled from audio thread)
-            const updateUiVisuals = () => {
-              setCurrentSubStepIndex(stepIndex);
+          // 4. UI visual state updates decoupled from audio thread
+          const visualDelayMs = Math.max(0, (eventTime - now) * 1000);
+          const timer = setTimeout(() => {
+            if (isPlayingRef.current) {
+              if (s === 0) {
+                setCurrentIndex(beatIndex);
+                setIsCountingIn(false);
+                setCountInBeat(0);
+              }
+              setCurrentSubStepIndex(stepIdx);
               if (chordTrigger === 'PUSH_NEXT_CHORD' || chordTrigger === 'PUSH_NEXT_ACCENT' || chordTrigger === 'PUSH_NEXT_ROOT') {
-                const targetBeatIndex = (beatIndex + 1) % progression.length;
-                const nextInfo = getEffectiveChord(progression, targetBeatIndex);
+                const targetBeatIndex = (beatIndex + 1) % prog.length;
+                const nextInfo = getEffectiveChord(prog, targetBeatIndex);
                 if (nextInfo) {
                   setEarlyPushEvent({
                     sourceBeat: beatIndex + 1,
@@ -401,102 +459,101 @@ const SyncEngine: React.FC = () => {
               } else {
                 setEarlyPushEvent(null);
               }
-            };
-
-            if (offsetSec <= 0.002) {
-              updateUiVisuals();
-            } else {
-              const timer = setTimeout(updateUiVisuals, offsetSec * 1000);
-              subBeatTimersRef.current.push(timer);
             }
-          }
-        } else {
-          // Standard Arpeggiator Logic (Scheduled with precise eventTime)
-          if (isBassEnabled && beatInMeasure === 0) {
-            const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
-            playNote(bassMidi - 60, 2.0, InstrumentType.Bass, accompanimentVolume, baseAudioTime);
-          }
+          }, visualDelayMs);
+          subBeatTimersRef.current.push(timer);
+        }
+      } else {
+        // Standard Arpeggiator / Block Chords
+        if (currentBassEnabled && beatInMeasure === 0) {
+          const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
+          playNote(bassMidi - 60, 2.0, InstrumentType.Bass, currentAccompVol, audioTime);
+        }
 
-          let notesPerBeat = 1;
-          if (arpeggioRate === '2x') notesPerBeat = 2;
-          else if (arpeggioRate === '3x') notesPerBeat = 3;
-          else if (arpeggioRate === '4x') notesPerBeat = 4;
-          else if (arpeggioRate === '0.5x') notesPerBeat = 0.5;
+        const arpPreset = arpeggioPresetRef.current;
+        const arpRate = arpeggioRateRef.current;
 
-          if (notesPerBeat === 0.5) {
-            if (effectiveBeat % 2 !== 0) {
-              lastBeatRef.current = currentBeat;
-              return;
-            }
-            notesPerBeat = 1;
-          }
+        let notesPerBeat = 1;
+        if (arpRate === '2x') notesPerBeat = 2;
+        else if (arpRate === '3x') notesPerBeat = 3;
+        else if (arpRate === '4x') notesPerBeat = 4;
+        else if (arpRate === '0.5x') notesPerBeat = 0.5;
 
-          const subStepDurationSec = beatDurationSec / notesPerBeat;
+        if (notesPerBeat === 0.5) {
+          if (effectiveBeat % 2 !== 0) return;
+          notesPerBeat = 1;
+        }
 
-          let intervals = [...voicedIntervals];
-          if (arpeggioPreset.includes('2 Octaves')) {
-            intervals = [...voicedIntervals, ...voicedIntervals.map(i => i + 12)];
-          }
+        const subStepDurationSec = beatDurationSec / notesPerBeat;
+        let intervals = [...voicedIntervals];
+        if (arpPreset.includes('2 Octaves')) {
+          intervals = [...voicedIntervals, ...voicedIntervals.map(i => i + 12)];
+        }
 
-          for (let s = 0; s < notesPerBeat; s++) {
-            const offsetSec = s * subStepDurationSec;
-            const eventTime = baseAudioTime + offsetSec;
-            const globalStepIndex = Math.floor(effectiveBeat * notesPerBeat + s);
+        for (let s = 0; s < notesPerBeat; s++) {
+          const offsetSec = s * subStepDurationSec;
+          const eventTime = audioTime + offsetSec;
+          const globalStepIndex = Math.floor(effectiveBeat * notesPerBeat + s);
 
-            if (arpeggioPreset === 'Block') {
-              if (s === 0 && (isExplicit || beatInMeasure === 0)) {
-                playChord(currentChord, selectedInstrument, accompanimentVolume, {
-                  customMidiNotes: currentVoicing?.allNotes,
-                  voicingStyle
-                }, eventTime);
-              }
-            } else if (arpeggioPreset === 'Double-Time Strum') {
-              playChord(currentChord, selectedInstrument, accompanimentVolume * (s === 0 ? 1.0 : 0.8), {
+          if (arpPreset === 'Block') {
+            if (s === 0 && (isExplicit || beatInMeasure === 0)) {
+              playChord(currentChord, currentInstrument, currentAccompVol, {
                 customMidiNotes: currentVoicing?.allNotes,
-                voicingStyle
+                voicingStyle: currentVoicingStyle
               }, eventTime);
-            } else {
-              const len = intervals.length;
-              let noteIndex = 0;
-
-              switch (arpeggioPreset) {
-                case 'Up':
-                case 'Double-Time Up':
-                  noteIndex = globalStepIndex % len;
-                  break;
-                case 'Down':
-                  noteIndex = (len - 1) - (globalStepIndex % len);
-                  break;
-                case 'Up-Down':
-                case 'Double-Time Up-Down': {
-                  const mod = globalStepIndex % (len * 2 - 2 || 1);
-                  noteIndex = mod < len ? mod : (len * 2 - 2) - mod;
-                  break;
-                }
-                default:
-                  noteIndex = globalStepIndex % len;
-              }
-
-              const noteDuration = Math.min(0.8, subStepDurationSec * 1.4);
-              const noteVolume = accompanimentVolume * (s === 0 ? 1.0 : 0.88);
-
-              playNote(intervals[noteIndex], noteDuration, selectedInstrument, noteVolume, eventTime);
             }
+          } else if (arpPreset === 'Double-Time Strum') {
+            playChord(currentChord, currentInstrument, currentAccompVol * (s === 0 ? 1.0 : 0.8), {
+              customMidiNotes: currentVoicing?.allNotes,
+              voicingStyle: currentVoicingStyle
+            }, eventTime);
+          } else {
+            const len = intervals.length;
+            let noteIndex = 0;
+            switch (arpPreset) {
+              case 'Up':
+              case 'Double-Time Up':
+                noteIndex = globalStepIndex % len;
+                break;
+              case 'Down':
+                noteIndex = (len - 1) - (globalStepIndex % len);
+                break;
+              case 'Up-Down':
+              case 'Double-Time Up-Down': {
+                const mod = globalStepIndex % (len * 2 - 2 || 1);
+                noteIndex = mod < len ? mod : (len * 2 - 2) - mod;
+                break;
+              }
+              default:
+                noteIndex = globalStepIndex % len;
+            }
+            const noteDuration = Math.min(0.8, subStepDurationSec * 1.4);
+            const noteVolume = currentAccompVol * (s === 0 ? 1.0 : 0.88);
+            playNote(intervals[noteIndex], noteDuration, currentInstrument, noteVolume, eventTime);
           }
+
+          // UI visual update
+          const visualDelayMs = Math.max(0, (eventTime - now) * 1000);
+          const timer = setTimeout(() => {
+            if (isPlayingRef.current) {
+              if (s === 0) {
+                setCurrentIndex(beatIndex);
+                setIsCountingIn(false);
+                setCountInBeat(0);
+              }
+            }
+          }, visualDelayMs);
+          subBeatTimersRef.current.push(timer);
         }
       }
-      lastBeatRef.current = currentBeat;
-    } else {
-      lastBeatRef.current = -1;
-      clearSubBeatTimers();
-    }
-  }, [
-    currentBeat, isPlaying, progression, arpeggioPreset, arpeggioRate, masterLength,
-    selectedInstrument, isBassEnabled, setCurrentIndex, playChord, playNote, playPercussion,
-    accompanimentVolume, setIsPendingStart, bpm, isRhythmEngineEnabled, activeRhythmPattern,
-    setCurrentSubStepIndex, setEarlyPushEvent, progressionVoicings, voicingStyle, getAudioContext,
-    isCountInEnabled, isCountingIn, setIsCountingIn, countInBeat, setCountInBeat, isMetronomePlaying
-  ]);
+    };
+
+    registerBeatScheduler(scheduleBeat);
+
+    return () => {
+      registerBeatScheduler(null);
+    };
+  }, [isPlaying, registerBeatScheduler, getAudioContext, playChord, playNote, playPercussion, setIsCountingIn, setCountInBeat, setCurrentIndex, setCurrentSubStepIndex, setEarlyPushEvent, setIsPendingStart]);
 
   return null;
 };

@@ -453,25 +453,21 @@ export default function App() {
         "flex-1 relative flex flex-col min-h-0 overflow-hidden",
         isDistractionFree && "fixed inset-0 z-50 bg-inherit"
       )}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentView}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className={cn(
-              "flex-1 flex flex-col min-h-0",
-              currentView === 'score' ? "h-full overflow-hidden" : "overflow-y-auto custom-scrollbar"
-            )}
-          >
-            {currentView === 'metronome' && <MetronomeView />}
-            {currentView === 'tuner' && <TunerView />}
-            {currentView === 'drone' && <DroneView />}
-            {currentView === 'score' && <ScoreView />}
-            {currentView === 'accompaniment' && <AccompanimentView />}
-          </motion.div>
-        </AnimatePresence>
+        <div className={cn("flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar", currentView !== 'metronome' && "hidden")}>
+          <MetronomeView />
+        </div>
+        <div className={cn("flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar", currentView !== 'tuner' && "hidden")}>
+          <TunerView />
+        </div>
+        <div className={cn("flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar", currentView !== 'drone' && "hidden")}>
+          <DroneView />
+        </div>
+        <div className={cn("flex-1 flex flex-col min-h-0 h-full overflow-hidden", currentView !== 'score' && "hidden")}>
+          <ScoreView />
+        </div>
+        <div className={cn("flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar", currentView !== 'accompaniment' && "hidden")}>
+          <AccompanimentView />
+        </div>
       </main>
 
       {/* Mobile Bottom Nav */}

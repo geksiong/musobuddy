@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
@@ -283,12 +283,12 @@ export default function AccompanimentView() {
     ? (progression[selectedBeatIndex + 1]?.name || getEffectiveChord(progression, selectedBeatIndex + 1)?.chord || null) 
     : null;
 
-  const suggestedChords = getSuggestedChords(
+  const suggestedChords = useMemo(() => getSuggestedChords(
     isSelectedBeatExplicit ? selectedBeatSlot?.name : null,
     prevBeatChord,
     nextBeatChord,
     accidentalMode === 'flat'
-  );
+  ), [isSelectedBeatExplicit, selectedBeatSlot?.name, prevBeatChord, nextBeatChord, accidentalMode]);
 
   const activePlayChordInfo = getEffectiveChord(progression, currentIndex);
   const selectedBeatChordInfo = selectedBeatIndex !== null ? getEffectiveChord(progression, selectedBeatIndex) : null;

@@ -352,10 +352,11 @@ export default function ScoreAudioPlayer({
 
         if (isMidiFile) {
           const polySynth = new Tone.PolySynth().connect(pitchShift);
+          polySynth.maxPolyphony = 32;
           localPolySynth = polySynth;
           polySynth.set({
             oscillator: { type: 'triangle' },
-            envelope: { attack: 0.05, release: 0.1 }
+            envelope: { attack: 0.02, decay: 0.15, sustain: 0.4, release: 0.25 }
           });
           
           if (!MidiPlayer || !MidiPlayer.Player) {

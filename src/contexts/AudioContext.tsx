@@ -60,12 +60,13 @@ interface AudioContextType {
   playNote: (noteIndex: number, duration?: number, instrument?: InstrumentType, volume?: number, time?: number) => void;
   playPercussion: (sound: MetronomeSound, isAccent?: boolean, volume?: number, time?: number) => void;
   getAudioContext: () => AudioContext;
+  registerBeatScheduler: (callback: ((stepIndex: number, audioTime: number, beatDuration: number) => void) | null) => void;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
 
-const LOOKAHEAD = 25.0;
-const SCHEDULE_AHEAD_TIME = 0.12;
+const LOOKAHEAD = 20.0;
+const SCHEDULE_AHEAD_TIME = 0.35;
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -86,6 +87,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentBeat, setCurrentBeat] = useState(0);
   const metronomeTimerRef = useRef<number | null>(null);
   const voiceStatesRef = useRef<{ nextNoteTime: number; stepIndex: number }[]>([]);
+  const beatSchedulerCallbackRef = useRef<((stepIndex: number, audioTime: number, beatDuration: number) => void) | null>(null);
+
+  const registerBeatScheduler = useCallback((callback: ((stepIndex: number, audioTime: number, beatDuration: number) => void) | null) => {
+    beatSchedulerCallbackRef.current = callback;
+  }, []);
 
   // Drone State
   const [activeDrones, setActiveDrones] = useState<Record<string, { tone: DroneTone; volume: number; pulseBpm: number }>>({});
@@ -227,12 +233,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const ctx = audioCtxRef.current;
     if (!ctx) return;
 
+    const outputTarget = getMasterOutput(ctx);
+
     // Accents are full volume (1.0), non-accented beats are softer (0.30 amplitude)
     const amplitude = isAccent ? 1.0 : 0.30;
     const startVol = Math.max(0.0001, volume * amplitude * 0.7);
     const masterGain = ctx.createGain();
 
-    const outputTarget = getMasterOutput(ctx);
     masterGain.connect(outputTarget);
 
     // Keep duration uniform for a sound type so decay is clean
@@ -463,6 +470,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const beatToUpdate = vState.stepIndex;
           const timeToUpdate = vState.nextNoteTime;
           
+          if (isAccompanimentPlayingRef.current && beatSchedulerCallbackRef.current) {
+            try {
+              beatSchedulerCallbackRef.current(beatToUpdate, timeToUpdate, baseBeatDuration);
+            } catch (err) {
+              console.error('Error in beatSchedulerCallback:', err);
+            }
+          }
+
           const delay = (timeToUpdate - ctx.currentTime) * 1000;
           setTimeout(() => {
             if (isMetronomePlayingRef.current || isAccompanimentPlayingRef.current) {
@@ -1593,6 +1608,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const outputTarget = getMasterOutput(ctx);
+
     const nodesToCleanup: { disconnect: () => void }[] = [];
 
     frequencies.forEach(({ freq, isBass, idx }) => {
@@ -1643,11 +1659,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const now = time ?? ctx.currentTime;
     const freq = rootFreq * Math.pow(2, interval / 12);
     
+    const outputTarget = getMasterOutput(ctx);
+    
     const osc = ctx.createOscillator();
     const voiceGain = ctx.createGain();
     const volumeGain = ctx.createGain();
-    
-    const outputTarget = getMasterOutput(ctx);
 
     osc.frequency.setValueAtTime(freq, now);
     applyTone(osc, voiceGain, instrument, freq, now, duration);
@@ -1684,7 +1700,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     playChord,
     playNote,
     playPercussion,
-    getAudioContext
+    getAudioContext,
+    registerBeatScheduler
   };
 
   return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;
