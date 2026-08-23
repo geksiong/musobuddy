@@ -67,6 +67,21 @@ class SimpleBiquad {
     this.a2 = (1 - alpha) / a0;
   }
 
+  setPeaking(freq, q, gainDb, sampleRate) {
+    const w0 = (TWO_PI * Math.min(freq, sampleRate * 0.49)) / sampleRate;
+    const cosw0 = Math.cos(w0);
+    const sinw0 = Math.sin(w0);
+    const alpha = sinw0 / (2 * Math.max(0.1, q));
+    const A = Math.pow(10, gainDb / 40);
+
+    const a0 = 1 + alpha / A;
+    this.b0 = (1 + alpha * A) / a0;
+    this.b1 = (-2 * cosw0) / a0;
+    this.b2 = (1 - alpha * A) / a0;
+    this.a1 = (-2 * cosw0) / a0;
+    this.a2 = (1 - alpha / A) / a0;
+  }
+
   process(x) {
     const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
     this.x2 = this.x1;
@@ -156,15 +171,21 @@ class SynthVoice {
     if (inst === 'piano') {
       this.filter.setLowpass(Math.min(8000, Math.max(2200, freq * 4.5)), 1.2, sampleRate);
     } else if (inst === 'epiano') {
-      this.filter.setLowpass(3200, 0.8, sampleRate);
+      this.filter.setLowpass(2800, 0.7, sampleRate);
     } else if (inst === 'bass') {
-      this.filter.setLowpass(Math.min(1800, freq * 5), 1.5, sampleRate);
+      this.filter.setLowpass(1800, 1.2, sampleRate);
     } else if (inst === 'guitar') {
-      this.filter.setLowpass(3600, 1.0, sampleRate);
+      this.filter.setLowpass(3400, 1.0, sampleRate);
     } else if (inst === 'strings') {
-      this.filter.setLowpass(2800, 0.9, sampleRate);
+      this.filter.setLowpass(2400, 1.1, sampleRate);
+    } else if (inst === 'organ') {
+      this.filter.setLowpass(4800, 0.7, sampleRate);
+    } else if (inst === 'flute') {
+      this.filter.setLowpass(3600, 0.8, sampleRate);
     } else if (inst === 'brass') {
-      this.filter.setLowpass(Math.min(3000, freq * 3.5), 1.4, sampleRate);
+      this.filter.setLowpass(Math.min(3200, freq * 3.8), 1.2, sampleRate);
+    } else if (inst === 'marimba') {
+      this.filter.setPeaking(480, 2.0, 3.5, sampleRate);
     } else {
       this.filter.setLowpass(4500, 0.7, sampleRate);
     }
@@ -411,7 +432,7 @@ class MusoSynthProcessor extends AudioWorkletProcessor {
 
         if (inst === 'piano') {
           // Acoustic piano: multi-harmonic rich decay with hammer click
-          const env = Math.exp(-t * 2.8) * Math.min(1.0, t * 400);
+          const env = Math.exp(-t * 2.5) * Math.min(1.0, t * 450);
           const h1 = Math.sin(TWO_PI * v.phase);
           const h2 = 0.55 * Math.sin(TWO_PI * v.phase * 2);
           const h3 = 0.35 * Math.sin(TWO_PI * v.phase * 3);
@@ -426,17 +447,26 @@ class MusoSynthProcessor extends AudioWorkletProcessor {
           rawSample = (h1 + h2 + h3 + h4 + unison + hammer) * env * 0.28;
           rawSample = v.filter.process(rawSample);
         } else if (inst === 'epiano') {
-          // Rhodes FM tine synthesis
-          const modEnv = Math.exp(-t * 22.0);
+          // Vintage Rhodes FM Tine synthesis: metallic tine FM ping + bell chime + warm 2nd harmonic
+          const tineEnv = Math.exp(-t * 28.0);
           const modFreq = v.freq * 14.0;
           v.fmPhase += modFreq / sampleRate;
           if (v.fmPhase > 1) v.fmPhase -= Math.floor(v.fmPhase);
-          const mod = Math.sin(TWO_PI * v.fmPhase) * modEnv * 1.6;
+          const tineMod = Math.sin(TWO_PI * v.fmPhase) * tineEnv * 2.0;
 
-          const carEnv = Math.exp(-t * 1.8) * Math.min(1.0, t * 500);
-          const mainTone = Math.sin(TWO_PI * v.phase + mod);
-          const secondHarm = 0.3 * Math.sin(TWO_PI * v.phase * 2) * Math.exp(-t * 3.5);
-          rawSample = (mainTone + secondHarm) * carEnv * 0.30;
+          // 7.0x Bell Chime Overtone
+          const bellPhase = (v.phase * 7.0) % 1;
+          const bell = Math.sin(TWO_PI * bellPhase) * 0.25 * Math.exp(-t * 14.0);
+
+          // Warm pickup 2nd harmonic
+          const h2 = 0.35 * Math.sin(TWO_PI * v.phase * 2) * Math.exp(-t * 2.5);
+
+          // Singing Rhodes carrier envelope + soft suitcase tremolo
+          const tremolo = 1.0 + 0.08 * Math.sin(TWO_PI * 0.75 * t);
+          const carEnv = Math.exp(-t * 1.3) * Math.min(1.0, t * 400);
+          const mainTone = Math.sin(TWO_PI * v.phase + tineMod);
+
+          rawSample = (mainTone + bell + h2) * carEnv * tremolo * 0.28;
           rawSample = v.filter.process(rawSample);
         } else if (inst === 'guitar') {
           // Plucked acoustic guitar string
@@ -450,57 +480,109 @@ class MusoSynthProcessor extends AudioWorkletProcessor {
           rawSample = (tri * 0.7 + saw * 0.3 + pluck) * env * 0.28;
           rawSample = v.filter.process(rawSample);
         } else if (inst === 'bass') {
-          // Deep punchy bass
-          const env = Math.exp(-t * 2.2) * Math.min(1.0, t * 300);
+          // Articulate Plucked Bass: finger pluck transient, dynamic filter damping, tight envelope
+          let pluck = 0;
+          if (t < 0.010) {
+            pluck = (Math.random() * 2 - 1) * Math.exp(-t * 500) * 0.35;
+          }
+
+          // Dynamic lowpass filter sweep
+          const currentCutoff = Math.max(280, 1800 * Math.exp(-t * 16));
+          v.filter.setLowpass(currentCutoff, 1.2, sampleRate);
+
+          const env = Math.exp(-t * 3.6) * Math.min(1.0, t * 400);
           const sine = Math.sin(TWO_PI * v.phase);
-          const sub = 0.5 * Math.sin(TWO_PI * v.phase * 0.5);
-          const tri = 0.3 * (2 * Math.abs(2 * (v.phase - Math.floor(v.phase + 0.5))) - 1);
-          rawSample = (sine + sub + tri) * env * 0.35;
+          const sub = 0.55 * Math.sin(TWO_PI * v.phase * 0.5);
+          const tri = 0.45 * (2 * Math.abs(2 * (v.phase - Math.floor(v.phase + 0.5))) - 1);
+          rawSample = (sine + sub + tri + pluck) * env * 0.36;
           rawSample = v.filter.process(rawSample);
         } else if (inst === 'strings') {
-          // Bowed string ensemble (chorused detuned saw)
-          let env = 1.0;
-          if (t < 0.08) env = t / 0.08;
-          else if (progress > 0.8) env = (1.0 - progress) / 0.2;
+          // Symphonic String Ensemble: bow attack, musical decrescendo, articulate release, 3 detuned saws + sub-saw
+          const bowAttack = Math.min(1.0, t / 0.045);
+          const bowDecay = 0.40 + 0.60 * Math.exp(-t * 1.6);
+          const releaseEnv = (progress > 0.85) ? (1.0 - progress) / 0.15 : 1.0;
+          const env = bowAttack * bowDecay * releaseEnv;
+
           const saw1 = 2 * (v.phase - Math.floor(v.phase + 0.5));
           const saw2 = 2 * (v.phase2 - Math.floor(v.phase2 + 0.5));
           const saw3 = 2 * (v.phase3 - Math.floor(v.phase3 + 0.5));
-          rawSample = (saw1 * 0.4 + saw2 * 0.3 + saw3 * 0.3) * env * 0.20;
+          const subSawPhase = (v.phase * 0.5) % 1;
+          const subSaw = 2 * (subSawPhase - Math.floor(subSawPhase + 0.5));
+
+          rawSample = (saw1 * 0.35 + saw2 * 0.28 + saw3 * 0.28 + subSaw * 0.15) * env * 0.22;
           rawSample = v.filter.process(rawSample);
         } else if (inst === 'organ') {
-          // Hammond B3 drawbar multi-sine
-          let env = 1.0;
-          if (t < 0.01) env = t / 0.01;
-          else if (progress > 0.9) env = (1.0 - progress) / 0.1;
-          const sub = 0.4 * Math.sin(TWO_PI * v.phase * 0.5);
-          const fund = 0.6 * Math.sin(TWO_PI * v.phase);
-          const h2 = 0.3 * Math.sin(TWO_PI * v.phase * 2);
-          const h3 = 0.2 * Math.sin(TWO_PI * v.phase * 3);
-          rawSample = (sub + fund + h2 + h3) * env * 0.22;
+          // Hammond B3: Key click transient, 6 drawbars, rotary Doppler modulation, articulate envelope
+          let click = 0;
+          if (t < 0.006) {
+            click = (Math.random() * 2 - 1) * Math.exp(-t * 600) * 0.3;
+          }
+
+          const attack = Math.min(1.0, t / 0.005);
+          const decay = 0.50 + 0.50 * Math.exp(-t * 2.2);
+          const rel = progress > 0.92 ? (1.0 - progress) / 0.08 : 1.0;
+          const env = attack * decay * rel;
+
+          // Rotary Leslie Doppler vibrato (1.2 Hz)
+          const rotaryMod = 1.0 + 0.004 * Math.sin(TWO_PI * 1.2 * t);
+          const p = v.phase * rotaryMod;
+
+          const sub = 0.35 * Math.sin(TWO_PI * p * 0.5);
+          const fund = 0.55 * Math.sin(TWO_PI * p);
+          const quint = 0.25 * Math.sin(TWO_PI * p * 1.5);
+          const h2 = 0.30 * Math.sin(TWO_PI * p * 2.0);
+          const h3 = 0.15 * Math.sin(TWO_PI * p * 3.0);
+          const h4 = 0.10 * Math.sin(TWO_PI * p * 4.0);
+
+          rawSample = (sub + fund + quint + h2 + h3 + h4 + click) * env * 0.22;
         } else if (inst === 'flute') {
-          // Concert flute with soft vibrato
-          let env = 1.0;
-          if (t < 0.04) env = t / 0.04;
-          else if (progress > 0.85) env = (1.0 - progress) / 0.15;
-          const vib = 1.0 + 0.006 * Math.sin(TWO_PI * 5.2 * t);
-          const sine = Math.sin(TWO_PI * v.phase * vib);
-          const breath = (Math.random() * 2 - 1) * 0.02;
-          rawSample = (sine + breath) * env * 0.25;
+          // Concert Flute: breath chiff onset, fundamental + 2nd harmonic octave overblow + 3rd harmonic air tube, lyrical vibrato, clean breath release
+          let chiff = 0;
+          if (t < 0.030) {
+            chiff = (Math.random() * 2 - 1) * Math.exp(-t * 120) * 0.12;
+          }
+
+          const attack = Math.min(1.0, t / 0.025);
+          const breathDecay = 0.45 + 0.55 * Math.exp(-t * 1.5);
+          const rel = progress > 0.88 ? (1.0 - progress) / 0.12 : 1.0;
+          const env = attack * breathDecay * rel;
+
+          // Lyrical vibrato blooming in after 60ms
+          const vibAmount = t < 0.06 ? (t / 0.06) * 0.005 : 0.005;
+          const vib = 1.0 + vibAmount * Math.sin(TWO_PI * 5.4 * t);
+
+          const fund = Math.sin(TWO_PI * v.phase * vib);
+          const h2 = 0.18 * Math.sin(TWO_PI * v.phase * 2 * vib);
+          const h3 = 0.05 * Math.sin(TWO_PI * v.phase * 3 * vib);
+
+          rawSample = (fund + h2 + h3 + chiff) * env * 0.26;
         } else if (inst === 'brass') {
-          // Horn section saw + triangle
-          let env = 1.0;
-          if (t < 0.03) env = t / 0.03;
-          else if (progress > 0.85) env = (1.0 - progress) / 0.15;
+          // Horn Section: Lip swell attack, dynamic filter sweep, detuned saw/tri blend
+          const attack = Math.min(1.0, t / 0.035);
+          const brassDecay = 0.50 + 0.50 * Math.exp(-t * 1.6);
+          const rel = progress > 0.88 ? (1.0 - progress) / 0.12 : 1.0;
+          const env = attack * brassDecay * rel;
+
           const saw = 2 * (v.phase - Math.floor(v.phase + 0.5));
-          const tri = 2 * Math.abs(2 * (v.phase2 - Math.floor(v.phase2 + 0.5))) - 1;
-          rawSample = (saw * 0.6 + tri * 0.4) * env * 0.24;
+          const saw2 = 2 * (v.phase2 - Math.floor(v.phase2 + 0.5));
+          const tri = 2 * Math.abs(2 * (v.phase3 - Math.floor(v.phase3 + 0.5))) - 1;
+
+          rawSample = (saw * 0.45 + saw2 * 0.30 + tri * 0.25) * env * 0.25;
           rawSample = v.filter.process(rawSample);
         } else if (inst === 'marimba') {
-          // Wooden marimba bar
-          const env = Math.exp(-t * 4.5) * Math.min(1.0, t * 500);
+          // Acoustic Rosewood Marimba: wooden mallet click, 4.0x double-octave overtone, 9.8x transverse mode, hollow resonator filter
+          let mallet = 0;
+          if (t < 0.006) {
+            mallet = (Math.random() * 2 - 1) * Math.exp(-t * 600) * 0.4;
+          }
+
+          const env = Math.exp(-t * 6.5) * Math.min(1.0, t * 550);
           const fund = Math.sin(TWO_PI * v.phase);
-          const overtone = 0.35 * Math.sin(TWO_PI * v.phase * 3.88) * Math.exp(-t * 18.0);
-          rawSample = (fund + overtone) * env * 0.32;
+          const overtone4x = 0.40 * Math.sin(TWO_PI * v.phase * 4.0) * Math.exp(-t * 25.0);
+          const overtone9x = 0.20 * Math.sin(TWO_PI * v.phase * 9.8) * Math.exp(-t * 50.0);
+
+          rawSample = (fund + overtone4x + overtone9x + mallet) * env * 0.35;
+          rawSample = v.filter.process(rawSample);
         } else {
           // Default triangle
           const env = Math.exp(-t * 2.0) * Math.min(1.0, t * 300);

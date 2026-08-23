@@ -198,6 +198,58 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return buffer;
   };
 
+  const getMarimbaClickBuffer = (ctx: AudioContext): AudioBuffer => {
+    const key = 'marimbaClick' as any;
+    if ((cachedBuffersRef.current as any)[key]) return (cachedBuffersRef.current as any)[key];
+    const bufferSize = Math.max(128, Math.floor(ctx.sampleRate * 0.006));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.18));
+    }
+    (cachedBuffersRef.current as any)[key] = buffer;
+    return buffer;
+  };
+
+  const getOrganKeyClickBuffer = (ctx: AudioContext): AudioBuffer => {
+    const key = 'organClick' as any;
+    if ((cachedBuffersRef.current as any)[key]) return (cachedBuffersRef.current as any)[key];
+    const bufferSize = Math.max(128, Math.floor(ctx.sampleRate * 0.005));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.20));
+    }
+    (cachedBuffersRef.current as any)[key] = buffer;
+    return buffer;
+  };
+
+  const getFluteBreathBuffer = (ctx: AudioContext): AudioBuffer => {
+    const key = 'fluteBreath' as any;
+    if ((cachedBuffersRef.current as any)[key]) return (cachedBuffersRef.current as any)[key];
+    const bufferSize = Math.max(256, Math.floor(ctx.sampleRate * 0.035));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.45));
+    }
+    (cachedBuffersRef.current as any)[key] = buffer;
+    return buffer;
+  };
+
+  const getBassPluckBuffer = (ctx: AudioContext): AudioBuffer => {
+    const key = 'bassPluck' as any;
+    if ((cachedBuffersRef.current as any)[key]) return (cachedBuffersRef.current as any)[key];
+    const bufferSize = Math.max(128, Math.floor(ctx.sampleRate * 0.010));
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.22));
+    }
+    (cachedBuffersRef.current as any)[key] = buffer;
+    return buffer;
+  };
+
   const getPercussionNoiseBuffer = (ctx: AudioContext, type: 'hiHat' | 'clap' | 'snare', durationSec: number): AudioBuffer => {
     if (cachedBuffersRef.current[type]) return cachedBuffersRef.current[type]!;
     const bufferSize = Math.max(256, Math.floor(ctx.sampleRate * durationSec));
@@ -1161,7 +1213,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         hammerFilter.Q.setValueAtTime(1.8, now);
 
         const hammerGain = ctx.createGain();
-        hammerGain.gain.setValueAtTime(0.02, now);
+        hammerGain.gain.setValueAtTime(0.025, now);
 
         hammerSource.connect(hammerFilter);
         hammerFilter.connect(hammerGain);
@@ -1183,7 +1235,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         thumpOsc.stop(now + 0.02);
         cleanupNodes.push(thumpOsc, thumpGain);
 
-        // 2. Soundboard Body Resonators & Dynamic Lowpass Filter
+        // 2. Soundboard Body Resonator & Dynamic Lowpass Filter
         const soundboardFilter1 = ctx.createBiquadFilter();
         soundboardFilter1.type = 'peaking';
         soundboardFilter1.frequency.setValueAtTime(280, now);
@@ -1204,7 +1256,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // 3. Reusable Realistic Piano Harmonic PeriodicWave
         const pianoWave = getPianoPeriodicWave(ctx);
 
-        // 4. 2-String Chorused Unison (Center & Detuned) for warmth & CPU efficiency
+        // 4. 2-String Chorused Unison (Center & Detuned) for warmth
         const mainGain = ctx.createGain();
         mainGain.gain.setValueAtTime(0.0001, now);
         mainGain.gain.linearRampToValueAtTime(0.12, now + 0.003);
@@ -1231,50 +1283,77 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       case InstrumentType.ElectricPiano: {
-        // --- Vintage Rhodes Electric Piano ---
-        const modOsc = ctx.createOscillator();
-        const modGain = ctx.createGain();
-        modOsc.type = 'sine';
-        modOsc.frequency.setValueAtTime(freq * 14, now);
-        modGain.gain.setValueAtTime(freq * 1.5, now);
-        modGain.gain.exponentialRampToValueAtTime(0.05, now + 0.035);
+        // --- Vintage Rhodes Electric Piano (FM Tine + Bell Chime + Magnetic Pickup Bark) ---
+        // Operator 1: Silver Tine FM Modulator (ratio 14.0x) for dynamic metallic tine ping
+        const tineModOsc = ctx.createOscillator();
+        const tineModGain = ctx.createGain();
+        tineModOsc.type = 'sine';
+        tineModOsc.frequency.setValueAtTime(freq * 14.0, now);
+        tineModGain.gain.setValueAtTime(freq * 1.8, now);
+        tineModGain.gain.exponentialRampToValueAtTime(0.01, now + 0.045);
 
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now);
-        osc.connect(gain);
-        modOsc.connect(modGain);
-        modGain.connect(osc.frequency);
+        tineModOsc.connect(tineModGain);
+        tineModGain.connect(osc.frequency);
+        tineModOsc.start(now);
+        tineModOsc.stop(now + 0.06);
 
-        // Body Warmth Harmonic
+        // Operator 2: Bell Chime Overtone (ratio 7.0x)
+        const bellOsc = ctx.createOscillator();
+        const bellGain = ctx.createGain();
+        bellOsc.type = 'sine';
+        bellOsc.frequency.setValueAtTime(freq * 7.0, now);
+        bellGain.gain.setValueAtTime(0.035, now);
+        bellGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+        bellOsc.connect(bellGain);
+        bellOsc.start(now);
+        bellOsc.stop(now + 0.15);
+
+        // Warm Pickup 2nd Harmonic Body (velvety mid-range warmth)
         const h2Osc = ctx.createOscillator();
         const h2Gain = ctx.createGain();
         h2Osc.type = 'sine';
-        h2Osc.frequency.setValueAtTime(freq * 2, now);
+        h2Osc.frequency.setValueAtTime(freq * 2.0, now);
         h2Gain.gain.setValueAtTime(0.0001, now);
-        h2Gain.gain.linearRampToValueAtTime(0.03, now + 0.005);
-        h2Gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.7);
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2600, now);
-
-        gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.linearRampToValueAtTime(0.11, now + 0.004);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
+        h2Gain.gain.linearRampToValueAtTime(0.045, now + 0.006);
+        h2Gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.95);
         h2Osc.connect(h2Gain);
-        h2Gain.connect(filter);
-        filter.connect(gain);
         h2Osc.start(now);
         h2Osc.stop(now + duration);
-        modOsc.start(now);
-        modOsc.stop(now + 0.05);
-        cleanupNodes.push(modOsc, modGain, h2Osc, h2Gain, filter);
+
+        // Warm Suitcase Tremolo / Chorus LFO
+        const tremLfo = ctx.createOscillator();
+        const tremGain = ctx.createGain();
+        tremLfo.type = 'sine';
+        tremLfo.frequency.setValueAtTime(0.75, now);
+        tremGain.gain.setValueAtTime(0.015, now);
+        tremLfo.connect(tremGain);
+        tremGain.connect(gain.gain);
+        tremLfo.start(now);
+        tremLfo.stop(now + duration);
+
+        // Warm Rhodes Tone Filter
+        const rhodesFilter = ctx.createBiquadFilter();
+        rhodesFilter.type = 'lowpass';
+        rhodesFilter.frequency.setValueAtTime(2800, now);
+
+        // Carrier Envelope: Singing Electric Piano Decay
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.connect(rhodesFilter);
+        bellGain.connect(rhodesFilter);
+        h2Gain.connect(rhodesFilter);
+        rhodesFilter.connect(gain);
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(0.12, now + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.05);
+
+        cleanupNodes.push(tineModOsc, tineModGain, bellOsc, bellGain, h2Osc, h2Gain, tremLfo, tremGain, rhodesFilter);
         break;
       }
 
       case InstrumentType.Guitar: {
-        // --- Acoustic Guitar (Plucked String Modeling) ---
+        // --- Acoustic Guitar (Steel/Nylon Plucked String Modeling) ---
         const pluckSource = ctx.createBufferSource();
         pluckSource.buffer = getPluckBuffer(ctx);
 
@@ -1284,7 +1363,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         pluckFilter.Q.setValueAtTime(1.2, now);
 
         const pluckGain = ctx.createGain();
-        pluckGain.gain.setValueAtTime(0.03, now);
+        pluckGain.gain.setValueAtTime(0.035, now);
 
         pluckSource.connect(pluckFilter);
         pluckFilter.connect(pluckGain);
@@ -1297,7 +1376,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         bodyWoodFilter.type = 'peaking';
         bodyWoodFilter.frequency.setValueAtTime(220, now);
         bodyWoodFilter.Q.setValueAtTime(2.0, now);
-        bodyWoodFilter.gain.setValueAtTime(3, now);
+        bodyWoodFilter.gain.setValueAtTime(3.5, now);
 
         const guitarLP = ctx.createBiquadFilter();
         guitarLP.type = 'lowpass';
@@ -1320,8 +1399,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         overtone.type = 'sawtooth';
         overtone.frequency.setValueAtTime(freq * 2, now);
         oGain.gain.setValueAtTime(0.0001, now);
-        oGain.gain.linearRampToValueAtTime(0.02, now + 0.005);
-        oGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.3);
+        oGain.gain.linearRampToValueAtTime(0.025, now + 0.005);
+        oGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.35);
 
         overtone.connect(oGain);
         oGain.connect(bodyWoodFilter);
@@ -1334,98 +1413,158 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       case InstrumentType.Bass: {
-        // --- Acoustic / Electric Plucked Bass ---
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now);
+        // --- Acoustic / Electric Plucked Bass (Articulate Finger Pluck, Punchy Filter Sweep & Tight Damping) ---
+        // 1. Finger Pluck Attack Transient
+        const pluckSrc = ctx.createBufferSource();
+        pluckSrc.buffer = getBassPluckBuffer(ctx);
+        const pluckFilt = ctx.createBiquadFilter();
+        pluckFilt.type = 'bandpass';
+        pluckFilt.frequency.setValueAtTime(1400, now);
+        pluckFilt.Q.setValueAtTime(1.5, now);
+        const pluckVol = ctx.createGain();
+        pluckVol.gain.setValueAtTime(0.04, now);
+        pluckSrc.connect(pluckFilt);
+        pluckFilt.connect(pluckVol);
+        pluckVol.connect(gain);
+        pluckSrc.start(now);
+        pluckSrc.stop(now + 0.015);
+        cleanupNodes.push(pluckSrc, pluckFilt, pluckVol);
 
+        // 2. Dynamic Lowpass Filter Sweep (snappy high-frequency damping like real steel string)
         const bassFilter = ctx.createBiquadFilter();
         bassFilter.type = 'lowpass';
-        bassFilter.frequency.setValueAtTime(1200, now);
-        bassFilter.frequency.exponentialRampToValueAtTime(380, now + 0.08);
-
+        bassFilter.frequency.setValueAtTime(1800, now);
+        bassFilter.frequency.exponentialRampToValueAtTime(320, now + 0.065);
         bassFilter.connect(gain);
+
+        // 3. String Body: Triangle (string buzz) + Sine (fundamental pitch definition)
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
         osc.connect(bassFilter);
 
-        // Sub-bass sine
+        const sineFund = ctx.createOscillator();
+        const fundGain = ctx.createGain();
+        sineFund.type = 'sine';
+        sineFund.frequency.setValueAtTime(freq, now);
+        fundGain.gain.setValueAtTime(0.0001, now);
+        fundGain.gain.linearRampToValueAtTime(0.12, now + 0.004);
+        fundGain.gain.exponentialRampToValueAtTime(0.0001, now + Math.min(duration * 0.9, 0.75));
+        sineFund.connect(fundGain);
+        fundGain.connect(gain);
+        sineFund.start(now);
+        sineFund.stop(now + duration);
+
+        // Sub-octave reinforcement for focused low-end weight
         const subOsc = ctx.createOscillator();
         const subGain = ctx.createGain();
         subOsc.type = 'sine';
         subOsc.frequency.setValueAtTime(freq * 0.5, now);
         subGain.gain.setValueAtTime(0.0001, now);
-        subGain.gain.linearRampToValueAtTime(0.12, now + 0.015);
-        subGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.2);
-
+        subGain.gain.linearRampToValueAtTime(0.09, now + 0.008);
+        subGain.gain.exponentialRampToValueAtTime(0.0001, now + Math.min(duration * 0.85, 0.65));
         subOsc.connect(subGain);
         subGain.connect(gain);
         subOsc.start(now);
         subOsc.stop(now + duration);
 
+        // Tight, punchy master envelope to prevent muddy bass overhang
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.linearRampToValueAtTime(0.14, now + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-        cleanupNodes.push(bassFilter, subOsc, subGain);
+        gain.gain.linearRampToValueAtTime(0.13, now + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + Math.min(duration * 0.9, 0.75));
+
+        cleanupNodes.push(bassFilter, sineFund, fundGain, subOsc, subGain);
         break;
       }
 
       case InstrumentType.Strings: {
-        // --- Symphonic String Ensemble ---
-        const stringFilter1 = ctx.createBiquadFilter();
-        stringFilter1.type = 'peaking';
-        stringFilter1.frequency.setValueAtTime(300, now);
-        stringFilter1.Q.setValueAtTime(1.5, now);
-        stringFilter1.gain.setValueAtTime(3, now);
+        // --- Symphonic String Ensemble (Warm Bow Bite, Lush Chorusing, Natural Decrescendo & Articulate Release) ---
+        const stringFilter = ctx.createBiquadFilter();
+        stringFilter.type = 'peaking';
+        stringFilter.frequency.setValueAtTime(340, now);
+        stringFilter.Q.setValueAtTime(1.4, now);
+        stringFilter.gain.setValueAtTime(3.5, now);
 
         const stringLP = ctx.createBiquadFilter();
         stringLP.type = 'lowpass';
-        stringLP.frequency.setValueAtTime(2200, now);
+        stringLP.frequency.setValueAtTime(2400, now);
 
-        stringFilter1.connect(stringLP);
+        stringFilter.connect(stringLP);
         stringLP.connect(gain);
 
-        // Main voice osc
+        // Center Voice Sawtooth
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(freq, now);
-        osc.connect(stringFilter1);
+        osc.connect(stringFilter);
 
-        // Bow Friction Envelope
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.08, now + 0.12);
-        gain.gain.linearRampToValueAtTime(0.07, now + duration - 0.15);
-        gain.gain.linearRampToValueAtTime(0.0001, now + duration);
-
-        const detuneCents = [-6, 6];
-        detuneCents.forEach((cents) => {
+        // Multi-voice Ensemble Detuning (-6 cents, +6 cents, -12 cents sub-saw for cello richness)
+        const detunes = [-6, 6, -12];
+        const gains = [0.035, 0.035, 0.02];
+        detunes.forEach((cents, i) => {
           const sOsc = ctx.createOscillator();
           const sGain = ctx.createGain();
           sOsc.type = 'sawtooth';
-          sOsc.frequency.setValueAtTime(freq, now);
+          sOsc.frequency.setValueAtTime(i === 2 ? freq * 0.5 : freq, now);
           sOsc.detune.setValueAtTime(cents, now);
+          sGain.gain.setValueAtTime(gains[i], now);
 
-          sGain.gain.setValueAtTime(0.03, now);
           sOsc.connect(sGain);
-          sGain.connect(stringFilter1);
-
+          sGain.connect(stringFilter);
           sOsc.start(now);
           sOsc.stop(now + duration);
           cleanupNodes.push(sOsc, sGain);
         });
-        cleanupNodes.push(stringFilter1, stringLP);
+
+        // Articulate Bow Envelope: Smooth attack (45ms), natural bowing decrescendo down to 40% sustain, fast clean release
+        const peakTime = now + 0.05;
+        const decayTime = now + Math.min(duration * 0.6, 0.45);
+        const releaseStartTime = Math.max(decayTime, now + duration - 0.08);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.085, peakTime);
+        gain.gain.exponentialRampToValueAtTime(0.035, decayTime);
+        gain.gain.setValueAtTime(0.035, releaseStartTime);
+        gain.gain.linearRampToValueAtTime(0.0001, now + duration);
+
+        cleanupNodes.push(stringFilter, stringLP);
         break;
       }
 
       case InstrumentType.Organ: {
-        // --- Hammond B3 Organ ---
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.08, now + 0.015);
-        gain.gain.linearRampToValueAtTime(0.07, now + duration - 0.02);
-        gain.gain.linearRampToValueAtTime(0, now + duration);
+        // --- Hammond B3 Organ (B3 Drawbars, Key Click Percussion, Rotary Chorus & Crisp Chords) ---
+        // 1. Mechanical B3 Key Click Transient
+        const keyClickSrc = ctx.createBufferSource();
+        keyClickSrc.buffer = getOrganKeyClickBuffer(ctx);
+        const clickFilt = ctx.createBiquadFilter();
+        clickFilt.type = 'bandpass';
+        clickFilt.frequency.setValueAtTime(4500, now);
+        clickFilt.Q.setValueAtTime(2.0, now);
+        const clickGain = ctx.createGain();
+        clickGain.gain.setValueAtTime(0.035, now);
+        keyClickSrc.connect(clickFilt);
+        clickFilt.connect(clickGain);
+        clickGain.connect(gain);
+        keyClickSrc.start(now);
+        keyClickSrc.stop(now + 0.008);
+        cleanupNodes.push(keyClickSrc, clickFilt, clickGain);
 
+        // 2. Rotary Leslie Speaker Emulation (Subtle dual-chorus vibrato modulation)
+        const leslieLfo = ctx.createOscillator();
+        const leslieGain = ctx.createGain();
+        leslieLfo.type = 'sine';
+        leslieLfo.frequency.setValueAtTime(1.2, now); // Slow rotary chorusing
+        leslieGain.gain.setValueAtTime(2.5, now);
+        leslieLfo.connect(leslieGain);
+        leslieGain.connect(osc.detune);
+        leslieLfo.start(now);
+        leslieLfo.stop(now + duration);
+
+        // 3. Full B3 Drawbar Harmonics: 16' (0.5x), 8' (1.0x), 5 1/3' (1.5x), 4' (2.0x), 2 2/3' (3.0x), 2' (4.0x)
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
         osc.connect(gain);
 
-        const drawbarRatios = [0.5, 1.0, 2.0, 3.0];
-        const drawbarGains  = [0.04, 0.06, 0.03, 0.015];
+        const drawbarRatios = [0.5, 1.5, 2.0, 3.0, 4.0];
+        const drawbarGains  = [0.035, 0.025, 0.03, 0.015, 0.01];
 
         drawbarRatios.forEach((ratio, i) => {
           const dOsc = ctx.createOscillator();
@@ -1440,92 +1579,199 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           dOsc.stop(now + duration);
           cleanupNodes.push(dOsc, dGain);
         });
+
+        // Articulate Envelope: Instant punchy onset, smooth decay to 50% warm sustain, snappy 30ms release
+        const decayTime = now + Math.min(duration * 0.55, 0.35);
+        const relStartTime = Math.max(decayTime, now + duration - 0.035);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.09, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.045, decayTime);
+        gain.gain.setValueAtTime(0.045, relStartTime);
+        gain.gain.linearRampToValueAtTime(0.0001, now + duration);
+
+        cleanupNodes.push(leslieLfo, leslieGain);
         break;
       }
 
       case InstrumentType.Flute: {
-        // --- Concert Flute / Woodwind ---
+        // --- Concert Flute (Embouchure Chiff, Octave Overblowing, Warm Air & Lyrical Vibrato) ---
+        // 1. Embouchure Breath Chiff Attack Transient
+        const chiffSrc = ctx.createBufferSource();
+        chiffSrc.buffer = getFluteBreathBuffer(ctx);
+        const chiffFilt = ctx.createBiquadFilter();
+        chiffFilt.type = 'bandpass';
+        chiffFilt.frequency.setValueAtTime(2400, now);
+        chiffFilt.Q.setValueAtTime(1.8, now);
+        const chiffGain = ctx.createGain();
+        chiffGain.gain.setValueAtTime(0.025, now);
+        chiffSrc.connect(chiffFilt);
+        chiffFilt.connect(chiffGain);
+        chiffGain.connect(gain);
+        chiffSrc.start(now);
+        chiffSrc.stop(now + 0.035);
+        cleanupNodes.push(chiffSrc, chiffFilt, chiffGain);
+
+        // 2. Pure Fundamental Tone
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
         osc.connect(gain);
 
-        // Expression Vibrato
+        // 3. 2nd Harmonic Octave Overblowing (18%) + 3rd Harmonic Air Column (5%)
+        const h2Osc = ctx.createOscillator();
+        const h2Gain = ctx.createGain();
+        h2Osc.type = 'sine';
+        h2Osc.frequency.setValueAtTime(freq * 2, now);
+        h2Gain.gain.setValueAtTime(0.015, now);
+        h2Osc.connect(h2Gain);
+        h2Gain.connect(gain);
+        h2Osc.start(now);
+        h2Osc.stop(now + duration);
+
+        const h3Osc = ctx.createOscillator();
+        const h3Gain = ctx.createGain();
+        h3Osc.type = 'sine';
+        h3Osc.frequency.setValueAtTime(freq * 3, now);
+        h3Gain.gain.setValueAtTime(0.005, now);
+        h3Osc.connect(h3Gain);
+        h3Gain.connect(gain);
+        h3Osc.start(now);
+        h3Osc.stop(now + duration);
+
+        // 4. Lyrical Vibrato LFO (5.4 Hz blooming in after 60ms)
         const vibLfo = ctx.createOscillator();
         const vibGain = ctx.createGain();
         vibLfo.type = 'sine';
-        vibLfo.frequency.setValueAtTime(5.2, now);
+        vibLfo.frequency.setValueAtTime(5.4, now);
         vibGain.gain.setValueAtTime(0, now);
-        vibGain.gain.linearRampToValueAtTime(3.0, now + 0.15);
+        vibGain.gain.linearRampToValueAtTime(3.2, now + 0.12);
         vibLfo.connect(vibGain);
         vibGain.connect(osc.frequency);
-
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.09, now + 0.04);
-        gain.gain.linearRampToValueAtTime(0.08, now + duration - 0.06);
-        gain.gain.linearRampToValueAtTime(0, now + duration);
-
+        vibGain.connect(h2Osc.frequency);
         vibLfo.start(now);
         vibLfo.stop(now + duration);
-        cleanupNodes.push(vibLfo, vibGain);
+
+        // Articulate Flute Envelope: Smooth breath rise (25ms), natural decrescendo to 45%, clean 60ms breath release
+        const decayTime = now + Math.min(duration * 0.65, 0.45);
+        const relStartTime = Math.max(decayTime, now + duration - 0.06);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.08, now + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.04, decayTime);
+        gain.gain.setValueAtTime(0.04, relStartTime);
+        gain.gain.linearRampToValueAtTime(0.0001, now + duration);
+
+        cleanupNodes.push(h2Osc, h2Gain, h3Osc, h3Gain, vibLfo, vibGain);
         break;
       }
 
       case InstrumentType.Brass: {
-        // --- Acoustic Brass Horn Section ---
+        // --- Acoustic Brass Section (Lip Swell, Dynamic Filter Opening, Warm Saw/Tri Blend) ---
         const brassFilter = ctx.createBiquadFilter();
         brassFilter.type = 'lowpass';
-        brassFilter.Q.setValueAtTime(0.8, now);
+        brassFilter.Q.setValueAtTime(1.1, now);
         brassFilter.frequency.setValueAtTime(freq * 1.5, now);
-        brassFilter.frequency.exponentialRampToValueAtTime(Math.min(2200, freq * 3.2), now + 0.045);
-        brassFilter.frequency.exponentialRampToValueAtTime(Math.min(1400, freq * 2.0), now + duration);
+        brassFilter.frequency.exponentialRampToValueAtTime(Math.min(3200, freq * 3.8), now + 0.045);
+        brassFilter.frequency.exponentialRampToValueAtTime(Math.min(1600, freq * 2.0), now + duration * 0.6);
 
         brassFilter.connect(gain);
 
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(freq, now);
-        osc.detune.setValueAtTime(-3, now);
+        osc.detune.setValueAtTime(-4, now);
         osc.connect(brassFilter);
 
         const bOsc2 = ctx.createOscillator();
-        bOsc2.type = 'triangle';
+        bOsc2.type = 'sawtooth';
         bOsc2.frequency.setValueAtTime(freq, now);
-        bOsc2.detune.setValueAtTime(4, now);
+        bOsc2.detune.setValueAtTime(5, now);
         bOsc2.connect(brassFilter);
 
+        const bOsc3 = ctx.createOscillator();
+        bOsc3.type = 'triangle';
+        bOsc3.frequency.setValueAtTime(freq, now);
+        bOsc3.connect(brassFilter);
+
+        // Dynamic Brass Swell & Articulate Release
+        const peakTime = now + 0.035;
+        const decayTime = now + Math.min(duration * 0.6, 0.45);
+        const relStartTime = Math.max(decayTime, now + duration - 0.06);
+
         gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.08, now + 0.03);
-        gain.gain.linearRampToValueAtTime(0.07, now + duration - 0.05);
-        gain.gain.linearRampToValueAtTime(0, now + duration);
+        gain.gain.linearRampToValueAtTime(0.085, peakTime);
+        gain.gain.exponentialRampToValueAtTime(0.045, decayTime);
+        gain.gain.setValueAtTime(0.045, relStartTime);
+        gain.gain.linearRampToValueAtTime(0.0001, now + duration);
 
         bOsc2.start(now);
         bOsc2.stop(now + duration);
-        cleanupNodes.push(brassFilter, bOsc2);
+        bOsc3.start(now);
+        bOsc3.stop(now + duration);
+        cleanupNodes.push(brassFilter, bOsc2, bOsc3);
         break;
       }
 
       case InstrumentType.Marimba: {
-        // --- Acoustic Marimba / Wooden Bar ---
+        // --- Acoustic Rosewood Marimba (Wooden Mallet Click, 4x Double-Octave Overtone, Resonator Pipe Body) ---
+        // 1. Hard Mallet on Rosewood Strike Transient
+        const clickSrc = ctx.createBufferSource();
+        clickSrc.buffer = getMarimbaClickBuffer(ctx);
+        const clickFilt = ctx.createBiquadFilter();
+        clickFilt.type = 'bandpass';
+        clickFilt.frequency.setValueAtTime(2600, now);
+        clickFilt.Q.setValueAtTime(2.2, now);
+        const clickVol = ctx.createGain();
+        clickVol.gain.setValueAtTime(0.045, now);
+        clickSrc.connect(clickFilt);
+        clickFilt.connect(clickVol);
+        clickVol.connect(gain);
+        clickSrc.start(now);
+        clickSrc.stop(now + 0.008);
+        cleanupNodes.push(clickSrc, clickFilt, clickVol);
+
+        // 2. Tubular Resonator Pipe Peaking Filter (amplifies warm acoustic bar resonance)
+        const resonatorPipe = ctx.createBiquadFilter();
+        resonatorPipe.type = 'peaking';
+        resonatorPipe.frequency.setValueAtTime(480, now);
+        resonatorPipe.Q.setValueAtTime(2.0, now);
+        resonatorPipe.gain.setValueAtTime(4.0, now);
+        resonatorPipe.connect(gain);
+
+        // 3. Fundamental Sine Tone (warm hollow wooden bar)
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
-        osc.connect(gain);
+        osc.connect(resonatorPipe);
 
-        const overtone = ctx.createOscillator();
-        const oGain = ctx.createGain();
-        overtone.type = 'sine';
-        overtone.frequency.setValueAtTime(freq * 3.88, now);
-        oGain.gain.setValueAtTime(0.04, now);
-        oGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+        // 4. Acoustic Marimba Bar 1st Overtone (4.0x double octave mode, decays quickly in ~45ms)
+        const overtone4x = ctx.createOscillator();
+        const o4Gain = ctx.createGain();
+        overtone4x.type = 'sine';
+        overtone4x.frequency.setValueAtTime(freq * 4.0, now);
+        o4Gain.gain.setValueAtTime(0.04, now);
+        o4Gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+        overtone4x.connect(o4Gain);
+        o4Gain.connect(resonatorPipe);
+        overtone4x.start(now);
+        overtone4x.stop(now + 0.06);
 
+        // 5. Acoustic Marimba Bar 2nd Overtone (9.8x transverse mode, decays in 15ms)
+        const overtone9x = ctx.createOscillator();
+        const o9Gain = ctx.createGain();
+        overtone9x.type = 'sine';
+        overtone9x.frequency.setValueAtTime(freq * 9.8, now);
+        o9Gain.gain.setValueAtTime(0.02, now);
+        o9Gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.018);
+        overtone9x.connect(o9Gain);
+        o9Gain.connect(resonatorPipe);
+        overtone9x.start(now);
+        overtone9x.stop(now + 0.03);
+
+        // Crisp, snappy wooden mallet decay curve (unmistakably percussive marimba)
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.linearRampToValueAtTime(0.12, now + 0.002);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.6);
+        gain.gain.linearRampToValueAtTime(0.13, now + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + Math.min(duration * 0.55, 0.38));
 
-        overtone.connect(oGain);
-        oGain.connect(gain);
-
-        overtone.start(now);
-        overtone.stop(now + 0.1);
-        cleanupNodes.push(overtone, oGain);
+        cleanupNodes.push(resonatorPipe, overtone4x, o4Gain, overtone9x, o9Gain);
         break;
       }
 
@@ -1533,8 +1779,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         osc.type = 'triangle';
         osc.connect(gain);
         gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.08, now + 0.1);
-        gain.gain.linearRampToValueAtTime(0, now + duration);
+        gain.gain.linearRampToValueAtTime(0.08, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     }
 
     if (cleanupNodes.length > 0) {
