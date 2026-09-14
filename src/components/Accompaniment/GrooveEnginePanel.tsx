@@ -180,9 +180,9 @@ export default function GrooveEnginePanel() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0 max-w-full">
               {/* Groove Preset Selector */}
-              <div className="relative">
+              <div className="relative max-w-[180px] sm:max-w-[240px] min-w-0 flex-1">
                 <select
                   value={activeGroovePattern?.id}
                   onChange={(e) => {
@@ -190,13 +190,14 @@ export default function GrooveEnginePanel() {
                     if (found) setActiveGroovePattern(found);
                   }}
                   className={cn(
-                    "appearance-none border px-3 pr-8 py-1.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer outline-none focus:border-emerald-500",
+                    "w-full appearance-none border px-3 pr-8 py-1.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer outline-none focus:border-emerald-500 truncate",
                     resolvedTheme === 'dark' ? "bg-white/10 border-white/15 text-white" : "bg-white border-slate-300 text-slate-800"
                   )}
+                  title={activeGroovePattern ? `${activeGroovePattern.name} (${activeGroovePattern.genre})` : 'Select Preset'}
                 >
                   {filteredPresets.map(preset => (
                     <option key={preset.id} value={preset.id} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                      {preset.name} ({preset.genre})
+                      {preset.name}
                     </option>
                   ))}
                 </select>
@@ -205,11 +206,11 @@ export default function GrooveEnginePanel() {
 
               <button
                 onClick={() => setIsSaveModalOpen(true)}
-                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[9px] font-extrabold uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-xs"
+                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[9px] font-extrabold uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-xs shrink-0"
                 title="Save current custom groove configuration"
               >
                 <BookmarkPlus className="w-3.5 h-3.5" />
-                <span>Save Preset</span>
+                <span>Save</span>
               </button>
             </div>
           </div>
