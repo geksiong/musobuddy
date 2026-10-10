@@ -24,12 +24,15 @@ import {
   Radio,
   Rewind,
   VolumeX,
-  X
+  X,
+  Settings,
+  Gamepad2
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { useScores } from '../../contexts/ScoreContext.tsx';
 import { useAudio } from '../../contexts/AudioContext.tsx';
+import { useController } from '../../contexts/ControllerContext.tsx';
 import { useMetronome } from '../../hooks/useMetronome.ts';
 import { useDrone } from '../../hooks/useDrone.ts';
 import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
@@ -47,6 +50,7 @@ export default function PracticeToolsPanel({ onNavigate, fileInputRef }: Practic
   const { resolvedTheme } = useTheme();
   const { globalAudio, activeScore, loadFiles, setPlaybackTime } = useScores();
   const { playingRefNote, playRefNote, stopRefNote } = useAudio();
+  const { setIsControllerModalOpen, gamepads, midiDevices, isMidiActive } = useController();
 
   // Practice Tools Hooks
   const { 
@@ -707,6 +711,44 @@ export default function PracticeToolsPanel({ onNavigate, fileInputRef }: Practic
                         <span>{isAccompanimentPlaying ? 'Stop Backing' : 'Start Backing'}</span>
                       </button>
                     </div>
+                  </div>
+
+                  {/* Hardware & Controller Setup Strip */}
+                  <div className={cn(
+                    "p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs transition-colors",
+                    resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"
+                  )}>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                        <Gamepad2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h5 className="font-extrabold uppercase tracking-wider text-[11px]">Hardware & Controller Setup</h5>
+                          {(gamepads.length > 0 || (isMidiActive && midiDevices.length > 0)) && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          {gamepads.length > 0 || midiDevices.length > 0 
+                            ? `${gamepads.length} gamepad(s), ${midiDevices.length} MIDI device(s) connected` 
+                            : 'Configure foot pedals, bluetooth page turners, gamepads, and keyboard shortcuts'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setIsControllerModalOpen(true)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm",
+                        resolvedTheme === 'dark'
+                          ? "bg-indigo-600/20 hover:bg-indigo-600/30 border-indigo-500/40 text-indigo-200"
+                          : "bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700"
+                      )}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Setup Controllers &amp; Shortcuts</span>
+                    </button>
                   </div>
                 </div>
               </motion.div>

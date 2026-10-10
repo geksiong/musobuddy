@@ -35,13 +35,16 @@ import {
   WifiOff,
   RefreshCw,
   Smartphone,
-  AudioWaveform
+  AudioWaveform,
+  Gamepad2,
+  Sliders
 } from 'lucide-react';
 import { cn } from './lib/utils.ts';
 import { useAudio } from './contexts/AudioContext.tsx';
 import { useAccompaniment } from './contexts/AccompanimentContext.tsx';
 import { useTheme } from './contexts/ThemeContext.tsx';
 import { useScores } from './contexts/ScoreContext.tsx';
+import { useController } from './contexts/ControllerContext.tsx';
 import { ScoreFormat } from './components/Score/types.ts';
 import { usePWA } from './hooks/usePWA.ts';
 
@@ -55,6 +58,7 @@ import PracticeToolsPanel from './components/Navigation/PracticeToolsPanel.tsx';
 import AboutModal from './components/AboutModal.tsx';
 import LoadUrlModal from './components/Score/LoadUrlModal.tsx';
 import TranscribeMelodyModal from './components/Score/TranscribeMelodyModal.tsx';
+import { ControllerMappingModal } from './components/Score/ControllerMappingModal.tsx';
 
 type ViewType = 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment' | 'settings';
 
@@ -65,6 +69,13 @@ export default function App() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { scores, setScores, activeScoreId, setActiveScoreId, loadFiles, loadFromUrl, createScore, isDistractionFree, setIsDistractionFree } = useScores();
   const { isInstallable, isInstalled, isOffline, hasUpdate, promptInstall, updateApp } = usePWA();
+  const { 
+    setIsControllerModalOpen, 
+    gamepads, 
+    midiDevices, 
+    isMidiActive, 
+    activeToast 
+  } = useController();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isNewScoreOpen, setIsNewScoreOpen] = useState(false);
@@ -641,8 +652,25 @@ export default function App() {
               )}
             </div>
 
-            {/* Right: About button */}
+            {/* Right: Controller & About buttons */}
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setIsControllerModalOpen(true)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors flex items-center gap-1.5",
+                  resolvedTheme === 'dark'
+                    ? "border-white/10 hover:bg-white/10 text-slate-300"
+                    : "border-black/10 hover:bg-black/5 text-slate-700"
+                )}
+                title="Controller & Hardware Setup"
+              >
+                <Sliders className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-[10px] uppercase font-bold tracking-wider">Setup</span>
+                {(gamepads.length > 0 || (isMidiActive && midiDevices.length > 0)) && (
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                )}
+              </button>
+
               <button
                 onClick={() => setIsAboutOpen(true)}
                 className={cn(
@@ -661,6 +689,9 @@ export default function App() {
         </footer>
       )}
 
+      {/* Controller & Hardware Mapping Modal */}
+      <ControllerMappingModal />
+
       {/* About Modal */}
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
 
@@ -676,6 +707,27 @@ export default function App() {
         isOpen={isTranscribeModalOpen}
         onClose={() => setIsTranscribeModalOpen(false)}
       />
+
+      {/* Live Controller / MIDI / Shortcut HUD Toast */}
+      <AnimatePresence>
+        {activeToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex items-center gap-2.5 px-4 py-2 rounded-full shadow-2xl backdrop-blur-xl border border-indigo-500/40 bg-slate-900/90 text-white"
+          >
+            <div className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+            <div className="text-xs font-medium">
+              <span className="font-bold text-indigo-300">{activeToast.title}</span>
+              {activeToast.subtitle && (
+                <span className="text-slate-300 ml-1.5 opacity-90">• {activeToast.subtitle}</span>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Service Worker Update Toast Notification */}
       <AnimatePresence>

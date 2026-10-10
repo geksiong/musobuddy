@@ -24,6 +24,15 @@ export interface Bookmark {
   createdAt: number;
 }
 
+export interface Waypoint {
+  id: string;
+  page: number;
+  title: string;
+  createdAt: number;
+  scoreId?: string;
+  color?: string;
+}
+
 export interface PenAnnotation extends BaseAnnotation {
   type: 'pen';
   points: Point[];
@@ -62,6 +71,7 @@ export interface DocumentAnnotations {
   updatedAt: number;
   annotations: Record<number, Annotation[]>; // key is page number
   bookmarks?: Bookmark[];
+  waypoints?: Waypoint[];
 }
 
 export interface AnnotationState {

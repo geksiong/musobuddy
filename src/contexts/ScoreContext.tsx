@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
 import { parseMxlFile } from '../lib/mxlUtils.ts';
 import { detectChordEngine } from '../lib/chordSheetUtils.ts';
 import { loadScoreFromUrl, LoadScoreUrlResult } from '../lib/urlScoreLoader.ts';
+
+import { Waypoint } from '../components/Score/annotationTypes.ts';
 
 interface GlobalAudio {
   url: string;
@@ -32,6 +34,28 @@ interface ScoreContextType {
   isDistractionFree: boolean;
   setIsDistractionFree: React.Dispatch<React.SetStateAction<boolean>>;
   toggleDistractionFree: () => void;
+
+  // Waypoints & Page Navigation
+  waypoints: Waypoint[];
+  setWaypoints: React.Dispatch<React.SetStateAction<Waypoint[]>>;
+  addWaypoint: (page: number, title?: string) => Waypoint;
+  removeWaypoint: (id: string) => void;
+  updateWaypoint: (id: string, updates: Partial<Waypoint>) => void;
+  nextWaypoint: () => Waypoint | null;
+  prevWaypoint: () => Waypoint | null;
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  totalPages: number;
+  setTotalPages: React.Dispatch<React.SetStateAction<number>>;
+  jumpToPage: (page: number) => void;
+  registerPageJumper: (fn: ((page: number) => void) | null) => void;
+  scrollScore: (direction: 'up' | 'down' | 'home' | 'end') => void;
+  registerScrollHandler: (fn: ((direction: 'up' | 'down' | 'home' | 'end') => void) | null) => void;
+
+  // Audio Playback Controller Bridge
+  audioControlsRef: React.MutableRefObject<any>;
+  registerAudioControls: (controls: any) => void;
+  toggleAudioPlayback: () => void;
 }
 
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
@@ -193,6 +217,14 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
   const [playbackTime, setPlaybackTime] = useState<number>(0);
   const [isDistractionFree, setIsDistractionFree] = useState<boolean>(false);
 
+  // Waypoints and Page Navigation State
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+  const pageJumperRef = useRef<((page: number) => void) | null>(null);
+  const scrollHandlerRef = useRef<((direction: 'up' | 'down' | 'home' | 'end') => void) | null>(null);
+  const audioControlsRef = useRef<any>(null);
+
   const toggleDistractionFree = useCallback(() => {
     setIsDistractionFree(prev => !prev);
   }, []);
@@ -200,11 +232,200 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
   const setActiveScoreId = useCallback((id: string | null) => {
     setActiveScoreIdState(id);
     setGlobalAudio(null);
+    setCurrentPage(1);
   }, []);
 
   const activeScoreId = activeScoreIdState;
-
   const activeScore = scores.find(s => s.id === activeScoreId) || scores[0];
+
+  // Helper to load waypoints from localStorage for a score
+  const loadScoreWaypoints = useCallback((id: string, format?: ScoreFormat): Waypoint[] => {
+    if (!id) return [];
+    try {
+      // 1. Check dedicated waypoints storage
+      const wpKey = `studio_buddy_score_waypoints_v1_${id}`;
+      const savedWps = localStorage.getItem(wpKey);
+      if (savedWps) {
+        const parsed = JSON.parse(savedWps);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+
+      // 2. Check PDF annotations storage
+      const pdfKey = `studio_buddy_pdf_annotations_v1_${id}`;
+      const savedPdf = localStorage.getItem(pdfKey);
+      if (savedPdf) {
+        const parsed = JSON.parse(savedPdf);
+        if (parsed) {
+          if (Array.isArray(parsed.waypoints) && parsed.waypoints.length > 0) {
+            return parsed.waypoints;
+          }
+          if (Array.isArray(parsed.bookmarks) && parsed.bookmarks.length > 0) {
+            return parsed.bookmarks.map((b: any) => ({
+              id: b.id,
+              page: b.page,
+              title: b.title,
+              createdAt: b.createdAt,
+              scoreId: id
+            }));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load waypoints for score:', id, e);
+    }
+    return [];
+  }, []);
+
+  // Sync waypoints when active score changes
+  useEffect(() => {
+    if (!activeScoreId) {
+      setWaypoints([]);
+      return;
+    }
+
+    const loaded = loadScoreWaypoints(activeScoreId, activeScore?.format);
+    setWaypoints(loaded);
+  }, [activeScoreId, activeScore?.format, loadScoreWaypoints]);
+
+  // Persist waypoints helper
+  const persistScoreWaypoints = useCallback((id: string, updatedWps: Waypoint[]) => {
+    if (!id) return;
+    try {
+      // 1. Save to dedicated waypoints store
+      localStorage.setItem(`studio_buddy_score_waypoints_v1_${id}`, JSON.stringify(updatedWps));
+
+      // 2. Also keep PDF annotations storage in sync if it exists or if it's a PDF score
+      const pdfKey = `studio_buddy_pdf_annotations_v1_${id}`;
+      const savedPdf = localStorage.getItem(pdfKey);
+      let docData: any = {};
+      if (savedPdf) {
+        try { docData = JSON.parse(savedPdf); } catch {}
+      }
+      docData.scoreTitle = activeScore?.title || 'Score';
+      docData.version = 1;
+      docData.updatedAt = Date.now();
+      docData.waypoints = updatedWps;
+      docData.bookmarks = updatedWps.map(w => ({
+        id: w.id,
+        page: w.page,
+        title: w.title,
+        createdAt: w.createdAt
+      }));
+      localStorage.setItem(pdfKey, JSON.stringify(docData));
+
+      // 3. Update in score model in memory
+      setScores(prev => prev.map(s => s.id === id ? { ...s, waypoints: updatedWps } : s));
+    } catch (e) {
+      console.error('Failed to save score waypoints:', e);
+    }
+  }, [activeScore?.title]);
+
+  const addWaypoint = useCallback((page: number, title?: string): Waypoint => {
+    const id = Math.random().toString(36).substring(2, 11);
+    const safeTitle = (title && title.trim()) ? title.trim() : `Page ${page}`;
+    const newWp: Waypoint = {
+      id,
+      page,
+      title: safeTitle,
+      createdAt: Date.now(),
+      scoreId: activeScoreId || undefined
+    };
+
+    setWaypoints(prev => {
+      const filtered = prev.filter(w => w.page !== page);
+      const updated = [...filtered, newWp].sort((a, b) => a.page - b.page);
+      if (activeScoreId) {
+        persistScoreWaypoints(activeScoreId, updated);
+      }
+      return updated;
+    });
+
+    return newWp;
+  }, [activeScoreId, persistScoreWaypoints]);
+
+  const removeWaypoint = useCallback((id: string) => {
+    setWaypoints(prev => {
+      const updated = prev.filter(w => w.id !== id);
+      if (activeScoreId) {
+        persistScoreWaypoints(activeScoreId, updated);
+      }
+      return updated;
+    });
+  }, [activeScoreId, persistScoreWaypoints]);
+
+  const updateWaypoint = useCallback((id: string, updates: Partial<Waypoint>) => {
+    setWaypoints(prev => {
+      const updated = prev.map(w => w.id === id ? { ...w, ...updates } : w).sort((a, b) => a.page - b.page);
+      if (activeScoreId) {
+        persistScoreWaypoints(activeScoreId, updated);
+      }
+      return updated;
+    });
+  }, [activeScoreId, persistScoreWaypoints]);
+
+  const jumpToPage = useCallback((page: number) => {
+    const safePage = Math.max(1, page);
+    setCurrentPage(safePage);
+    if (pageJumperRef.current) {
+      pageJumperRef.current(safePage);
+    }
+    // Also dispatch custom event so any renderer or component can listen
+    window.dispatchEvent(new CustomEvent('score:jump-page', { detail: { page: safePage } }));
+  }, []);
+
+  const nextWaypoint = useCallback((): Waypoint | null => {
+    if (waypoints.length === 0) return null;
+    const sorted = [...waypoints].sort((a, b) => a.page - b.page);
+    
+    // Find next waypoint after current page
+    const next = sorted.find(w => w.page > currentPage);
+    const target = next || sorted[0]; // Wrap around to first waypoint
+    
+    jumpToPage(target.page);
+    // Dispatch notification event for HUD
+    window.dispatchEvent(new CustomEvent('score:waypoint-jump', { detail: { waypoint: target, direction: 'next' } }));
+    return target;
+  }, [waypoints, currentPage, jumpToPage]);
+
+  const prevWaypoint = useCallback((): Waypoint | null => {
+    if (waypoints.length === 0) return null;
+    const sorted = [...waypoints].sort((a, b) => a.page - b.page);
+    
+    // Find previous waypoint before current page
+    const reversed = [...sorted].reverse();
+    const prev = reversed.find(w => w.page < currentPage);
+    const target = prev || sorted[sorted.length - 1]; // Wrap around to last waypoint
+    
+    jumpToPage(target.page);
+    // Dispatch notification event for HUD
+    window.dispatchEvent(new CustomEvent('score:waypoint-jump', { detail: { waypoint: target, direction: 'prev' } }));
+    return target;
+  }, [waypoints, currentPage, jumpToPage]);
+
+  const registerPageJumper = useCallback((fn: ((page: number) => void) | null) => {
+    pageJumperRef.current = fn;
+  }, []);
+
+  const registerScrollHandler = useCallback((fn: ((direction: 'up' | 'down' | 'home' | 'end') => void) | null) => {
+    scrollHandlerRef.current = fn;
+  }, []);
+
+  const scrollScore = useCallback((direction: 'up' | 'down' | 'home' | 'end') => {
+    if (scrollHandlerRef.current) {
+      scrollHandlerRef.current(direction);
+    }
+    window.dispatchEvent(new CustomEvent('score:scroll', { detail: { direction } }));
+  }, []);
+
+  const registerAudioControls = useCallback((controls: any) => {
+    audioControlsRef.current = controls;
+  }, []);
+
+  const toggleAudioPlayback = useCallback(() => {
+    if (audioControlsRef.current && typeof audioControlsRef.current.togglePlay === 'function') {
+      audioControlsRef.current.togglePlay();
+    }
+  }, []);
 
   // Auto-generate MIDI audioUrl for active score if missing or empty
   useEffect(() => {
@@ -511,7 +732,29 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       setPlaybackTime,
       isDistractionFree,
       setIsDistractionFree,
-      toggleDistractionFree
+      toggleDistractionFree,
+
+      // Waypoints & Navigation
+      waypoints,
+      setWaypoints,
+      addWaypoint,
+      removeWaypoint,
+      updateWaypoint,
+      nextWaypoint,
+      prevWaypoint,
+      currentPage,
+      setCurrentPage,
+      totalPages,
+      setTotalPages,
+      jumpToPage,
+      registerPageJumper,
+      scrollScore,
+      registerScrollHandler,
+
+      // Audio Playback
+      audioControlsRef,
+      registerAudioControls,
+      toggleAudioPlayback
     }}>
       {children}
     </ScoreContext.Provider>

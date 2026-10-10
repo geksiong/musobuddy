@@ -5,7 +5,21 @@ import { AudioProvider } from './contexts/AudioContext.tsx';
 import { AccompanimentProvider } from './contexts/AccompanimentContext.tsx';
 import { ThemeProvider } from './contexts/ThemeContext.tsx';
 import { ScoreProvider } from './contexts/ScoreContext.tsx';
+import { ControllerProvider } from './contexts/ControllerContext.tsx';
 import './index.css';
+
+// Polyfill Promise.withResolvers for browsers/WebViews lacking native support (required by pdfjs-dist)
+if (typeof (Promise as any).withResolvers === 'undefined') {
+  (Promise as any).withResolvers = function <T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: any) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+}
 
 // Silence benign ResizeObserver loop limit errors that occur during fast UI reflows
 if (typeof window !== 'undefined') {
@@ -32,7 +46,9 @@ createRoot(document.getElementById('root')!).render(
       <AccompanimentProvider>
         <ThemeProvider>
           <ScoreProvider>
-            <App />
+            <ControllerProvider>
+              <App />
+            </ControllerProvider>
           </ScoreProvider>
         </ThemeProvider>
       </AccompanimentProvider>

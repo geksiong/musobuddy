@@ -60,14 +60,24 @@ import { detectAbcRenderer } from '../../lib/abcDetector.ts';
 import { detectChordEngine } from '../../lib/chordSheetUtils.ts';
 import { ChordSheetRenderer } from './ChordSheetRenderer.tsx';
 import ScoreErrorBoundary from './ScoreErrorBoundary.tsx';
+import { useController } from '../../contexts/ControllerContext.tsx';
 
-// Lazy load complex components
-const PdfRenderer = React.lazy(() => import('./PdfRenderer'));
-const MusicXmlRenderer = React.lazy(() => import('./MusicXmlRenderer'));
-const GuitarProRenderer = React.lazy(() => import('./GuitarProRenderer'));
+// Lazy load complex components with retry to guard against temporary network drops or cache invalidations
+const lazyWithRetry = <T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) =>
+  React.lazy(() =>
+    factory().catch(err => {
+      console.warn('Initial dynamic import failed, retrying once...', err);
+      return factory();
+    })
+  );
+
+const PdfRenderer = lazyWithRetry(() => import('./PdfRenderer.tsx'));
+const MusicXmlRenderer = lazyWithRetry(() => import('./MusicXmlRenderer.tsx'));
+const GuitarProRenderer = lazyWithRetry(() => import('./GuitarProRenderer.tsx'));
 
 export default function ScoreView() {
   const { scores, setScores, activeScoreId, setActiveScoreId, globalAudio, setGlobalAudio, loadFiles, loadFromUrl, exportActiveScore, playbackTime, isDistractionFree, toggleDistractionFree } = useScores();
+  const { isControllerModalOpen, setIsControllerModalOpen } = useController();
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadUrlOpen, setIsLoadUrlOpen] = useState(false);
   const [isTranscribeModalOpen, setIsTranscribeModalOpen] = useState(false);
@@ -486,18 +496,34 @@ function ScoreDisplay({
     };
   }, [headerExtra, score?.format, score?.id]);
 
+  useEffect(() => {
+    const handleScrollEvent = (e: any) => {
+      const dir = e.detail?.direction;
+      const container = scoreViewRef.current;
+      if (!container) return;
+      if (dir === 'up') {
+        container.scrollBy({ top: -400, behavior: 'smooth' });
+      } else if (dir === 'down') {
+        container.scrollBy({ top: 400, behavior: 'smooth' });
+      } else if (dir === 'home') {
+        container.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (dir === 'end') {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener('score:scroll', handleScrollEvent);
+    return () => window.removeEventListener('score:scroll', handleScrollEvent);
+  }, []);
+
   return (
     <div ref={scoreViewRef} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative min-h-0 h-full">
       {/* Floating HUD for No Distraction mode */}
       {isDistractionFree && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 sm:gap-3.5 px-3.5 sm:px-5 py-2 bg-black/90 backdrop-blur-2xl border border-white/20 text-white rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all hover:opacity-100 opacity-90 max-w-[95vw]">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 bg-black/90 backdrop-blur-2xl border border-white/20 text-white rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all hover:opacity-100 opacity-90 max-w-[95vw]">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse shrink-0" />
-            <span className="text-xs font-black uppercase tracking-wider truncate max-w-[120px] sm:max-w-[260px]">
+            <span className="text-xs font-black uppercase tracking-wider truncate max-w-[100px] sm:max-w-[200px]">
               {score.title || "UNTITLED SCORE"}
-            </span>
-            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0 hidden sm:inline-block">
-              No Distraction
             </span>
           </div>
 
@@ -617,6 +643,7 @@ function ScoreDisplay({
                   </button>
                 </div>
               )}
+
 
               {/* Zoom Controls */}
               <div className={cn("flex items-center p-1 rounded-xl border transition-colors shrink-0", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
@@ -1196,17 +1223,19 @@ function ScoreDisplay({
         ) : (
           <React.Suspense fallback={<div className="flex items-center justify-center p-20 animate-pulse text-[10px] uppercase font-black tracking-widest">Initialising Renderer...</div>}>
             {score.format === ScoreFormat.PDF ? (
-              <PdfRenderer 
-                url={score.content as string} 
-                viewMode={viewMode}
-                scoreTitle={score.title}
-                scoreId={score.id}
-                zoom={score.zoom}
-                headerHeight={headerHeight}
-                scoreViewHeight={scoreViewHeight}
-                onHeaderContentChange={setHeaderExtra}
-                onSidebarStateChange={setSidebarState}
-              />
+              <ScoreErrorBoundary fallbackTitle="PDF Score Error" key={score.id}>
+                <PdfRenderer 
+                  url={score.content as string} 
+                  viewMode={viewMode}
+                  scoreTitle={score.title}
+                  scoreId={score.id}
+                  zoom={score.zoom}
+                  headerHeight={headerHeight}
+                  scoreViewHeight={scoreViewHeight}
+                  onHeaderContentChange={setHeaderExtra}
+                  onSidebarStateChange={setSidebarState}
+                />
+              </ScoreErrorBoundary>
             ) : (
               <div 
                 className={cn(

@@ -3,19 +3,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Polyfill Promise.withResolvers for browsers/WebViews lacking native support (required by pdfjs-dist)
+if (typeof (Promise as any).withResolvers === 'undefined') {
+  (Promise as any).withResolvers = function <T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: any) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+}
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import { ChevronLeft, ChevronRight, Bookmark as BookmarkIcon } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { useTheme } from '../../contexts/ThemeContext';
-import { usePdfAnnotations } from './usePdfAnnotations';
-import { AnnotationToolbar } from './AnnotationToolbar';
-import { PdfAnnotationLayer } from './PdfAnnotationLayer';
-import { AnnotationSidebar } from './AnnotationSidebar';
-import { Annotation, AnnotationState } from './annotationTypes';
+import { cn } from '../../lib/utils.ts';
+import { useTheme } from '../../contexts/ThemeContext.tsx';
+import { useScores } from '../../contexts/ScoreContext.tsx';
+import { usePdfAnnotations } from './usePdfAnnotations.ts';
+import { AnnotationToolbar } from './AnnotationToolbar.tsx';
+import { PdfAnnotationLayer } from './PdfAnnotationLayer.tsx';
+import { AnnotationSidebar } from './AnnotationSidebar.tsx';
+import { Annotation, AnnotationState } from './annotationTypes.ts';
 
-// Set worker source using local same-origin assets
-pdfjs.GlobalWorkerOptions.workerSrc = `/pdfjs/build/pdf.worker.min.mjs`;
+// Set worker source using safe URL resolution
+try {
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url
+  ).href;
+} catch {
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdfjs/build/pdf.worker.min.mjs';
+}
 
 interface PdfRendererProps {
   url: string;
@@ -46,6 +67,12 @@ export default function PdfRenderer({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
+  const { 
+    setCurrentPage: setGlobalCurrentPage, 
+    setTotalPages: setGlobalTotalPages,
+    registerPageJumper,
+    registerScrollHandler 
+  } = useScores();
 
   const toggleSidebar = useCallback(() => {
     setIsSidebarOpen(open => !open);
@@ -209,19 +236,70 @@ export default function PdfRenderer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, numPages]);
 
-  const handleNavigateToPage = (page: number) => {
+  const handleNavigateToPage = useCallback((page: number) => {
     if (viewMode === 'scroll') {
       const pageEl = document.getElementById(`pdf-page-${page}`);
       if (pageEl) {
         pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+      setCurrentPage(Math.max(1, Math.min(numPages || 1, page)));
     } else if (viewMode === 'single') {
-      setCurrentPage(Math.max(1, Math.min(numPages, page)));
+      setCurrentPage(Math.max(1, Math.min(numPages || 1, page)));
     } else if (viewMode === 'double') {
+      const maxSpreads = Math.ceil((numPages || 1) / 2);
       const spread = Math.ceil(page / 2);
-      setCurrentPage(Math.max(1, Math.ceil(numPages / 2), spread));
+      setCurrentPage(Math.max(1, Math.min(maxSpreads, spread)));
     }
-  };
+  }, [viewMode, numPages]);
+
+  // Synchronize with global ScoreContext
+  useEffect(() => {
+    setGlobalCurrentPage(currentPage);
+  }, [currentPage, setGlobalCurrentPage]);
+
+  useEffect(() => {
+    if (numPages > 0) {
+      setGlobalTotalPages(numPages);
+    }
+  }, [numPages, setGlobalTotalPages]);
+
+  useEffect(() => {
+    registerPageJumper(handleNavigateToPage);
+
+    const scrollHandler = (dir: 'up' | 'down' | 'home' | 'end') => {
+      if (viewMode === 'single' || viewMode === 'double') {
+        if (dir === 'up') setCurrentPage(p => Math.max(1, p - 1));
+        else if (dir === 'down') setCurrentPage(p => Math.min(numPages || 1, p + 1));
+        else if (dir === 'home') setCurrentPage(1);
+        else if (dir === 'end') setCurrentPage(numPages || 1);
+      } else {
+        const scrollContainer = containerRef.current?.closest('.overflow-y-auto') as HTMLElement || window;
+        if (dir === 'home') {
+          scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (dir === 'end') {
+          scrollContainer.scrollTo({ top: 999999, behavior: 'smooth' });
+        } else if (dir === 'up') {
+          scrollContainer.scrollBy({ top: -450, behavior: 'smooth' });
+        } else if (dir === 'down') {
+          scrollContainer.scrollBy({ top: 450, behavior: 'smooth' });
+        }
+      }
+    };
+    registerScrollHandler(scrollHandler);
+
+    const handleJumpEvent = (e: any) => {
+      if (e.detail?.page) {
+        handleNavigateToPage(e.detail.page);
+      }
+    };
+    window.addEventListener('score:jump-page', handleJumpEvent);
+
+    return () => {
+      registerPageJumper(null);
+      registerScrollHandler(null);
+      window.removeEventListener('score:jump-page', handleJumpEvent);
+    };
+  }, [handleNavigateToPage, registerPageJumper, registerScrollHandler, viewMode, numPages]);
 
   if (!pdfProxy) {
     return (

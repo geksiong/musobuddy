@@ -188,11 +188,11 @@ export function AnnotationSidebar({
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                Saved Pages
+                Bookmarks
               </span>
               <button
                 onClick={() => setShowAddBk(!showAddBk)}
-                className="text-xs font-bold text-orange-400 hover:text-orange-300 flex items-center gap-1 bg-orange-500/10 hover:bg-orange-500/20 px-2 py-1 rounded-lg transition-colors"
+                className="text-xs font-bold text-orange-400 hover:text-orange-300 flex items-center gap-1 bg-orange-500/10 hover:bg-orange-500/20 px-2 py-1 rounded-lg transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Bookmark
               </button>

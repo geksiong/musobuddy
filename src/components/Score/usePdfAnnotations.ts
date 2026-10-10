@@ -12,7 +12,8 @@ import {
   PenAnnotation,
   HighlightAnnotation,
   TextAnnotation,
-  Bookmark
+  Bookmark,
+  Waypoint
 } from './annotationTypes.ts';
 
 const STORAGE_PREFIX = 'studio_buddy_pdf_annotations_v1_';
@@ -20,6 +21,7 @@ const STORAGE_PREFIX = 'studio_buddy_pdf_annotations_v1_';
 export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
   const [annotations, setAnnotations] = useState<Record<number, Annotation[]>>({});
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [toolState, setToolState] = useState<AnnotationState>({
     activeTool: 'select',
     color: '#ef4444', // Red default for pen
@@ -41,7 +43,7 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
 
   const storageKey = `${STORAGE_PREFIX}${scoreId || scoreTitle || 'default'}`;
 
-  // Load annotations and bookmarks from localStorage on mount or score change
+  // Load annotations, bookmarks, and waypoints from localStorage on mount or score change
   useEffect(() => {
     if (!storageKey) return;
     try {
@@ -54,9 +56,29 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
             setHistory([parsed.annotations]);
             setHistoryIndex(0);
           }
-          if (parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
-            setBookmarks(parsed.bookmarks);
-          }
+          // Load waypoints or fallback from bookmarks
+          const loadedWaypoints: Waypoint[] = Array.isArray(parsed.waypoints) && parsed.waypoints.length > 0
+            ? parsed.waypoints
+            : (Array.isArray(parsed.bookmarks)
+                ? parsed.bookmarks.map(b => ({
+                    id: b.id,
+                    page: b.page,
+                    title: b.title,
+                    createdAt: b.createdAt,
+                    scoreId: scoreId
+                  }))
+                : []);
+          setWaypoints(loadedWaypoints);
+
+          const loadedBookmarks: Bookmark[] = Array.isArray(parsed.bookmarks) && parsed.bookmarks.length > 0
+            ? parsed.bookmarks
+            : loadedWaypoints.map(w => ({
+                id: w.id,
+                page: w.page,
+                title: w.title,
+                createdAt: w.createdAt
+              }));
+          setBookmarks(loadedBookmarks);
           return;
         }
       }
@@ -65,12 +87,17 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
     }
     setAnnotations({});
     setBookmarks([]);
+    setWaypoints([]);
     setHistory([{}]);
     setHistoryIndex(0);
-  }, [storageKey]);
+  }, [storageKey, scoreId]);
 
-  // Save to localStorage when annotations or bookmarks change
-  const saveToLocalStorage = useCallback((data: Record<number, Annotation[]>, bks: Bookmark[] = bookmarks) => {
+  // Save to localStorage when annotations, bookmarks, or waypoints change
+  const saveToLocalStorage = useCallback((
+    data: Record<number, Annotation[]>,
+    bks: Bookmark[] = bookmarks,
+    wps: Waypoint[] = waypoints
+  ) => {
     if (!storageKey) return;
     try {
       const docData: DocumentAnnotations = {
@@ -79,12 +106,13 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
         updatedAt: Date.now(),
         annotations: data,
         bookmarks: bks,
+        waypoints: wps,
       };
       localStorage.setItem(storageKey, JSON.stringify(docData));
     } catch (err) {
       console.error('Failed to auto-save PDF annotations:', err);
     }
-  }, [storageKey, scoreTitle, bookmarks]);
+  }, [storageKey, scoreTitle, bookmarks, waypoints]);
 
   // Commit changes to history and persistence
   const updateAnnotationsState = useCallback((newAnnotations: Record<number, Annotation[]>) => {
@@ -200,6 +228,7 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
       updatedAt: Date.now(),
       annotations: annotations,
       bookmarks: bookmarks,
+      waypoints: waypoints,
     };
     const jsonString = JSON.stringify(docData, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -212,7 +241,7 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [scoreTitle, annotations, bookmarks]);
+  }, [scoreTitle, annotations, bookmarks, waypoints]);
 
   // Load from JSON File
   const loadFromFile = useCallback((file: File): Promise<boolean> => {
@@ -222,14 +251,32 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
         try {
           const content = e.target?.result as string;
           const parsed: DocumentAnnotations = JSON.parse(content);
-          if (parsed && (parsed.annotations || parsed.bookmarks)) {
+          if (parsed && (parsed.annotations || parsed.bookmarks || parsed.waypoints)) {
             if (parsed.annotations) {
               updateAnnotationsState(parsed.annotations);
             }
-            if (parsed.bookmarks && Array.isArray(parsed.bookmarks)) {
-              setBookmarks(parsed.bookmarks);
-              saveToLocalStorage(parsed.annotations || annotations, parsed.bookmarks);
-            }
+            const loadedWaypoints: Waypoint[] = Array.isArray(parsed.waypoints) && parsed.waypoints.length > 0
+              ? parsed.waypoints
+              : (Array.isArray(parsed.bookmarks)
+                  ? parsed.bookmarks.map(b => ({
+                      id: b.id,
+                      page: b.page,
+                      title: b.title,
+                      createdAt: b.createdAt,
+                      scoreId: scoreId
+                    }))
+                  : []);
+            const loadedBookmarks: Bookmark[] = Array.isArray(parsed.bookmarks) && parsed.bookmarks.length > 0
+              ? parsed.bookmarks
+              : loadedWaypoints.map(w => ({
+                  id: w.id,
+                  page: w.page,
+                  title: w.title,
+                  createdAt: w.createdAt
+                }));
+            setWaypoints(loadedWaypoints);
+            setBookmarks(loadedBookmarks);
+            saveToLocalStorage(parsed.annotations || annotations, loadedBookmarks, loadedWaypoints);
             resolve(true);
             return;
           }
@@ -241,44 +288,67 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
       reader.onerror = () => resolve(false);
       reader.readAsText(file);
     });
-  }, [updateAnnotationsState, saveToLocalStorage, annotations]);
+  }, [updateAnnotationsState, saveToLocalStorage, annotations, scoreId]);
 
-  // Bookmark functions
+  // Bookmark & Waypoint functions (kept unified for complete interoperability)
   const toggleBookmark = useCallback((page: number, customTitle?: string) => {
-    setBookmarks(prev => {
-      const exists = prev.some(b => b.page === page);
-      let updated: Bookmark[];
-      if (exists) {
-        updated = prev.filter(b => b.page !== page);
-      } else {
-        const newBk: Bookmark = {
-          id: Math.random().toString(36).substring(2, 11),
-          page,
-          title: customTitle || `Page ${page}`,
-          createdAt: Date.now(),
-        };
-        updated = [...prev, newBk].sort((a, b) => a.page - b.page);
-      }
-      saveToLocalStorage(annotations, updated);
-      return updated;
-    });
-  }, [annotations, saveToLocalStorage]);
+    const exists = bookmarks.some(b => b.page === page);
+    let updatedBks: Bookmark[];
+    let updatedWps: Waypoint[];
+
+    if (exists) {
+      updatedBks = bookmarks.filter(b => b.page !== page);
+      updatedWps = waypoints.filter(w => w.page !== page);
+    } else {
+      const id = Math.random().toString(36).substring(2, 11);
+      const title = customTitle || `Page ${page}`;
+      const now = Date.now();
+      const newBk: Bookmark = { id, page, title, createdAt: now };
+      const newWp: Waypoint = { id, page, title, createdAt: now, scoreId };
+      updatedBks = [...bookmarks, newBk].sort((a, b) => a.page - b.page);
+      updatedWps = [...waypoints, newWp].sort((a, b) => a.page - b.page);
+    }
+
+    setBookmarks(updatedBks);
+    setWaypoints(updatedWps);
+    saveToLocalStorage(annotations, updatedBks, updatedWps);
+  }, [bookmarks, waypoints, annotations, saveToLocalStorage, scoreId]);
+
+  const addWaypoint = useCallback((page: number, customTitle?: string): Waypoint => {
+    const id = Math.random().toString(36).substring(2, 11);
+    const title = customTitle || `Page ${page}`;
+    const now = Date.now();
+    const newWp: Waypoint = { id, page, title, createdAt: now, scoreId };
+    const newBk: Bookmark = { id, page, title, createdAt: now };
+    
+    const updatedWps = [...waypoints.filter(w => w.page !== page), newWp].sort((a, b) => a.page - b.page);
+    const updatedBks = [...bookmarks.filter(b => b.page !== page), newBk].sort((a, b) => a.page - b.page);
+    
+    setWaypoints(updatedWps);
+    setBookmarks(updatedBks);
+    saveToLocalStorage(annotations, updatedBks, updatedWps);
+    return newWp;
+  }, [waypoints, bookmarks, annotations, saveToLocalStorage, scoreId]);
 
   const removeBookmark = useCallback((id: string) => {
-    setBookmarks(prev => {
-      const updated = prev.filter(b => b.id !== id);
-      saveToLocalStorage(annotations, updated);
-      return updated;
-    });
-  }, [annotations, saveToLocalStorage]);
+    const updatedBks = bookmarks.filter(b => b.id !== id);
+    const updatedWps = waypoints.filter(w => w.id !== id);
+    setBookmarks(updatedBks);
+    setWaypoints(updatedWps);
+    saveToLocalStorage(annotations, updatedBks, updatedWps);
+  }, [bookmarks, waypoints, annotations, saveToLocalStorage]);
+
+  const removeWaypoint = removeBookmark;
 
   const updateBookmarkTitle = useCallback((id: string, title: string) => {
-    setBookmarks(prev => {
-      const updated = prev.map(b => b.id === id ? { ...b, title } : b);
-      saveToLocalStorage(annotations, updated);
-      return updated;
-    });
-  }, [annotations, saveToLocalStorage]);
+    const updatedBks = bookmarks.map(b => b.id === id ? { ...b, title } : b);
+    const updatedWps = waypoints.map(w => w.id === id ? { ...w, title } : w);
+    setBookmarks(updatedBks);
+    setWaypoints(updatedWps);
+    saveToLocalStorage(annotations, updatedBks, updatedWps);
+  }, [bookmarks, waypoints, annotations, saveToLocalStorage]);
+
+  const updateWaypointTitle = updateBookmarkTitle;
 
   const isPageBookmarked = useCallback((page: number) => {
     return bookmarks.some(b => b.page === page);
@@ -313,6 +383,7 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
   return {
     annotations,
     bookmarks,
+    waypoints,
     toolState,
     setToolState,
     addAnnotation,
@@ -324,6 +395,9 @@ export function usePdfAnnotations(scoreTitle: string, scoreId: string) {
     toggleBookmark,
     removeBookmark,
     updateBookmarkTitle,
+    addWaypoint,
+    removeWaypoint,
+    updateWaypointTitle,
     isPageBookmarked,
     undo,
     redo,

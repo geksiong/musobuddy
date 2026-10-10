@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { Waypoint } from './annotationTypes.ts';
+
 export enum ScoreFormat {
   Image = 'image',
   PDF = 'pdf',
@@ -34,4 +36,6 @@ export interface ScoreData {
   chordFormat?: 'html' | 'text' | 'chordpro'; // Output display format for ChordSheet
   accidentalPreference?: '#' | 'b'; // Sharp (#) vs Flat (b) preference for ChordSheet
   sourceUrl?: string; // Original URL if loaded from a URL
+  waypoints?: Waypoint[]; // Rehearsal marks & page waypoints
+  currentPage?: number;
 }
