@@ -25,6 +25,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Columns,
   Square,
   Scroll,
@@ -401,7 +402,7 @@ function ScoreDisplay({
   playbackTime: number
 }) {
   const { resolvedTheme } = useTheme();
-  const { exportActiveScore, isDistractionFree, toggleDistractionFree } = useScores();
+  const { scores, activeScoreId, setActiveScoreId, exportActiveScore, isDistractionFree, toggleDistractionFree } = useScores();
   
   if (!score) return (
     <div className={cn("flex-1 flex flex-col items-center justify-center gap-4 transition-colors p-8", resolvedTheme === 'dark' ? "text-slate-400" : "text-slate-600")}>
@@ -598,168 +599,191 @@ function ScoreDisplay({
         <div 
           ref={headerRef}
           className={cn(
-            "sticky top-0 z-30 px-3 sm:px-5 py-2 sm:py-2.5 flex flex-col border-b transition-all gap-2 backdrop-blur-xl shrink-0 shadow-sm",
-            resolvedTheme === 'dark' ? "border-white/10 bg-[#121215]/95 text-white" : "border-black/10 bg-white/95 text-slate-900"
+            "sticky top-0 z-30 px-3 sm:px-5 py-2 flex flex-col border-b transition-colors gap-1.5 backdrop-blur-xl shrink-0",
+            resolvedTheme === 'dark' 
+              ? "border-white/[0.08] bg-[#141518]/95 text-neutral-200" 
+              : "border-neutral-200 bg-white/95 text-neutral-800 shadow-sm"
           )}
         >
-          {/* First Row: Title, Pagination mode (if available), Zoom, No Distraction, Save, Close */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 w-full min-w-0">
-            <div className="flex items-center min-w-0 flex-1">
+          {/* Main Row: Score Selector/Title, Format Metadata, Zoom, Distraction Free, Save, Close */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {/* Score Switcher if multiple scores loaded */}
+              {scores.length > 1 && (
+                <div className="relative shrink-0">
+                  <select
+                    value={activeScoreId || score.id}
+                    onChange={(e) => setActiveScoreId(e.target.value)}
+                    className={cn(
+                      "h-8 pl-2 pr-6 rounded-lg text-xs font-semibold appearance-none outline-none cursor-pointer border max-w-[140px] truncate transition-colors",
+                      resolvedTheme === 'dark'
+                        ? "bg-white/[0.06] border-white/10 text-neutral-200 hover:bg-white/[0.1]"
+                        : "bg-neutral-100 border-neutral-200 text-neutral-800 hover:bg-neutral-200"
+                    )}
+                    title="Switch score"
+                  >
+                    {scores.map(s => (
+                      <option key={s.id} value={s.id} className={resolvedTheme === 'dark' ? "bg-neutral-900 text-white" : "bg-white text-neutral-900"}>
+                        {s.title} ({s.format.toUpperCase()})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3 h-3 text-neutral-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              )}
+
+              {/* Score Title */}
               <input 
                 value={score.title}
                 onChange={(e) => onUpdate({ title: e.target.value })}
                 className={cn(
-                  "w-full bg-transparent text-lg sm:text-2xl font-black focus:outline-none uppercase tracking-tighter italic transition-colors py-0.5 min-w-[120px]",
-                  resolvedTheme === 'dark' ? "text-white placeholder:text-white/10" : "text-slate-900 placeholder:text-slate-200"
+                  "w-full bg-transparent text-sm sm:text-base font-bold tracking-tight focus:outline-none transition-colors py-1 min-w-[120px]",
+                  resolvedTheme === 'dark' ? "text-white placeholder:text-white/20" : "text-neutral-900 placeholder:text-neutral-300"
                 )}
-                placeholder="UNTITLED SCORE"
+                placeholder="Untitled Score"
               />
+
+              {/* Format Unboxed Metadata */}
+              <div className="hidden md:flex items-center gap-1.5 text-xs text-neutral-500 whitespace-nowrap shrink-0">
+                <span>·</span>
+                <span className="font-medium text-neutral-400 dark:text-neutral-500">
+                  {score.format === ScoreFormat.MusicXML 
+                    ? (score.isMxl ? 'MusicXML (.mxl)' : 'MusicXML (.xml)') 
+                    : score.format === ScoreFormat.GuitarPro 
+                      ? 'Guitar Pro' 
+                      : score.format === ScoreFormat.ChordSheet
+                        ? 'Chord Sheet'
+                        : score.format.toUpperCase()}
+                </span>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
-              {/* Pagination Mode Selector (if available) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Pagination Mode Selector (for PDF/Image) */}
               {(score.format === ScoreFormat.Image || score.format === ScoreFormat.PDF) && (
-                <div className={cn("flex p-1 rounded-xl border transition-colors shrink-0", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
+                <div className={cn("flex p-0.5 rounded-lg border transition-colors shrink-0", resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/[0.08]" : "bg-neutral-100 border-neutral-200")}>
                   <button 
                     onClick={() => onUpdate({ viewMode: 'scroll' })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer", viewMode === 'scroll' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                    className={cn("p-1.5 rounded-md transition-colors cursor-pointer", viewMode === 'scroll' ? (resolvedTheme === 'dark' ? "bg-white/15 text-white" : "bg-white text-neutral-900 shadow-sm") : "text-neutral-400 hover:text-neutral-200")}
                     title="Continuous Scroll Mode"
                   >
-                    <Scroll className="w-4 h-4" />
+                    <Scroll className="w-3.5 h-3.5" />
                   </button>
                   <button 
                     onClick={() => onUpdate({ viewMode: 'single' })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer", viewMode === 'single' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                    className={cn("p-1.5 rounded-md transition-colors cursor-pointer", viewMode === 'single' ? (resolvedTheme === 'dark' ? "bg-white/15 text-white" : "bg-white text-neutral-900 shadow-sm") : "text-neutral-400 hover:text-neutral-200")}
                     title="Single Page Mode"
                   >
-                    <Square className="w-4 h-4" />
+                    <Square className="w-3.5 h-3.5" />
                   </button>
                   <button 
                     onClick={() => onUpdate({ viewMode: 'double' })}
-                    className={cn("p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer", viewMode === 'double' ? (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-white text-slate-900 shadow-sm") : "text-slate-400")}
+                    className={cn("p-1.5 rounded-md transition-colors cursor-pointer", viewMode === 'double' ? (resolvedTheme === 'dark' ? "bg-white/15 text-white" : "bg-white text-neutral-900 shadow-sm") : "text-neutral-400 hover:text-neutral-200")}
                     title="Double Page Mode"
                   >
-                    <Columns className="w-4 h-4" />
+                    <Columns className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
 
-
               {/* Zoom Controls */}
-              <div className={cn("flex items-center p-1 rounded-xl border transition-colors shrink-0", resolvedTheme === 'dark' ? "bg-black/20 border-white/5" : "bg-slate-100 border-black/5")}>
+              <div className={cn("flex items-center p-0.5 rounded-lg border transition-colors shrink-0", resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/[0.08]" : "bg-neutral-100 border-neutral-200")}>
                 <button 
                   onClick={() => onUpdate({ zoom: Math.max(0.1, Math.round(((score.zoom || 1) - 0.1) * 10) / 10) })}
-                  className={cn("p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
-                  title="Zoom Out (Min 10%)"
+                  className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                  title="Zoom Out"
                 >
-                  <ZoomOut className="w-4 h-4" />
+                  <ZoomOut className="w-3.5 h-3.5" />
                 </button>
                 <button 
                   onClick={() => onUpdate({ zoom: 1 })}
-                  className={cn(
-                    "px-2 text-[10px] font-black tabular-nums transition-colors hover:text-orange-500 cursor-pointer",
-                    resolvedTheme === 'dark' ? "text-white/70" : "text-slate-600"
-                  )}
+                  className="px-1.5 text-xs font-mono tabular-nums text-neutral-500 hover:text-[#E05A2B] transition-colors cursor-pointer"
                   title="Reset Zoom to 100%"
                 >
                   {Math.round((score.zoom || 1) * 100)}%
                 </button>
                 <button 
                   onClick={() => onUpdate({ zoom: Math.min(5, Math.round(((score.zoom || 1) + 0.1) * 10) / 10) })}
-                  className={cn("p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer", resolvedTheme === 'dark' ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-black/5")}
-                  title="Zoom In (Max 500%)"
+                  className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                  title="Zoom In"
                 >
-                  <ZoomIn className="w-4 h-4" />
+                  <ZoomIn className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* No Distraction Button */}
+              {/* Distraction Free Button */}
               <button 
                 onClick={toggleDistractionFree}
                 className={cn(
-                  "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0",
+                  "h-8 px-2.5 rounded-lg border transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer shrink-0",
                   isDistractionFree 
-                    ? "bg-orange-500 border-orange-500 text-white font-bold" 
-                    : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-orange-400 hover:text-white" : "bg-white border-black/10 text-orange-600 hover:text-slate-900")
+                    ? "bg-[#E05A2B] border-[#E05A2B] text-white" 
+                    : resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/[0.08] text-neutral-300 hover:bg-white/[0.08]" : "bg-neutral-100 border-neutral-200 text-neutral-700 hover:bg-neutral-200"
                 )}
-                title="No Distraction Mode (Full screen view)"
+                title="Distraction Free (Full Screen)"
               >
-                <Maximize2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">No Distraction</span>
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Focus</span>
               </button>
 
-              {/* Save Button(s) */}
+              {/* Save Button */}
               {score.format === ScoreFormat.MusicXML ? (
                 <div className="flex items-center gap-1 shrink-0">
                   <button 
                     onClick={() => exportActiveScore(true)}
                     className={cn(
-                      "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                      "h-8 px-2 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer",
                       score.isMxl 
-                        ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
-                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
+                        ? "bg-[#E05A2B]/15 border-[#E05A2B]/40 text-[#E05A2B]" 
+                        : resolvedTheme === 'dark' ? "border-white/[0.08] text-neutral-400 hover:text-white" : "border-neutral-200 text-neutral-600 hover:text-neutral-900"
                     )}
                     title="Save as Compressed MusicXML (.mxl)"
                   >
-                    <Download className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Save .MXL</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">.mxl</span>
                   </button>
-
                   <button 
                     onClick={() => exportActiveScore(false)}
                     className={cn(
-                      "p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer",
+                      "h-8 px-2 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer",
                       !score.isMxl 
-                        ? "bg-orange-500/20 border-orange-500/50 text-orange-400 font-bold" 
-                        : (resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/50 hover:text-white" : "bg-white border-black/10 text-slate-500 hover:text-slate-900")
+                        ? "bg-[#E05A2B]/15 border-[#E05A2B]/40 text-[#E05A2B]" 
+                        : resolvedTheme === 'dark' ? "border-white/[0.08] text-neutral-400 hover:text-white" : "border-neutral-200 text-neutral-600 hover:text-neutral-900"
                     )}
                     title="Save as Standard MusicXML (.xml)"
                   >
-                    <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save .XML</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">.xml</span>
                   </button>
                 </div>
               ) : (
                 <button 
                   onClick={onDownload}
                   className={cn(
-                    "p-2 rounded-xl border transition-all flex items-center gap-2 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0",
-                    resolvedTheme === 'dark' ? "bg-black/20 border-white/10 text-white/40 hover:text-white" : "bg-white border-black/10 text-slate-400 hover:text-slate-900"
+                    "h-8 px-2.5 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shrink-0",
+                    resolvedTheme === 'dark' ? "border-white/[0.08] text-neutral-300 hover:bg-white/[0.08]" : "border-neutral-200 text-neutral-700 hover:bg-neutral-100"
                   )}
                   title="Save Score"
                 >
-                  <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Save</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Save</span>
                 </button>
               )}
 
-              {/* Close Button */}
+              {/* Close Score Button */}
               <button 
                 onClick={onDelete}
-                className="p-2 rounded-xl border border-red-500/10 text-red-500/30 hover:text-white hover:bg-red-500 hover:border-red-500 transition-all shadow-sm active:scale-95 group cursor-pointer shrink-0"
-                title="Close Score"
+                className="h-8 w-8 rounded-lg border border-red-500/20 text-red-500/60 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/40 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+                title="Remove this score"
               >
-                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Subsequent Row: Format Badge and Format-Specific Controls */}
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-1.5 border-t border-black/5 dark:border-white/10 w-full">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
-              {/* Format Badge Indicator */}
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                <span className={cn("text-[10px] font-black uppercase tracking-[0.2em]", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
-                  {score.format === ScoreFormat.MusicXML 
-                    ? (score.isMxl ? 'MUSICXML (.MXL)' : 'MUSICXML (.XML)') 
-                    : score.format === ScoreFormat.GuitarPro 
-                      ? 'GUITAR PRO / TAB' 
-                      : score.format === ScoreFormat.ChordSheet
-                        ? 'CHORD SHEET'
-                        : `${score.format} MODE`}
-                </span>
-              </div>
+          {/* Format-Specific Controls Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 pt-1.5 border-t border-neutral-200 dark:border-white/[0.06] w-full text-xs">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 min-w-0">
 
               {/* Source URL Badge / Reload Link */}
               {score.sourceUrl && (

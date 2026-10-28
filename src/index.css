@@ -1,25 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "Geist", "SF Pro Display", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Space Mono", monospace;
+  --font-sans: "Plus Jakarta Sans", "Outfit", "SF Pro Display", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Space Mono", ui-monospace, monospace;
   
-  --color-accent: #FF4E00;
-  --color-bg-dark: #0A0A0A;
-  --color-card: rgba(255, 255, 255, 0.05);
-  --color-border: rgba(255, 255, 255, 0.1);
+  --color-accent: #E05A2B;
+  --color-accent-hover: #C8491C;
+  --color-bg-dark: #121316;
+  --color-surface-dark: #1A1C20;
+  --color-surface-elevated: #22252B;
 }
 
 @layer base {
   body {
-    @apply antialiased transition-colors duration-300;
+    @apply antialiased transition-colors duration-200 select-none;
   }
 }
 
 .custom-scrollbar::-webkit-scrollbar,
 ::-webkit-scrollbar {
-  width: 14px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track,
@@ -29,28 +30,28 @@
 
 ::-webkit-scrollbar-thumb,
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: rgba(0, 0, 0, 0.15);
   border-radius: 9999px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover,
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(0, 0, 0, 0.45);
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 .dark ::-webkit-scrollbar-thumb,
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover,
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.25);
 }
 
 .no-scrollbar::-webkit-scrollbar {
