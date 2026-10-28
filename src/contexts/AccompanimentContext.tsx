@@ -21,6 +21,12 @@ import {
   deleteUserGroovePreset
 } from '../components/Accompaniment/grooveEngine.ts';
 
+export function isValidChordName(name?: string | null): boolean {
+  if (!name) return false;
+  const t = name.trim();
+  return t !== '' && t !== '-' && t !== '—' && t !== '–' && t !== '_';
+}
+
 export function getEffectiveChord(
   progression: ProgressionChord[],
   beatIndex: number
@@ -29,20 +35,20 @@ export function getEffectiveChord(
   if (beatIndex < 0 || beatIndex >= progression.length) return null;
 
   const target = progression[beatIndex];
-  if (target && target.name && target.name.trim() !== '') {
+  if (target && isValidChordName(target.name)) {
     return { chord: target.name.trim(), isExplicit: true };
   }
 
   // Search backward from beatIndex - 1
   for (let i = beatIndex - 1; i >= 0; i--) {
-    if (progression[i] && progression[i].name && progression[i].name.trim() !== '') {
+    if (progression[i] && isValidChordName(progression[i].name)) {
       return { chord: progression[i].name.trim(), isExplicit: false };
     }
   }
 
   // Search backward from end of progression (wrap around)
   for (let i = progression.length - 1; i > beatIndex; i--) {
-    if (progression[i] && progression[i].name && progression[i].name.trim() !== '') {
+    if (progression[i] && isValidChordName(progression[i].name)) {
       return { chord: progression[i].name.trim(), isExplicit: false };
     }
   }

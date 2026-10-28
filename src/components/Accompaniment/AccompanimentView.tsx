@@ -1285,7 +1285,11 @@ export default function AccompanimentView() {
 
                             {/* Center Chord Name Display */}
                             <div className="flex flex-col items-center justify-center my-0.5 leading-none">
-                              {isExplicit ? (
+                              {isCellPlaying && (chordSlot.name.trim() === '-' || chordSlot.name.trim() === '—' || chordSlot.name.trim() === '–') ? (
+                                <span className="text-sm sm:text-base font-black font-mono tracking-tighter truncate max-w-full text-emerald-100">
+                                  {formatChordName(effective?.chord || '—')}
+                                </span>
+                              ) : isExplicit ? (
                                 <span className="text-sm sm:text-base font-black font-mono tracking-tighter truncate max-w-full">
                                   {formatChordName(chordSlot.name)}
                                 </span>

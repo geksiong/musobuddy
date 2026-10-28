@@ -31,7 +31,7 @@ import { useScores } from '../../contexts/ScoreContext.tsx';
 import { useAudio } from '../../contexts/AudioContext.tsx';
 import { useMetronome } from '../../hooks/useMetronome.ts';
 import { useDrone } from '../../hooks/useDrone.ts';
-import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
+import { useAccompaniment, getEffectiveChord } from '../../contexts/AccompanimentContext.tsx';
 import { NOTES } from '../../constants.ts';
 import { DroneTone } from '../Drone/types.ts';
 import { GROOVE_PRESETS } from '../Accompaniment/grooveEngine.ts';
@@ -131,9 +131,29 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
   };
 
   // Determine active chord in accompaniment
-  const activeChordName = progression.length > 0 && currentIndex >= 0 && currentIndex < progression.length
-    ? progression[currentIndex]?.name || '—'
-    : progression[0]?.name || '—';
+  const lastDisplayedChordRef = useRef<string>('—');
+  const effectiveActive = getEffectiveChord(progression, currentIndex);
+  const rawChordName = progression.length > 0 && currentIndex >= 0 && currentIndex < progression.length
+    ? progression[currentIndex]?.name
+    : progression[0]?.name;
+
+  let activeChordName: string;
+  if (isAccompanimentPlaying) {
+    if (!rawChordName || rawChordName === '-' || rawChordName === '—' || rawChordName === '–') {
+      // If the active chord is "-", display the last displayed active chord instead of "-"
+      activeChordName = (lastDisplayedChordRef.current && lastDisplayedChordRef.current !== '—' && lastDisplayedChordRef.current !== '-')
+        ? lastDisplayedChordRef.current
+        : (effectiveActive?.chord || '—');
+    } else {
+      activeChordName = rawChordName;
+      lastDisplayedChordRef.current = rawChordName;
+    }
+  } else {
+    activeChordName = rawChordName || effectiveActive?.chord || '—';
+    if (activeChordName && activeChordName !== '-' && activeChordName !== '—') {
+      lastDisplayedChordRef.current = activeChordName;
+    }
+  }
 
   const hasScoreAudio = !!(globalAudio || activeScore?.audioUrl);
 

@@ -47,7 +47,28 @@ export default function CompactPlaybackChart({
   const totalMeasures = Math.max(1, Math.ceil(progression.length / masterLength));
 
   // Determine current active and next chord for HUD
+  const lastDisplayedChordRef = useRef<string>('—');
   const currentActiveChordInfo = getEffectiveChord(progression, currentIndex);
+  const rawActiveChord = progression[currentIndex]?.name;
+
+  let activeChordToDisplay: string;
+  if (isPlaying) {
+    if (!rawActiveChord || rawActiveChord === '-' || rawActiveChord === '—' || rawActiveChord === '–') {
+      // If the active chord is "-", display the last displayed active chord instead of "-"
+      activeChordToDisplay = (lastDisplayedChordRef.current && lastDisplayedChordRef.current !== '—' && lastDisplayedChordRef.current !== '-')
+        ? lastDisplayedChordRef.current
+        : (currentActiveChordInfo?.chord || '—');
+    } else {
+      activeChordToDisplay = rawActiveChord;
+      lastDisplayedChordRef.current = rawActiveChord;
+    }
+  } else {
+    activeChordToDisplay = rawActiveChord || currentActiveChordInfo?.chord || '—';
+    if (activeChordToDisplay && activeChordToDisplay !== '-' && activeChordToDisplay !== '—') {
+      lastDisplayedChordRef.current = activeChordToDisplay;
+    }
+  }
+
   const nextBeatIndex = (currentIndex + 1) % Math.max(1, progression.length);
   const nextActiveChordInfo = getEffectiveChord(progression, nextBeatIndex);
 
@@ -143,17 +164,17 @@ export default function CompactPlaybackChart({
             <span className="text-[9px] uppercase font-bold tracking-widest text-slate-400">Now:</span>
             <div className={cn(
               "px-3 py-1 rounded-lg border text-sm font-black font-mono transition-all flex items-center gap-1.5 shadow-xs",
-              isPlaying && currentActiveChordInfo?.chord
+              isPlaying && activeChordToDisplay && activeChordToDisplay !== '—'
                 ? "bg-emerald-500 text-white border-emerald-400 scale-105"
                 : (resolvedTheme === 'dark' ? "bg-white/10 border-white/10 text-white" : "bg-white border-slate-300 text-slate-900")
             )}>
               <Music className="w-3.5 h-3.5" />
-              <span>{formatChordName(currentActiveChordInfo?.chord || '—')}</span>
+              <span>{formatChordName(activeChordToDisplay || '—')}</span>
             </div>
           </div>
 
           {/* Next Up Chord */}
-          {isPlaying && nextActiveChordInfo?.chord && nextActiveChordInfo.chord !== currentActiveChordInfo?.chord && (
+          {isPlaying && nextActiveChordInfo?.chord && nextActiveChordInfo.chord !== activeChordToDisplay && (
             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
               <ArrowRight className="w-3 h-3 text-slate-400" />
               <span className="text-[9px] uppercase font-bold text-slate-400">Next:</span>
@@ -309,7 +330,11 @@ export default function CompactPlaybackChart({
                           title={`Beat ${(beat.index % masterLength) + 1}: ${beat.effectiveChord || 'Empty'}`}
                         >
                           <span className="text-[11px] font-black font-mono leading-none truncate w-full px-0.5">
-                            {formatChordName(beat.rawName || (beat.effectiveChord ? '—' : '•'))}
+                            {formatChordName(
+                              isCellPlaying && (beat.rawName === '-' || beat.rawName === '—')
+                                ? (activeChordToDisplay || beat.effectiveChord || '—')
+                                : (beat.rawName || (beat.effectiveChord ? '—' : '•'))
+                            )}
                           </span>
                         </button>
                       );
