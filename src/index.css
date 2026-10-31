@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Plus Jakarta Sans", "Outfit", "SF Pro Display", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Space Mono", ui-monospace, monospace;
@@ -61,4 +63,10 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Ensure range sliders never extend outside their parent card containers */
+input[type="range"] {
+  max-width: 100%;
+  box-sizing: border-box;
 }

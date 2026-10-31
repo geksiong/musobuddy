@@ -183,10 +183,10 @@ export default function VoicingInspectorPanel() {
             {/* Chord & Inversion Info */}
             <div className="flex items-center gap-3">
               <div className="flex flex-col">
-                <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400">
+                <span className="text-[9px] font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 font-bold">
                   {isPlaying ? `Playing Beat ${targetBeatIndex + 1}` : `Selected Beat ${targetBeatIndex + 1}`}
                 </span>
-                <span className="text-base font-black font-mono text-emerald-500">
+                <span className="text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
                   {formatChordName(currentChord)}
                 </span>
               </div>
@@ -194,8 +194,8 @@ export default function VoicingInspectorPanel() {
               <div className="h-7 w-px bg-slate-200 dark:bg-white/10" />
 
               <div className="flex flex-col">
-                <span className="text-[9px] font-mono text-slate-400">Inversion / Voicing</span>
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                <span className="text-[9px] font-mono text-slate-600 dark:text-slate-400 font-bold">Inversion / Voicing</span>
+                <span className="text-xs font-black text-slate-900 dark:text-slate-100">
                   {currentVoicing.inversionName || currentVoicing.label}
                 </span>
               </div>
@@ -204,11 +204,11 @@ export default function VoicingInspectorPanel() {
 
               {/* Hand Distribution */}
               <div className="hidden sm:flex flex-col">
-                <span className="text-[9px] font-mono text-slate-400">Voiced Notes</span>
-                <div className="text-[10px] font-mono flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                  <span className="text-indigo-500 font-bold">LH: {midiToNoteName(currentVoicing.bassNote)}</span>
+                <span className="text-[9px] font-mono text-slate-600 dark:text-slate-400 font-bold">Voiced Notes</span>
+                <div className="text-[10px] font-mono flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
+                  <span className="text-indigo-600 dark:text-indigo-400 font-black">LH: {midiToNoteName(currentVoicing.bassNote)}</span>
                   <span className="text-slate-300 dark:text-white/20">|</span>
-                  <span className="text-emerald-500 font-bold">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-black">
                     RH: {currentVoicing.upperNotes.map(midiToNoteName).join(' · ')}
                   </span>
                 </div>
@@ -218,7 +218,7 @@ export default function VoicingInspectorPanel() {
             {/* Voice Leading Step Delta & Preview Button */}
             <div className="flex items-center gap-2">
               {currentVoicing.voiceLeadingDistance !== undefined && currentVoicing.voiceLeadingDistance > 0 && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[9px] font-mono text-emerald-500 font-bold">
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[9px] font-mono text-emerald-700 dark:text-emerald-300 font-black">
                   <span>Δ {currentVoicing.voiceLeadingDistance} semitones</span>
                 </div>
               )}
@@ -226,8 +226,8 @@ export default function VoicingInspectorPanel() {
               <button
                 onClick={() => handlePreviewVoicing(currentVoicing)}
                 className={cn(
-                  "px-2.5 py-1 rounded-lg text-[9px] font-bold border flex items-center gap-1.5 transition-all",
-                  resolvedTheme === 'dark' ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25" : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                  "px-2.5 py-1 rounded-lg text-[9px] font-extrabold border flex items-center gap-1.5 transition-all shadow-xs",
+                  resolvedTheme === 'dark' ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25" : "bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100"
                 )}
                 title="Play this voiced chord on the piano"
               >
@@ -238,26 +238,26 @@ export default function VoicingInspectorPanel() {
           </div>
 
           {/* Voice Leading Progression Flow: Prev -> Current -> Next */}
-          <div className="flex items-center gap-2 text-[10px] font-mono flex-wrap p-2 rounded-lg bg-black/10 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5">
-            <span className="text-slate-400 uppercase text-[8px] tracking-wider">Voice Flow:</span>
+          <div className="flex items-center gap-2 text-[10px] font-mono flex-wrap p-2 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-slate-300 dark:border-white/10">
+            <span className="text-slate-700 dark:text-slate-300 uppercase text-[8px] font-extrabold tracking-wider">Voice Flow:</span>
             {prevInfo?.chord && prevInfo.chord !== currentChord && (
               <>
-                <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 font-bold">
+                <span className="px-1.5 py-0.5 rounded bg-white dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-slate-200 font-bold">
                   {formatChordName(prevInfo.chord)}
                   {prevVoicing ? ` (${prevVoicing.inversionName})` : ''}
                 </span>
-                <ArrowRight className="w-3 h-3 text-emerald-500 shrink-0" />
+                <ArrowRight className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
               </>
             )}
 
-            <span className="px-2 py-0.5 rounded bg-emerald-500 text-white font-black shadow-xs">
+            <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-black shadow-xs">
               {formatChordName(currentChord)} ({currentVoicing.inversionName || currentVoicing.label})
             </span>
 
             {nextInfo?.chord && nextInfo.chord !== currentChord && (
               <>
-                <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-                <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 font-bold">
+                <ArrowRight className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                <span className="px-1.5 py-0.5 rounded bg-white dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-slate-200 font-bold">
                   {formatChordName(nextInfo.chord)}
                 </span>
               </>
@@ -266,7 +266,7 @@ export default function VoicingInspectorPanel() {
 
           {/* Mini Interactive Piano Visualizer */}
           <div className="flex flex-col space-y-1">
-            <div className="flex items-center justify-between text-[9px] font-mono text-slate-400">
+            <div className="flex items-center justify-between text-[9px] font-mono text-slate-700 dark:text-slate-300 font-bold">
               <span>Keyboard Voice Map (C2 to C6)</span>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
@@ -361,7 +361,7 @@ export default function VoicingInspectorPanel() {
           {/* Alternative Voicing Options Comparison */}
           {candidateVoicings.length > 1 && (
             <div className="pt-1">
-              <div className="text-[9px] font-mono text-slate-400 mb-1">
+              <div className="text-[9px] font-mono text-slate-700 dark:text-slate-300 font-bold mb-1">
                 Candidate Voicing Inversions for {formatChordName(currentChord)}:
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
@@ -377,15 +377,15 @@ export default function VoicingInspectorPanel() {
                       className={cn(
                         "p-1.5 rounded-lg border text-left flex flex-col justify-between transition-all text-[9px]",
                         isCurrentSelected
-                          ? "bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold"
-                          : (resolvedTheme === 'dark' ? "bg-white/5 border-white/5 hover:bg-white/10 text-white/70" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700")
+                          ? "bg-emerald-500/15 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-bold"
+                          : (resolvedTheme === 'dark' ? "bg-white/5 border-white/5 hover:bg-white/10 text-white/90" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900")
                       )}
                     >
                       <div className="flex items-center justify-between w-full">
-                        <span className="font-bold truncate">{cVoicing.inversionName}</span>
-                        {isCurrentSelected && <Check className="w-3 h-3 text-emerald-500 shrink-0" />}
+                        <span className="font-extrabold truncate">{cVoicing.inversionName}</span>
+                        {isCurrentSelected && <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />}
                       </div>
-                      <span className="text-[8px] font-mono text-slate-400 truncate">
+                      <span className="text-[8px] font-mono text-slate-600 dark:text-slate-400 font-semibold truncate">
                         {cVoicing.upperNotes.map(midiToNoteName).join(' ')}
                       </span>
                     </button>
@@ -396,7 +396,7 @@ export default function VoicingInspectorPanel() {
           )}
         </div>
       ) : (
-        <div className="py-4 text-center text-slate-400 text-xs font-mono">
+        <div className="py-4 text-center text-slate-600 dark:text-slate-400 text-xs font-mono font-medium">
           Select or add a chord in the progression timeline to view its piano voicing and voice-leading paths.
         </div>
       )}

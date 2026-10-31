@@ -83,6 +83,11 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
     setAccompanimentVolume,
     progression,
     currentIndex,
+    activeGroovePattern,
+    setActiveGroovePattern,
+    customGroovePresets,
+    isGrooveEngineEnabled,
+    setIsGrooveEngineEnabled,
     arpeggioPreset,
     setArpeggioPreset,
     voicingStyle,
@@ -458,18 +463,25 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <div className="text-xs text-neutral-500">Groove Style</div>
+                    <div className="text-xs text-neutral-500">Groove Pattern</div>
                     <select
-                      value={arpeggioPreset}
-                      onChange={(e) => setArpeggioPreset(e.target.value)}
+                      value={activeGroovePattern?.id || ''}
+                      onChange={(e) => {
+                        const allAvailable = [...GROOVE_PRESETS, ...(customGroovePresets || [])];
+                        const found = allAvailable.find((p) => p.id === e.target.value);
+                        if (found) {
+                          setActiveGroovePattern(found);
+                          setIsGrooveEngineEnabled(true);
+                        }
+                      }}
                       className={cn(
                         "px-2.5 py-1.5 rounded-lg text-xs font-semibold outline-none cursor-pointer border",
                         resolvedTheme === 'dark' ? "bg-white/[0.06] border-white/10 text-white" : "bg-neutral-100 border-neutral-200 text-neutral-800"
                       )}
                     >
-                      {GROOVE_PRESETS.map((p) => (
+                      {[...GROOVE_PRESETS, ...(customGroovePresets || [])].map((p) => (
                         <option key={p.id} value={p.id} className={resolvedTheme === 'dark' ? "bg-neutral-900" : "bg-white"}>
-                          {p.name}
+                          {p.name} ({p.genre})
                         </option>
                       ))}
                     </select>
@@ -637,8 +649,8 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
               title="Click to view groove & chord settings"
             >
               <span className="font-mono text-amber-500">{activeChordName}</span>
-              <span className="text-[10px] text-neutral-400 uppercase hidden sm:inline truncate max-w-[80px]">
-                {arpeggioPreset}
+              <span className="text-[10px] text-neutral-400 uppercase hidden sm:inline truncate max-w-[90px]" title={activeGroovePattern?.name}>
+                {activeGroovePattern?.name || 'Groove'}
               </span>
               <ChevronUp className={cn("w-3 h-3 text-neutral-400 transition-transform", activeDrawer === 'accompaniment' && "rotate-180")} />
             </button>

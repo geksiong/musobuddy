@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles, Play, Volume2, VolumeX, Plus, Trash2, BookmarkPlus,
-  Flame, Zap, Sliders, ChevronDown, Check, Info, Layers, RefreshCw
+  Flame, Zap, Sliders, ChevronDown, Check, Info, Layers, RefreshCw,
+  Music, Disc, SlidersHorizontal, Eye
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
@@ -11,13 +12,21 @@ import {
   GROOVE_PRESETS,
   ChordTriggerType,
   BassTriggerType,
+  SynthTriggerType,
   GroovePatternPreset,
   GrooveGenre
 } from './grooveEngine.ts';
-import { MetronomeSound } from '../Metronome/types.ts';
+import {
+  PERCUSSION_SOUNDS,
+  DRUM_SETS,
+  getDrumSetInfo,
+  BASS_INSTRUMENTS,
+  RHYTHM_INSTRUMENTS,
+  SYNTH_INSTRUMENTS
+} from './instrumentCatalog.ts';
 
 const CHORD_TRIGGER_LABELS: { type: ChordTriggerType; label: string; color: string; desc: string }[] = [
-  { type: 'OFF', label: 'OFF', color: 'bg-slate-200/50 dark:bg-white/5 text-slate-400', desc: 'Silent step' },
+  { type: 'OFF', label: 'OFF', color: 'bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 font-bold', desc: 'Silent step' },
   { type: 'CHORD', label: 'Hit', color: 'bg-emerald-500 text-white', desc: 'Standard chord hit' },
   { type: 'CHORD_ACCENT', label: 'ACC', color: 'bg-emerald-600 text-white font-black ring-1 ring-emerald-300', desc: 'Accented chord hit' },
   { type: 'PUSH_NEXT_CHORD', label: 'Push Next', color: 'bg-amber-500 text-white font-extrabold', desc: 'Syncopated early chord anticipation' },
@@ -27,7 +36,7 @@ const CHORD_TRIGGER_LABELS: { type: ChordTriggerType; label: string; color: stri
 ];
 
 const BASS_TRIGGER_LABELS: { type: BassTriggerType; label: string; color: string; desc: string }[] = [
-  { type: 'OFF', label: 'OFF', color: 'bg-slate-200/50 dark:bg-white/5 text-slate-400', desc: 'Silent bass step' },
+  { type: 'OFF', label: 'OFF', color: 'bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 font-bold', desc: 'Silent bass step' },
   { type: 'ROOT', label: 'Root', color: 'bg-blue-500 text-white', desc: 'Bass root note' },
   { type: 'ROOT_ACCENT', label: 'Root ACC', color: 'bg-blue-600 text-white font-black', desc: 'Accented bass root' },
   { type: 'FIFTH', label: '5th', color: 'bg-indigo-500 text-white', desc: 'Bass fifth note' },
@@ -36,13 +45,31 @@ const BASS_TRIGGER_LABELS: { type: BassTriggerType; label: string; color: string
   { type: 'WALKING', label: 'Walk', color: 'bg-purple-500 text-white', desc: 'Walking chromatic approach' },
 ];
 
+const SYNTH_TRIGGER_LABELS: { type: SynthTriggerType; label: string; color: string; desc: string }[] = [
+  { type: 'OFF', label: 'OFF', color: 'bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 font-bold', desc: 'Silent synth step' },
+  { type: 'PAD', label: 'Pad', color: 'bg-fuchsia-600 text-white font-bold', desc: 'Sustained chord pad swell' },
+  { type: 'LEAD_ROOT', label: 'Lead', color: 'bg-violet-500 text-white font-bold', desc: 'Melodic lead on chord root' },
+  { type: 'LEAD_ACCENT', label: 'Lead !', color: 'bg-violet-600 text-white font-black ring-1 ring-violet-300', desc: 'Accented lead melody hit' },
+  { type: 'LEAD_FIFTH', label: '5th', color: 'bg-pink-500 text-white font-bold', desc: 'Harmonic fifth lead' },
+  { type: 'LEAD_OCTAVE', label: '8va', color: 'bg-rose-500 text-white font-bold', desc: 'High octave bell/lead' },
+  { type: 'PUSH_NEXT_LEAD', label: 'Push ➜', color: 'bg-amber-500 text-white font-black animate-pulse', desc: 'Syncopated lead push into next root' },
+  { type: 'ARP_FLOURISH', label: 'Arp', color: 'bg-cyan-500 text-white font-bold', desc: 'Arpeggiated melodic flourish' },
+];
+
 export default function GrooveEnginePanel() {
   const {
     isGrooveEngineEnabled, setIsGrooveEngineEnabled,
     activeGroovePattern, setActiveGroovePattern,
     customGroovePresets, saveCustomPreset, deleteCustomPreset,
     updateActiveGroovePatternStep, updatePercussionLayerProps,
-    currentSubStepIndex, earlyPushEvent, isPlaying
+    addPercussionLayer, removePercussionLayer,
+    currentSubStepIndex, earlyPushEvent, isPlaying,
+    selectedRhythmInstrument, setSelectedRhythmInstrument,
+    selectedBassInstrument, setSelectedBassInstrument,
+    selectedSynthInstrument, setSelectedSynthInstrument,
+    selectedDrumSet, setSelectedDrumSet,
+    trackVolumes, setTrackVolume,
+    trackMutes, setTrackMute
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
@@ -51,6 +78,7 @@ export default function GrooveEnginePanel() {
   const [newPresetName, setNewPresetName] = useState('');
   const [newPresetGenre, setNewPresetGenre] = useState<GrooveGenre>('Rock');
   const [newPresetDesc, setNewPresetDesc] = useState('');
+  const [showMixer, setShowMixer] = useState(true);
 
   const genres = ['ALL', 'Rock', 'Pop', 'Funk', 'Jazz', 'Latin', 'World', 'Flamenco', 'CUSTOM'];
 
@@ -61,6 +89,18 @@ export default function GrooveEnginePanel() {
     if (selectedGenre === 'CUSTOM') return customGroovePresets.some(c => c.id === preset.id);
     return preset.genre === selectedGenre;
   });
+
+  // Ensure active preset is visible in the grid when changed externally
+  useEffect(() => {
+    if (activeGroovePattern && selectedGenre !== 'ALL') {
+      const isCustom = customGroovePresets.some(c => c.id === activeGroovePattern.id);
+      if (isCustom && selectedGenre !== 'CUSTOM') {
+        setSelectedGenre('CUSTOM');
+      } else if (!isCustom && activeGroovePattern.genre && activeGroovePattern.genre !== selectedGenre) {
+        setSelectedGenre('ALL');
+      }
+    }
+  }, [activeGroovePattern?.id]);
 
   const subsPerBeat = activeGroovePattern?.subdivisionsPerBeat || 2;
   const totalSteps = activeGroovePattern?.chordPattern?.length || 8;
@@ -82,6 +122,14 @@ export default function GrooveEnginePanel() {
     updateActiveGroovePatternStep('bass', stepIdx, order[nextIndex]);
   };
 
+  const handleCycleSynthStep = (stepIdx: number) => {
+    if (!activeGroovePattern) return;
+    const current = (activeGroovePattern.synthPattern && activeGroovePattern.synthPattern[stepIdx]) || 'OFF';
+    const order: SynthTriggerType[] = ['OFF', 'PAD', 'LEAD_ROOT', 'LEAD_ACCENT', 'LEAD_FIFTH', 'LEAD_OCTAVE', 'PUSH_NEXT_LEAD', 'ARP_FLOURISH'];
+    const nextIndex = (order.indexOf(current) + 1) % order.length;
+    updateActiveGroovePatternStep('synth', stepIdx, order[nextIndex]);
+  };
+
   const handleCyclePercussionStep = (layerId: string, stepIdx: number) => {
     if (!activeGroovePattern) return;
     const layer = activeGroovePattern.percussionLayers.find(l => l.id === layerId);
@@ -100,7 +148,10 @@ export default function GrooveEnginePanel() {
       id: `custom_groove_${Date.now()}`,
       name: newPresetName.trim(),
       genre: newPresetGenre,
-      description: newPresetDesc.trim() || 'Custom syncopated groove preset',
+      description: newPresetDesc.trim() || 'Custom syncopated 4-track groove',
+      rhythmInstrument: selectedRhythmInstrument,
+      bassInstrument: selectedBassInstrument,
+      synthInstrument: selectedSynthInstrument,
     };
 
     saveCustomPreset(newPreset);
@@ -121,7 +172,7 @@ export default function GrooveEnginePanel() {
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-emerald-500 animate-pulse" />
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">
-              Groove & Syncopation Engine
+              4-Track Groove & Instrument Engine
             </h3>
           </div>
 
@@ -148,107 +199,392 @@ export default function GrooveEnginePanel() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-500 text-[9px] font-black uppercase tracking-wider whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] tracking-wide shadow-xs animate-bounce"
               >
-                <Zap className="w-3 h-3 fill-current animate-bounce shrink-0" />
-                <span>Early Push: Beat {earlyPushEvent.sourceBeat} → Chord [{earlyPushEvent.pushedChord}]</span>
+                <Flame className="w-3 h-3 fill-slate-950" />
+                <span>ANTICIPATION PUSH: Beat {earlyPushEvent.sourceBeat} ➜ {earlyPushEvent.pushedChord}</span>
               </motion.div>
-            ) : null}
+            ) : (
+              <div className="text-[10px] font-mono text-slate-400 flex items-center gap-2">
+                <span className="hidden sm:inline">4 Tracks:</span>
+                <span className="text-emerald-500 font-bold">Rhythm</span>
+                <span>•</span>
+                <span className="text-blue-500 font-bold">Bass</span>
+                <span>•</span>
+                <span className="text-purple-500 font-bold">Synth</span>
+                <span>•</span>
+                <span className="text-amber-500 font-bold">Percussion</span>
+              </div>
+            )}
           </AnimatePresence>
         </div>
       </div>
 
-      {isGrooveEngineEnabled && (
-        <div className="flex flex-col gap-4">
-          {/* Genre Filter Tabs & Preset Dropdown */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-              {genres.map(genre => (
-                <button
-                  key={genre}
-                  onClick={() => setSelectedGenre(genre)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all border shrink-0",
-                    selectedGenre === genre
-                      ? "bg-emerald-500 text-white border-emerald-500 shadow-xs"
-                      : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/50 hover:text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100")
-                  )}
-                >
-                  {genre}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2 min-w-0 max-w-full">
-              {/* Groove Preset Selector */}
-              <div className="relative max-w-[180px] sm:max-w-[240px] min-w-0 flex-1">
-                <select
-                  value={activeGroovePattern?.id}
-                  onChange={(e) => {
-                    const found = allPresets.find(p => p.id === e.target.value);
-                    if (found) setActiveGroovePattern(found);
-                  }}
-                  className={cn(
-                    "w-full appearance-none border px-3 pr-8 py-1.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer outline-none focus:border-emerald-500 truncate",
-                    resolvedTheme === 'dark' ? "bg-white/10 border-white/15 text-white" : "bg-white border-slate-300 text-slate-800"
-                  )}
-                  title={activeGroovePattern ? `${activeGroovePattern.name} (${activeGroovePattern.genre})` : 'Select Preset'}
-                >
-                  {filteredPresets.map(preset => (
-                    <option key={preset.id} value={preset.id} className={resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900"}>
-                      {preset.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
-              </div>
-
+      {/* Preset Picker & Genre Filter */}
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Genre Tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 max-w-full text-[10px] font-extrabold scrollbar-none">
+            {genres.map(genre => (
               <button
-                onClick={() => setIsSaveModalOpen(true)}
-                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[9px] font-extrabold uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-xs shrink-0"
-                title="Save current custom groove configuration"
+                key={genre}
+                onClick={() => setSelectedGenre(genre)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg transition-all whitespace-nowrap",
+                  selectedGenre === genre
+                    ? "bg-emerald-500 text-white shadow-xs"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-white/5"
+                )}
               >
-                <BookmarkPlus className="w-3.5 h-3.5" />
-                <span>Save</span>
+                {genre}
               </button>
-            </div>
+            ))}
           </div>
 
-          {/* Active Preset Description Card */}
-          {activeGroovePattern && (
-            <div className={cn(
-              "p-3 rounded-xl border flex items-center justify-between gap-3 text-[10px]",
-              resolvedTheme === 'dark' ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-300" : "bg-emerald-50 border-emerald-200 text-emerald-900"
-            )}>
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-emerald-500 shrink-0" />
-                <div>
-                  <span className="font-extrabold mr-1.5">{activeGroovePattern.name}:</span>
-                  <span className="opacity-80">{activeGroovePattern.description}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {activeGroovePattern && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold shrink-0">
+                <span className="text-slate-500 dark:text-slate-400 font-bold uppercase text-[9px]">Active:</span>
+                <span className="font-black truncate max-w-[130px]">{activeGroovePattern.name}</span>
+                <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-500 text-white font-mono uppercase">{activeGroovePattern.genre}</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowMixer(!showMixer)}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 transition-colors border",
+                showMixer 
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" 
+                  : "text-slate-500 border-slate-300 dark:border-white/10 hover:bg-slate-200/50 dark:hover:bg-white/5"
+              )}
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+              <span>Track Mixer</span>
+            </button>
+
+            <button
+              onClick={() => setIsSaveModalOpen(true)}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-colors flex items-center gap-1 border border-emerald-500/30"
+              title="Save current 4-track groove pattern as a custom preset"
+            >
+              <BookmarkPlus className="w-3 h-3" />
+              <span>Save Preset</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Preset Selector Dropdown */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {filteredPresets.map(preset => {
+            const isSelected = activeGroovePattern?.id === preset.id;
+            return (
+              <button
+                key={preset.id}
+                onClick={() => {
+                  setActiveGroovePattern(preset);
+                  setIsGrooveEngineEnabled(true);
+                }}
+                className={cn(
+                  "text-left p-3 rounded-xl border transition-all flex flex-col gap-1.5 relative group shadow-2xs cursor-pointer",
+                  isSelected
+                    ? "border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500/40 shadow-xs"
+                    : "border-slate-300 dark:border-white/15 hover:border-emerald-400 dark:hover:border-white/30 bg-white dark:bg-white/[0.04]"
+                )}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[11px] font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                      {preset.name}
+                    </span>
+                    {preset.hasEarlyPush && (
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5 shrink-0">
+                        <Flame className="w-2.5 h-2.5" /> Push
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[9px] font-mono font-extrabold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded border border-slate-200 dark:border-white/10 uppercase shrink-0">
+                    {preset.timeSignature} • {preset.defaultBpm} BPM
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-600 dark:text-slate-300 line-clamp-1 font-medium">
+                  {preset.description}
+                </p>
+                {preset.isUserPreset && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCustomPreset(preset.id);
+                    }}
+                    className="absolute bottom-2 right-2 text-rose-500 opacity-0 group-hover:opacity-100 hover:text-rose-600 transition-opacity p-1 cursor-pointer"
+                    title="Delete custom preset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* TRACK MIXER & INSTRUMENT PALETTES */}
+      <AnimatePresence>
+        {showMixer && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="rounded-xl border border-slate-300 dark:border-white/15 p-3.5 bg-white dark:bg-black/40 shadow-xs flex flex-col gap-3"
+          >
+            <div className="flex items-center justify-between pb-1 border-b border-slate-200 dark:border-white/10">
+              <span className="text-[10px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-wider flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-emerald-500" />
+                Track Instruments & Mixer
+              </span>
+              <span className="text-[9px] text-slate-600 dark:text-slate-400 font-bold">Independent volume, mutes, and physical models</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* 1. RHYTHM / HARMONY TRACK */}
+              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                    <span className="text-[11px] font-black uppercase text-emerald-800 dark:text-emerald-400">Rhythm / Chords</span>
+                  </div>
+                  <button
+                    onClick={() => setTrackMute('rhythm', !trackMutes.rhythm)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
+                      trackMutes.rhythm ? "text-rose-600 bg-rose-500/15" : "text-emerald-600 hover:bg-emerald-500/15"
+                    )}
+                    title={trackMutes.rhythm ? "Unmute Rhythm Track" : "Mute Rhythm Track"}
+                  >
+                    {trackMutes.rhythm ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-700 dark:text-slate-300">Instrument</label>
+                  <select
+                    value={selectedRhythmInstrument}
+                    onChange={(e) => setSelectedRhythmInstrument(e.target.value)}
+                    className="text-[11px] font-bold p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none cursor-pointer border border-slate-300 dark:border-white/15 shadow-2xs truncate"
+                  >
+                    {RHYTHM_INSTRUMENTS.map(inst => (
+                      <option key={inst.id} value={inst.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white font-bold">
+                        {inst.name} ({inst.badge})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 min-w-0 w-full overflow-hidden">
+                  <span className="text-[9px] font-mono font-extrabold text-slate-700 dark:text-slate-300 w-7 shrink-0">Vol</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.05"
+                    value={trackVolumes.rhythm}
+                    onChange={(e) => setTrackVolume('rhythm', parseFloat(e.target.value))}
+                    className="w-full min-w-0 flex-1 accent-emerald-500 h-1.5 bg-slate-200 dark:bg-white/10 rounded-lg cursor-pointer"
+                  />
+                  <span className="text-[9px] font-mono font-extrabold text-slate-900 dark:text-slate-100 w-9 text-right shrink-0">
+                    {Math.round(trackVolumes.rhythm * 100)}%
+                  </span>
                 </div>
               </div>
-              {activeGroovePattern.swingRatio && (
-                <div className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-mono text-[9px] font-black shrink-0">
-                  Swing: {Math.round(activeGroovePattern.swingRatio * 100)}%
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* MULTI-LAYER BEAT STEP GRID VISUALIZER */}
-          <div className="w-full overflow-x-auto pb-1">
-            <div className="min-w-[620px] flex flex-col gap-2">
-              {/* Step Grid Header: Sub-beat division markings */}
+              {/* 2. BASS TRACK */}
+              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                    <span className="text-[11px] font-black uppercase text-blue-800 dark:text-blue-400">Bass Track</span>
+                  </div>
+                  <button
+                    onClick={() => setTrackMute('bass', !trackMutes.bass)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
+                      trackMutes.bass ? "text-rose-600 bg-rose-500/15" : "text-blue-600 hover:bg-blue-500/15"
+                    )}
+                    title={trackMutes.bass ? "Unmute Bass Track" : "Mute Bass Track"}
+                  >
+                    {trackMutes.bass ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-700 dark:text-slate-300">Bass Type</label>
+                  <select
+                    value={selectedBassInstrument}
+                    onChange={(e) => setSelectedBassInstrument(e.target.value)}
+                    className="text-[11px] font-bold p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none cursor-pointer border border-slate-300 dark:border-white/15 shadow-2xs truncate"
+                  >
+                    {BASS_INSTRUMENTS.map(inst => (
+                      <option key={inst.id} value={inst.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white font-bold">
+                        {inst.name} ({inst.badge})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 min-w-0 w-full overflow-hidden">
+                  <span className="text-[9px] font-mono font-extrabold text-slate-700 dark:text-slate-300 w-7 shrink-0">Vol</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.05"
+                    value={trackVolumes.bass}
+                    onChange={(e) => setTrackVolume('bass', parseFloat(e.target.value))}
+                    className="w-full min-w-0 flex-1 accent-blue-500 h-1.5 bg-slate-200 dark:bg-white/10 rounded-lg cursor-pointer"
+                  />
+                  <span className="text-[9px] font-mono font-extrabold text-slate-900 dark:text-slate-100 w-9 text-right shrink-0">
+                    {Math.round(trackVolumes.bass * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* 3. SYNTH TRACK */}
+              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
+                    <span className="text-[11px] font-black uppercase text-purple-800 dark:text-purple-400">Synth / Lead Track</span>
+                  </div>
+                  <button
+                    onClick={() => setTrackMute('synth', !trackMutes.synth)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
+                      trackMutes.synth ? "text-rose-600 bg-rose-500/15" : "text-purple-600 hover:bg-purple-500/15"
+                    )}
+                    title={trackMutes.synth ? "Unmute Synth Track" : "Mute Synth Track"}
+                  >
+                    {trackMutes.synth ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] font-extrabold uppercase text-slate-700 dark:text-slate-300">Synth Model</label>
+                  <select
+                    value={selectedSynthInstrument}
+                    onChange={(e) => setSelectedSynthInstrument(e.target.value)}
+                    className="text-[11px] font-bold p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none cursor-pointer border border-slate-300 dark:border-white/15 shadow-2xs truncate"
+                  >
+                    {SYNTH_INSTRUMENTS.map(inst => (
+                      <option key={inst.id} value={inst.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white font-bold">
+                        {inst.name} ({inst.badge})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 min-w-0 w-full overflow-hidden">
+                  <span className="text-[9px] font-mono font-extrabold text-slate-700 dark:text-slate-300 w-7 shrink-0">Vol</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.05"
+                    value={trackVolumes.synth}
+                    onChange={(e) => setTrackVolume('synth', parseFloat(e.target.value))}
+                    className="w-full min-w-0 flex-1 accent-purple-500 h-1.5 bg-slate-200 dark:bg-white/10 rounded-lg cursor-pointer"
+                  />
+                  <span className="text-[9px] font-mono font-extrabold text-slate-900 dark:text-slate-100 w-9 text-right shrink-0">
+                    {Math.round(trackVolumes.synth * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* 4. PERCUSSION TRACK & DRUM SET */}
+              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+                    <span className="text-[11px] font-black uppercase text-amber-800 dark:text-amber-400">Percussion Drumset</span>
+                  </div>
+                  <button
+                    onClick={() => setTrackMute('percussion', !trackMutes.percussion)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
+                      trackMutes.percussion ? "text-rose-600 bg-rose-500/15" : "text-amber-600 hover:bg-amber-500/15"
+                    )}
+                    title={trackMutes.percussion ? "Unmute Percussion Track" : "Mute Percussion Track"}
+                  >
+                    {trackMutes.percussion ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-extrabold uppercase text-slate-700 dark:text-slate-300">Drum Set</label>
+                    <span className="text-[8px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                      {getDrumSetInfo(selectedDrumSet)?.badge || 'Kit'}
+                    </span>
+                  </div>
+                  <select
+                    value={selectedDrumSet}
+                    onChange={(e) => setSelectedDrumSet(e.target.value)}
+                    className="text-[11px] font-bold p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none cursor-pointer border border-slate-300 dark:border-white/15 shadow-2xs truncate"
+                    title="Select cohesive drumset (Acoustic Studio, Vintage Jazz, 808, Latin, Bossa, Flamenco, etc.)"
+                  >
+                    {DRUM_SETS.map(dSet => (
+                      <option key={dSet.id} value={dSet.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white font-bold">
+                        {dSet.name} ({dSet.badge})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 min-w-0 w-full overflow-hidden">
+                  <span className="text-[9px] font-mono font-extrabold text-slate-700 dark:text-slate-300 w-7 shrink-0">Vol</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.05"
+                    value={trackVolumes.percussion}
+                    onChange={(e) => setTrackVolume('percussion', parseFloat(e.target.value))}
+                    className="w-full min-w-0 flex-1 accent-amber-500 h-1.5 bg-slate-200 dark:bg-white/10 rounded-lg cursor-pointer"
+                  />
+                  <span className="text-[9px] font-mono font-extrabold text-slate-900 dark:text-slate-100 w-9 text-right shrink-0">
+                    {Math.round(trackVolumes.percussion * 100)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SEQUENCER GRID (4-TRACK MULTI-LAYER SEQUENCER) */}
+      {isGrooveEngineEnabled && (
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-center justify-between pb-1">
+            <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider flex items-center gap-1.5">
+              <Zap className="w-3 h-3 text-emerald-500" />
+              Interactive Step Sequencer (Click steps to cycle triggers & accents)
+            </span>
+            <span className="text-[9px] font-mono font-bold text-emerald-500">
+              {totalSteps} Steps • {subsPerBeat} per beat • {activeGroovePattern?.swingRatio ? 'Swing' : 'Straight'}
+            </span>
+          </div>
+
+          <div className="w-full overflow-x-auto pb-2 scrollbar-none">
+            <div className="min-w-[620px] flex flex-col gap-1.5">
+              {/* Step Numbers Header */}
               <div 
-                className="grid gap-1 items-center text-[9px] font-black uppercase text-slate-400 font-mono border-b pb-1.5 border-slate-200 dark:border-white/10"
-                style={{ gridTemplateColumns: `110px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                className="grid gap-1 items-center py-1 text-[9px] font-extrabold text-slate-400 uppercase tracking-widest pl-1"
+                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
               >
-                <div className="pl-1">Layer</div>
+                <div>Track / Beat</div>
                 {Array.from({ length: totalSteps }).map((_, stepIdx) => {
                   const isCurrentSubStep = isPlaying && currentSubStepIndex === stepIdx;
                   const beatNumber = Math.floor(stepIdx / subsPerBeat) + 1;
-                  const subBeatLetter = stepIdx % subsPerBeat === 0 ? `Beat ${beatNumber}` : `&`;
+                  const subBeatLetter = stepIdx % subsPerBeat === 0 ? `B${beatNumber}` : `&`;
 
                   return (
                     <div
@@ -264,14 +600,17 @@ export default function GrooveEnginePanel() {
                 })}
               </div>
 
-              {/* 1. CHORD TRIGGER LAYER */}
+              {/* 1. CHORD / RHYTHM TRIGGER LAYER */}
               <div 
-                className="grid gap-1 items-center py-1 rounded-xl bg-slate-200/40 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
-                style={{ gridTemplateColumns: `110px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                className="grid gap-1 items-center py-1.5 rounded-xl bg-slate-200/50 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
+                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
               >
                 <div className="flex flex-col pl-1">
-                  <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider">Chord Hit</span>
-                  <span className="text-[8px] text-slate-400">Harmony / Push</span>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                    <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider">Rhythm / Chord</span>
+                  </div>
+                  <span className="text-[8px] text-slate-400 truncate">Comping / Pushes</span>
                 </div>
 
                 {activeGroovePattern?.chordPattern?.map((triggerType, stepIdx) => {
@@ -285,7 +624,7 @@ export default function GrooveEnginePanel() {
                       className={cn(
                         "h-10 rounded-lg text-[9px] font-black font-mono transition-colors flex flex-col items-center justify-center border shadow-xs leading-none p-0.5",
                         meta.color,
-                        isCurrentSubStep ? "ring-2 ring-emerald-400 z-10" : "hover:brightness-110"
+                        isCurrentSubStep ? "ring-2 ring-emerald-400 z-10 scale-105" : "hover:brightness-110"
                       )}
                       title={`${meta.desc} (Click to change)`}
                     >
@@ -297,12 +636,15 @@ export default function GrooveEnginePanel() {
 
               {/* 2. BASS TRIGGER LAYER */}
               <div 
-                className="grid gap-1 items-center py-1 rounded-xl bg-slate-200/40 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
-                style={{ gridTemplateColumns: `110px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                className="grid gap-1 items-center py-1.5 rounded-xl bg-slate-200/50 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
+                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
               >
                 <div className="flex flex-col pl-1">
-                  <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider">Bass Line</span>
-                  <span className="text-[8px] text-slate-400">Root / 5th / Walk</span>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                    <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider">Bass Line</span>
+                  </div>
+                  <span className="text-[8px] text-slate-400 truncate">Root / 5th / Walk</span>
                 </div>
 
                 {activeGroovePattern?.bassPattern?.map((triggerType, stepIdx) => {
@@ -316,7 +658,7 @@ export default function GrooveEnginePanel() {
                       className={cn(
                         "h-10 rounded-lg text-[9px] font-black font-mono transition-colors flex flex-col items-center justify-center border shadow-xs leading-none p-0.5",
                         meta.color,
-                        isCurrentSubStep ? "ring-2 ring-blue-400 z-10" : "hover:brightness-110"
+                        isCurrentSubStep ? "ring-2 ring-blue-400 z-10 scale-105" : "hover:brightness-110"
                       )}
                       title={`${meta.desc} (Click to change)`}
                     >
@@ -326,51 +668,92 @@ export default function GrooveEnginePanel() {
                 })}
               </div>
 
-              {/* 3. PERCUSSION LAYERS (Clave, Shaker, HiHat, Kick, Snare, Conga, Bongo) */}
+              {/* 3. SYNTH / LEAD TRIGGER LAYER */}
+              <div 
+                className="grid gap-1 items-center py-1.5 rounded-xl bg-slate-200/50 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
+                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
+              >
+                <div className="flex flex-col pl-1">
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
+                    <span className="text-[10px] font-black uppercase text-purple-500 tracking-wider">Synth / Lead</span>
+                  </div>
+                  <span className="text-[8px] text-slate-400 truncate">Pad / Lead / Arp</span>
+                </div>
+
+                {Array.from({ length: totalSteps }).map((_, stepIdx) => {
+                  const triggerType = (activeGroovePattern?.synthPattern && activeGroovePattern.synthPattern[stepIdx]) || 'OFF';
+                  const isCurrentSubStep = isPlaying && currentSubStepIndex === stepIdx;
+                  const meta = SYNTH_TRIGGER_LABELS.find(m => m.type === triggerType) || SYNTH_TRIGGER_LABELS[0];
+
+                  return (
+                    <button
+                      key={stepIdx}
+                      onClick={() => handleCycleSynthStep(stepIdx)}
+                      className={cn(
+                        "h-10 rounded-lg text-[9px] font-black font-mono transition-colors flex flex-col items-center justify-center border shadow-xs leading-none p-0.5",
+                        meta.color,
+                        isCurrentSubStep ? "ring-2 ring-purple-400 z-10 scale-105" : "hover:brightness-110"
+                      )}
+                      title={`${meta.desc} (Click to change)`}
+                    >
+                      <span>{meta.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 4. PERCUSSION TRACK LAYERS */}
               {activeGroovePattern?.percussionLayers?.map((pLayer) => (
                 <div 
                   key={pLayer.id}
                   className={cn(
-                    "grid gap-1 items-center py-1 rounded-xl p-1.5 border transition-all",
+                    "grid gap-1 items-center py-1.5 rounded-xl p-1.5 border transition-all",
                     pLayer.muted
                       ? "opacity-40 bg-slate-100 dark:bg-white/[0.01] border-slate-200 dark:border-white/5"
-                      : "bg-slate-200/40 dark:bg-white/[0.03] border-slate-200 dark:border-white/5"
+                      : "bg-slate-200/50 dark:bg-white/[0.03] border-slate-200 dark:border-white/5"
                   )}
-                  style={{ gridTemplateColumns: `110px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                  style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
                 >
                   <div className="flex items-center justify-between pr-2 pl-1">
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-extrabold capitalize text-slate-700 dark:text-slate-200 truncate">
-                        {pLayer.name}
-                      </span>
+                    <div className="flex flex-col flex-1 mr-1 overflow-hidden">
                       <select
                         value={pLayer.sound}
-                        onChange={(e) => updatePercussionLayerProps(pLayer.id, { sound: e.target.value as MetronomeSound })}
-                        className="text-[7px] text-slate-400 font-mono uppercase bg-transparent hover:text-emerald-500 cursor-pointer outline-none font-bold"
-                        title="Change sound instrument"
+                        onChange={(e) => updatePercussionLayerProps(pLayer.id, { sound: e.target.value })}
+                        className="text-[9px] text-slate-700 dark:text-slate-200 font-extrabold uppercase bg-transparent hover:text-emerald-500 cursor-pointer outline-none truncate"
+                        title="Change drum / percussion instrument"
                       >
-                        <option value={MetronomeSound.Woodblock} className="bg-slate-900 text-white">Woodblock</option>
-                        <option value={MetronomeSound.Cowbell} className="bg-slate-900 text-white">Cowbell</option>
-                        <option value={MetronomeSound.Kick} className="bg-slate-900 text-white">Kick</option>
-                        <option value={MetronomeSound.Snare} className="bg-slate-900 text-white">Snare</option>
-                        <option value={MetronomeSound.HiHat} className="bg-slate-900 text-white">HiHat</option>
-                        <option value={MetronomeSound.Clap} className="bg-slate-900 text-white">Clap</option>
-                        <option value={MetronomeSound.Bass} className="bg-slate-900 text-white">Bass Drum</option>
-                        <option value={MetronomeSound.Bodhran} className="bg-slate-900 text-white">Bodhrán</option>
-                        <option value={MetronomeSound.ClockTick} className="bg-slate-900 text-white">Clock Tick</option>
+                        {PERCUSSION_SOUNDS.map(s => (
+                          <option key={s.id} value={s.id} className="bg-slate-900 text-white font-normal">
+                            {s.name} ({s.category})
+                          </option>
+                        ))}
                       </select>
+                      <span className="text-[7px] text-slate-400 font-mono">Percussion Voice</span>
                     </div>
 
-                    <button
-                      onClick={() => updatePercussionLayerProps(pLayer.id, { muted: !pLayer.muted })}
-                      className={cn(
-                        "p-1 rounded transition-colors",
-                        pLayer.muted ? "text-slate-400 hover:text-slate-600" : "text-emerald-500 hover:text-emerald-600"
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => updatePercussionLayerProps(pLayer.id, { muted: !pLayer.muted })}
+                        className={cn(
+                          "p-1 rounded transition-colors",
+                          pLayer.muted ? "text-slate-400 hover:text-slate-600" : "text-amber-500 hover:text-amber-600"
+                        )}
+                        title={pLayer.muted ? "Unmute layer" : "Mute layer"}
+                      >
+                        {pLayer.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                      </button>
+
+                      {activeGroovePattern.percussionLayers.length > 1 && (
+                        <button
+                          onClick={() => removePercussionLayer(pLayer.id)}
+                          className="p-1 rounded text-slate-400 hover:text-rose-500 transition-colors"
+                          title="Remove percussion track"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       )}
-                      title={pLayer.muted ? "Unmute layer" : "Mute layer"}
-                    >
-                      {pLayer.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                    </button>
+                    </div>
                   </div>
 
                   {pLayer.pattern.map((val, stepIdx) => {
@@ -383,13 +766,13 @@ export default function GrooveEnginePanel() {
                         key={stepIdx}
                         onClick={() => handleCyclePercussionStep(pLayer.id, stepIdx)}
                         className={cn(
-                          "h-8 rounded-lg transition-colors flex items-center justify-center border font-mono text-[9px] font-extrabold",
+                          "h-9 rounded-lg transition-colors flex items-center justify-center border font-mono text-[9px] font-extrabold",
                           isAccent
                             ? "bg-rose-500 border-rose-400 text-white shadow-xs"
                             : isHit
                               ? "bg-amber-500 border-amber-400 text-white shadow-xs"
                               : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-transparent hover:border-slate-300",
-                          isCurrentSubStep ? "ring-2 ring-rose-400 z-10" : ""
+                          isCurrentSubStep ? "ring-2 ring-rose-400 z-10 scale-105" : ""
                         )}
                         title={isAccent ? 'Accented Hit' : isHit ? 'Normal Hit' : 'Click to activate hit'}
                       >
@@ -402,13 +785,23 @@ export default function GrooveEnginePanel() {
             </div>
           </div>
 
-          {/* Trigger Types Quick Legend */}
-          <div className="flex flex-wrap items-center gap-3 pt-2 text-[9px] font-bold text-slate-400 border-t border-slate-200 dark:border-white/10">
-            <span className="uppercase text-[8px] tracking-wider font-mono">Legend:</span>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" /> Chord Hit</div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500 inline-block" /> Early Push (Next Chord)</div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block" /> Bass Root</div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block" /> Percussion Hit</div>
+          {/* Quick Legend & Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-[9px] font-bold text-slate-400 border-t border-slate-200 dark:border-white/10">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="uppercase text-[8px] tracking-wider font-mono">Legend:</span>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" /> Chord Hit</div>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500 inline-block" /> Early Push ➜</div>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block" /> Bass Note</div>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-purple-500 inline-block" /> Synth Lead/Pad</div>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block" /> Percussion Hit</div>
+            </div>
+
+            <button
+              onClick={() => addPercussionLayer('snare_brush', 'Brushed Snare')}
+              className="text-[9px] font-black text-amber-500 hover:text-amber-400 flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/20 hover:border-amber-500/40"
+            >
+              <Plus className="w-3 h-3" /> Add Percussion Voice
+            </button>
           </div>
         </div>
       )}
@@ -428,7 +821,9 @@ export default function GrooveEnginePanel() {
               )}
             >
               <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
-                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-500">Save Custom Groove Preset</h4>
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                  <BookmarkPlus className="w-4 h-4" /> Save 4-Track Custom Groove Preset
+                </h4>
                 <button
                   type="button"
                   onClick={() => setIsSaveModalOpen(false)}
@@ -444,62 +839,66 @@ export default function GrooveEnginePanel() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Cuban Songo Syncopation"
+                    placeholder="e.g. Neo-Soul Groove with 808 Sub"
                     value={newPresetName}
                     onChange={(e) => setNewPresetName(e.target.value)}
                     className={cn(
-                      "w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:border-emerald-500",
-                      resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200"
+                      "w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none",
+                      resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-100 border-slate-200 text-slate-900"
                     )}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Genre Category</label>
-                  <select
-                    value={newPresetGenre}
-                    onChange={(e) => setNewPresetGenre(e.target.value as GrooveGenre)}
-                    className={cn(
-                      "w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:border-emerald-500",
-                      resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200"
-                    )}
-                  >
-                    <option value="Rock">Rock</option>
-                    <option value="Pop">Pop</option>
-                    <option value="Funk">Funk</option>
-                    <option value="Jazz">Jazz</option>
-                    <option value="Latin">Latin</option>
-                    <option value="World">World</option>
-                    <option value="Flamenco">Flamenco</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Genre Category</label>
+                    <select
+                      value={newPresetGenre}
+                      onChange={(e) => setNewPresetGenre(e.target.value as GrooveGenre)}
+                      className={cn(
+                        "w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none",
+                        resolvedTheme === 'dark' ? "bg-slate-800 border-white/10 text-white" : "bg-slate-100 border-slate-200 text-slate-900"
+                      )}
+                    >
+                      {genres.filter(g => g !== 'ALL' && g !== 'CUSTOM').map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Time Signature</label>
+                    <div className="px-3 py-2 rounded-xl border text-xs font-mono font-bold bg-slate-200/50 dark:bg-white/5 border-slate-300 dark:border-white/10">
+                      {activeGroovePattern?.timeSignature || '4/4'} ({activeGroovePattern?.defaultBpm || 120} BPM)
+                    </div>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Description</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Description / Notes</label>
                   <textarea
                     rows={2}
-                    placeholder="Brief description of the syncopated rhythm feel..."
+                    placeholder="Describe the rhythm style, syncopated anticipation, and instrument setup..."
                     value={newPresetDesc}
                     onChange={(e) => setNewPresetDesc(e.target.value)}
                     className={cn(
-                      "w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:border-emerald-500 resize-none",
-                      resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-50 border-slate-200"
+                      "w-full px-3 py-2 rounded-xl border text-xs outline-none resize-none",
+                      resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white" : "bg-slate-100 border-slate-200 text-slate-900"
                     )}
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setIsSaveModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border text-xs font-bold text-slate-400 hover:text-slate-600"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-extrabold hover:bg-emerald-700 shadow-md"
+                  className="px-4 py-1.5 rounded-xl text-xs font-black bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors shadow-xs"
                 >
                   Save Preset
                 </button>

@@ -9,7 +9,7 @@ import {
   Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
   Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles,
   ArrowLeftRight, BookmarkPlus, Save, Hash, Search, Tag, LayoutGrid, Rows, Edit2, Edit3, FileCode, Timer,
-  Disc, Sliders, SlidersHorizontal, ChevronRight, Eye, EyeOff
+  Disc, Sliders, SlidersHorizontal, ChevronRight, Eye, EyeOff, LocateFixed
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useMetronome } from '../../hooks/useMetronome.ts';
@@ -35,6 +35,12 @@ import {
 import { Song, POPULAR_STANDARDS } from './songLibrary.ts';
 import { GROOVE_PRESETS } from './grooveEngine.ts';
 import { DEFAULT_PRESETS } from '../Metronome/constants.ts';
+import { 
+  RHYTHM_INSTRUMENTS, 
+  BASS_INSTRUMENTS, 
+  SYNTH_INSTRUMENTS, 
+  PERCUSSION_SOUNDS 
+} from './instrumentCatalog.ts';
 import { getSuggestedChords } from '../../lib/chordSuggestions.ts';
 
 const ALL_ROOT_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -73,6 +79,11 @@ export default function AccompanimentView() {
     arpeggioPreset, setArpeggioPreset,
     arpeggioRate, setArpeggioRate,
     selectedInstrument, setSelectedInstrument,
+    selectedRhythmInstrument, setSelectedRhythmInstrument,
+    selectedBassInstrument, setSelectedBassInstrument,
+    selectedSynthInstrument, setSelectedSynthInstrument,
+    trackVolumes, setTrackVolume,
+    trackMutes, setTrackMute,
     isBassEnabled, setIsBassEnabled,
     selectedLibraryRoot, setSelectedLibraryRoot,
     trackedChord, setTrackedChord,
@@ -90,8 +101,11 @@ export default function AccompanimentView() {
     countInBeat,
     activeGroovePattern,
     setActiveGroovePattern,
+    customGroovePresets,
     isGrooveEngineEnabled,
-    setIsGrooveEngineEnabled
+    setIsGrooveEngineEnabled,
+    isTrackMeasuresEnabled,
+    setIsTrackMeasuresEnabled
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
@@ -383,14 +397,14 @@ export default function AccompanimentView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full min-w-0">
           {/* 1. Song / Progression Picker */}
           <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden",
-            resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:border-emerald-500/40" : "bg-slate-50 border-slate-200 hover:border-emerald-400"
+            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
+            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10 hover:border-emerald-500/40" : "bg-white border-slate-300 hover:border-emerald-500"
           )}>
             <div className="flex items-center justify-between min-w-0">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 truncate">Song / Progression</span>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Song / Progression</span>
               <button
                 onClick={() => setIsQuickPickerOpen(true)}
-                className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer shrink-0"
+                className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer shrink-0"
               >
                 <span>Browse</span>
                 <ChevronRight className="w-3 h-3" />
@@ -401,32 +415,32 @@ export default function AccompanimentView() {
               className="w-full flex items-center justify-between gap-2 text-left group cursor-pointer min-w-0"
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+                <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
                   <Disc className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-black text-xs md:text-sm truncate text-slate-800 dark:text-white group-hover:text-emerald-500 transition-colors">
+                  <div className="font-black text-xs md:text-sm truncate text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                     {currentTitle || 'Custom Progression'}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-mono truncate">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-300 font-mono font-bold truncate">
                     {totalMeasures} {totalMeasures === 1 ? 'bar' : 'bars'} • {timeSigLabel}
                   </div>
                 </div>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors shrink-0" />
             </button>
           </div>
 
           {/* 2. Key & Transposition */}
           <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden",
-            resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"
+            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
+            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-white border-slate-300"
           )}>
             <div className="flex items-center justify-between min-w-0">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 truncate">Key & Transpose</span>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Key & Transpose</span>
               <button
                 onClick={handleToggleProgressionEnharmonics}
-                className="text-[10px] font-bold text-slate-500 hover:text-emerald-500 dark:text-slate-400 dark:hover:text-emerald-400 flex items-center gap-1 cursor-pointer shrink-0"
+                className="text-[10px] font-extrabold text-slate-700 hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400 flex items-center gap-1 cursor-pointer shrink-0"
                 title="Swap ♯ / ♭ Enharmonics"
               >
                 <ArrowLeftRight className="w-2.5 h-2.5" />
@@ -438,20 +452,22 @@ export default function AccompanimentView() {
                 value={currentKey}
                 onChange={(e) => handleSelectDirectKey(e.target.value)}
                 className={cn(
-                  "flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border text-xs font-black font-mono outline-none cursor-pointer truncate",
-                  resolvedTheme === 'dark' ? "bg-slate-800 border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+                  "flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border text-xs font-black font-mono outline-none cursor-pointer truncate shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-slate-900 border-white/15 text-white" : "bg-white border-slate-300 text-slate-900"
                 )}
               >
                 {ALL_ROOT_KEYS.map(k => (
-                  <option key={k} value={k}>{k} Key</option>
+                  <option key={k} value={k} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900 font-bold")}>
+                    {k} Key
+                  </option>
                 ))}
               </select>
 
               <button
                 onClick={() => handleTranspose(-1)}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
+                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
                 )}
                 title="Transpose down 1 semitone"
               >
@@ -460,8 +476,8 @@ export default function AccompanimentView() {
               <button
                 onClick={() => handleTranspose(1)}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
+                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
                 )}
                 title="Transpose up 1 semitone"
               >
@@ -472,12 +488,12 @@ export default function AccompanimentView() {
 
           {/* 3. Tempo & Meter */}
           <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden",
-            resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"
+            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
+            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-white border-slate-300"
           )}>
             <div className="flex items-center justify-between min-w-0">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 truncate">Tempo & Meter</span>
-              <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Tempo & Meter</span>
+              <span className="text-[10px] font-mono font-black text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded shrink-0">
                 {timeSigLabel}
               </span>
             </div>
@@ -485,8 +501,8 @@ export default function AccompanimentView() {
               <button
                 onClick={() => setBpm(Math.max(30, bpm - 5))}
                 className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
+                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
                 )}
                 title="-5 BPM"
               >
@@ -495,21 +511,21 @@ export default function AccompanimentView() {
               <button
                 onClick={() => setBpm(Math.max(30, bpm - 1))}
                 className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
+                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
                 )}
                 title="-1 BPM"
               >
                 -
               </button>
-              <div className="flex-1 text-center font-mono font-black text-xs text-slate-800 dark:text-white truncate">
-                {bpm} <span className="text-[9px] text-slate-400 font-normal">BPM</span>
+              <div className="flex-1 text-center font-mono font-black text-xs text-slate-950 dark:text-white truncate">
+                {bpm} <span className="text-[9px] text-slate-600 dark:text-slate-400 font-bold">BPM</span>
               </div>
               <button
                 onClick={() => setBpm(Math.min(300, bpm + 1))}
                 className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
+                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
                 )}
                 title="+1 BPM"
               >
@@ -518,8 +534,8 @@ export default function AccompanimentView() {
               <button
                 onClick={() => setBpm(Math.min(300, bpm + 5))}
                 className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-bold transition-all cursor-pointer shrink-0",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700"
+                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
                 )}
                 title="+5 BPM"
               >
@@ -530,16 +546,16 @@ export default function AccompanimentView() {
 
           {/* 4. Groove Pattern */}
           <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden",
-            resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"
+            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
+            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-white border-slate-300"
           )}>
             <div className="flex items-center justify-between min-w-0 gap-1">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 truncate">Groove Pattern</span>
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Groove Pattern</span>
               <button
                 onClick={() => setIsGrooveEngineOpen(!isGrooveEngineOpen)}
                 className={cn(
-                  "text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer shrink-0",
-                  isGrooveEngineOpen ? "text-emerald-500 font-black" : "text-slate-400 hover:text-emerald-500"
+                  "text-[10px] font-extrabold flex items-center gap-1 transition-colors cursor-pointer shrink-0",
+                  isGrooveEngineOpen ? "text-emerald-700 dark:text-emerald-400 font-black" : "text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400"
                 )}
               >
                 <SlidersHorizontal className="w-3 h-3" />
@@ -551,21 +567,22 @@ export default function AccompanimentView() {
                 <select
                   value={activeGroovePattern?.id || ''}
                   onChange={(e) => {
-                    const found = GROOVE_PRESETS.find(g => g.id === e.target.value);
+                    const allAvailable = [...GROOVE_PRESETS, ...(customGroovePresets || [])];
+                    const found = allAvailable.find(g => g.id === e.target.value);
                     if (found) {
                       setActiveGroovePattern(found);
                       setIsGrooveEngineEnabled(true);
                     }
                   }}
                   className={cn(
-                    "w-full min-w-0 appearance-none pl-2.5 pr-7 py-1.5 rounded-lg border text-xs font-bold outline-none cursor-pointer truncate",
-                    resolvedTheme === 'dark' ? "bg-slate-800 border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+                    "w-full min-w-0 appearance-none pl-2.5 pr-7 py-1.5 rounded-lg border text-xs font-bold outline-none cursor-pointer truncate shadow-2xs",
+                    resolvedTheme === 'dark' ? "bg-slate-900 border-white/15 text-white" : "bg-white border-slate-300 text-slate-900"
                   )}
                   title={activeGroovePattern ? `${activeGroovePattern.name} (${activeGroovePattern.genre})` : 'Select Groove Pattern'}
                 >
-                  {GROOVE_PRESETS.map(g => (
-                    <option key={g.id} value={g.id} title={`${g.name} (${g.genre})`}>
-                      {g.name}
+                  {[...GROOVE_PRESETS, ...(customGroovePresets || [])].map(g => (
+                    <option key={g.id} value={g.id} title={`${g.name} (${g.genre})`} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900 font-bold")}>
+                      {g.name} ({g.genre})
                     </option>
                   ))}
                 </select>
@@ -575,10 +592,10 @@ export default function AccompanimentView() {
               <button
                 onClick={() => setIsGrooveEngineEnabled(!isGrooveEngineEnabled)}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all shrink-0 cursor-pointer",
+                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase transition-all shrink-0 cursor-pointer shadow-2xs",
                   isGrooveEngineEnabled
-                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-500"
-                    : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-400"
+                    ? "bg-emerald-600 text-white border-emerald-500 shadow-xs"
+                    : "bg-white dark:bg-white/10 border-slate-300 dark:border-white/15 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-100"
                 )}
                 title="Toggle Groove Engine On/Off"
               >
@@ -629,10 +646,10 @@ export default function AccompanimentView() {
             <button
               onClick={() => setIsCountInEnabled(!isCountInEnabled)}
               className={cn(
-                "px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer",
+                "px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
                 isCountInEnabled
-                  ? "bg-amber-500/15 border-amber-500/50 text-amber-600 dark:text-amber-400"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                  ? "bg-amber-500/15 border-amber-500/50 text-amber-700 dark:text-amber-300"
+                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
               )}
               title="Toggle 1-measure count-in clicks before playback"
             >
@@ -645,10 +662,10 @@ export default function AccompanimentView() {
             <button
               onClick={() => isMetronomeRunning ? stopMetronome() : startMetronome()}
               className={cn(
-                "px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer",
+                "px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
                 isMetronomeRunning
-                  ? "bg-orange-500/15 border-orange-500/50 text-orange-600 dark:text-orange-400"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                  ? "bg-orange-500/15 border-orange-500/50 text-orange-700 dark:text-orange-300"
+                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
               )}
               title="Toggle Metronome Click"
             >
@@ -660,10 +677,10 @@ export default function AccompanimentView() {
             <button
               onClick={() => setIsBassEnabled(!isBassEnabled)}
               className={cn(
-                "px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer",
+                "px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
                 isBassEnabled
-                  ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-400"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                  ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
+                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
               )}
               title="Toggle Plucked Bass Notes"
             >
@@ -674,27 +691,20 @@ export default function AccompanimentView() {
 
           {/* Right: Sound & Voicing Options */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Instrument */}
-            <div className="relative group shrink-0">
-              <select
-                value={selectedInstrument}
-                onChange={(e) => {
-                  setSelectedInstrument(e.target.value as InstrumentType);
-                  e.target.blur();
-                }}
-                className={cn(
-                  "appearance-none border px-3 pr-7 py-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer outline-none",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/90 hover:text-white" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
-                )}
-              >
-                {INSTRUMENTS.map(inst => (
-                  <option key={inst.id} value={inst.id} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
-                    {inst.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-slate-400" />
-            </div>
+            {/* 4-Track Mixer Quick Drawer */}
+            <button
+              onClick={() => setIsGrooveEngineOpen(!isGrooveEngineOpen)}
+              className={cn(
+                "px-2.5 py-2 rounded-xl text-[10px] font-extrabold flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
+                isGrooveEngineOpen
+                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
+              )}
+              title="Open 4-Track Accompaniment Mixer & Step Sequencer"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>4-Track Engine</span>
+            </button>
 
             {/* Voicing Style */}
             <div className="relative group shrink-0">
@@ -705,13 +715,13 @@ export default function AccompanimentView() {
                   e.target.blur();
                 }}
                 className={cn(
-                  "appearance-none border px-3 pr-7 py-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer outline-none",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-emerald-400" : "bg-white border-slate-200 text-emerald-700 hover:bg-slate-100"
+                  "appearance-none border px-3 pr-7 py-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer outline-none shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-slate-900 border-white/15 text-emerald-400" : "bg-white border-slate-300 text-emerald-800 hover:bg-slate-50"
                 )}
                 title="Select keyboard voicing algorithm"
               >
                 {VOICING_STYLES.map(style => (
-                  <option key={style.id} value={style.id} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900")}>
+                  <option key={style.id} value={style.id} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900 font-bold")}>
                     Voicing: {style.shortLabel}
                   </option>
                 ))}
@@ -735,8 +745,8 @@ export default function AccompanimentView() {
             </button>
 
             {/* Volume */}
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
-              <Volume2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-white/10 bg-slate-50 dark:bg-white/5 min-w-0 overflow-hidden">
+              <Volume2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
               <input 
                 type="range"
                 min="0"
@@ -744,9 +754,9 @@ export default function AccompanimentView() {
                 step="0.05"
                 value={accompanimentVolume}
                 onChange={(e) => setAccompanimentVolume(parseFloat(e.target.value))}
-                className="w-14 accent-emerald-500 h-1 rounded-lg appearance-none bg-slate-200 dark:bg-white/20 cursor-pointer"
+                className="w-16 min-w-0 flex-1 accent-emerald-500 h-1.5 rounded-lg appearance-none bg-slate-200 dark:bg-white/20 cursor-pointer"
               />
-              <span className="text-[9px] font-mono font-bold text-emerald-500 w-[28px] text-right">
+              <span className="text-[9px] font-mono font-extrabold text-emerald-700 dark:text-emerald-400 w-8 text-right shrink-0">
                 {Math.round(accompanimentVolume * 100)}%
               </span>
             </div>
@@ -764,32 +774,57 @@ export default function AccompanimentView() {
         )}>
           {/* Main Stage Top Navigation Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200 dark:border-white/10">
-            {/* View Mode Switcher */}
-            <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-              <button
-                onClick={() => setViewMode('compact')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                  viewMode === 'compact'
-                    ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-                )}
-              >
-                <Music className="w-3.5 h-3.5" />
-                <span>Compact Chart</span>
-              </button>
+            {/* View Mode Switcher & Measure Tracking Toggle */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center p-1 rounded-xl bg-slate-200/80 dark:bg-white/10 border border-slate-300 dark:border-white/15 shadow-2xs">
+                <button
+                  onClick={() => setViewMode('compact')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                    viewMode === 'compact'
+                      ? "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-xs"
+                      : "text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white"
+                  )}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Compact Chart</span>
+                </button>
 
+                <button
+                  onClick={() => setViewMode('editor')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                    viewMode === 'editor'
+                      ? "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-xs"
+                      : "text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white"
+                  )}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Beat Grid Editor</span>
+                </button>
+              </div>
+
+              {/* Measure Tracking Toggle Button */}
               <button
-                onClick={() => setViewMode('editor')}
+                onClick={() => setIsTrackMeasuresEnabled(!isTrackMeasuresEnabled)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                  viewMode === 'editor'
-                    ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-extrabold transition-all cursor-pointer shadow-2xs",
+                  isTrackMeasuresEnabled
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
+                    : (resolvedTheme === 'dark'
+                        ? "bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10"
+                        : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100")
                 )}
+                title={isTrackMeasuresEnabled ? "Measure tracking is active (Click to disable auto-scroll)" : "Measure tracking is paused (Click to follow playback)"}
               >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Beat Grid Editor</span>
+                <LocateFixed className={cn("w-3.5 h-3.5", isTrackMeasuresEnabled ? "text-emerald-500" : "text-slate-400")} />
+                <span className="hidden sm:inline">Track Measures</span>
+                <span className={cn(
+                  "text-[8px] font-mono px-1 py-0.2 rounded font-black uppercase tracking-wider",
+                  isTrackMeasuresEnabled ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-white/15 text-slate-700 dark:text-slate-300"
+                )}>
+                  {isTrackMeasuresEnabled ? "ON" : "OFF"}
+                </span>
               </button>
             </div>
 
@@ -798,21 +833,21 @@ export default function AccompanimentView() {
               <button
                 onClick={() => setIsGrooveEngineOpen(!isGrooveEngineOpen)}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer",
+                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
                   isGrooveEngineOpen
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-500"
-                    : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                    : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
                 )}
               >
-                <Sliders className="w-3 h-3" />
+                <Sliders className="w-3 h-3 text-emerald-500" />
                 <span>Groove Sequencer</span>
               </button>
 
               <button
                 onClick={() => setIsImportAbcModalOpen(true)}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
+                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
                 )}
                 title="Import Chords from ABC notation or Sheet"
               >
@@ -824,9 +859,9 @@ export default function AccompanimentView() {
                 onClick={() => setIsSaveModalOpen(true)}
                 disabled={progression.every(p => !p.name || p.name.trim() === '')}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer",
+                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
                   progression.some(p => p.name && p.name.trim() !== '')
-                    ? (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100")
+                    ? (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100")
                     : "opacity-40 cursor-not-allowed"
                 )}
                 title="Save current progression as a preset"
@@ -838,10 +873,10 @@ export default function AccompanimentView() {
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                 className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 border transition-all cursor-pointer",
+                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
                   !isSidebarOpen
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-500"
-                    : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                    : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
                 )}
                 title={isSidebarOpen ? "Expand chart to full width" : "Show reference sidebar"}
               >
@@ -1254,10 +1289,20 @@ export default function AccompanimentView() {
                               isCellPlaying
                                 ? "bg-emerald-500 text-white border-emerald-400 ring-2 ring-emerald-300 shadow-md z-10 font-bold scale-[1.02]"
                                 : isSelected
-                                  ? cn(isExplicit ? chordTypeInfo.color : (resolvedTheme === 'dark' ? "bg-white/10 text-white" : "bg-slate-100 text-slate-900"), "ring-2 ring-emerald-500 border-emerald-500 shadow-xs z-10")
+                                  ? (isExplicit
+                                      ? (resolvedTheme === 'dark'
+                                          ? "bg-emerald-950/70 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500 shadow-xs z-10"
+                                          : "bg-emerald-50 text-emerald-950 border-emerald-500 ring-2 ring-emerald-500 shadow-xs z-10 font-black")
+                                      : (resolvedTheme === 'dark'
+                                          ? "bg-white/10 text-white border-emerald-500 ring-2 ring-emerald-500 z-10"
+                                          : "bg-slate-200 text-slate-950 border-emerald-500 ring-2 ring-emerald-500 z-10 font-black"))
                                   : isExplicit
-                                    ? cn(chordTypeInfo.color, "hover:brightness-110 border-transparent shadow-2xs")
-                                    : (resolvedTheme === 'dark' ? "bg-black/20 border-white/5 text-white/40 hover:bg-black/30" : "bg-slate-100/70 border-slate-200 text-slate-400 hover:bg-slate-100")
+                                    ? (resolvedTheme === 'dark'
+                                        ? "bg-white/[0.04] border-white/10 text-white hover:bg-emerald-950/40 hover:border-emerald-500/60 hover:text-emerald-300 shadow-2xs"
+                                        : "bg-white border-slate-300 text-slate-900 hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-950 shadow-2xs")
+                                    : (resolvedTheme === 'dark'
+                                        ? "bg-black/20 border-dashed border-white/10 text-slate-400 hover:bg-white/5 hover:text-white"
+                                        : "bg-slate-100/80 border-dashed border-slate-300 text-slate-600 hover:bg-slate-200 hover:text-slate-900")
                             )}
                           >
                             {/* Cell Top Header */}
@@ -1266,7 +1311,7 @@ export default function AccompanimentView() {
                                 "text-[7px] font-black font-mono px-1 py-0.2 rounded",
                                 isCellPlaying
                                   ? "bg-white/20 text-white"
-                                  : (resolvedTheme === 'dark' ? "bg-white/5 text-white/40" : "bg-black/5 text-slate-500")
+                                  : (resolvedTheme === 'dark' ? "bg-white/10 text-slate-300" : "bg-slate-200 text-slate-800 font-extrabold")
                               )}>
                                 b.{bIdx + 1}
                               </span>
@@ -1274,12 +1319,12 @@ export default function AccompanimentView() {
                               {progressionVoicings[globalBeatIndex] && targetChordName ? (
                                 <span className={cn(
                                   "text-[6.5px] font-mono font-bold truncate max-w-[48px] px-0.5 rounded",
-                                  isCellPlaying ? "bg-white/20 text-white" : (resolvedTheme === 'dark' ? "text-emerald-400/80" : "text-emerald-700/80")
+                                  isCellPlaying ? "bg-white/20 text-white" : (resolvedTheme === 'dark' ? "text-emerald-400" : "text-emerald-800 font-extrabold")
                                 )} title={progressionVoicings[globalBeatIndex]?.description}>
                                   {progressionVoicings[globalBeatIndex]?.inversionName}
                                 </span>
                               ) : !isExplicit ? (
-                                <span className="text-[6px] font-bold uppercase tracking-tight opacity-50">sus</span>
+                                <span className="text-[6px] font-bold uppercase tracking-tight text-slate-400 dark:text-slate-500">sus</span>
                               ) : null}
                             </div>
 
@@ -1290,11 +1335,17 @@ export default function AccompanimentView() {
                                   {formatChordName(effective?.chord || '—')}
                                 </span>
                               ) : isExplicit ? (
-                                <span className="text-sm sm:text-base font-black font-mono tracking-tighter truncate max-w-full">
+                                <span className={cn(
+                                  "text-sm sm:text-base font-black font-mono tracking-tighter truncate max-w-full transition-colors",
+                                  resolvedTheme === 'dark' ? "text-white group-hover/cell:text-emerald-300" : "text-slate-900 group-hover/cell:text-emerald-950"
+                                )}>
                                   {formatChordName(chordSlot.name)}
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-bold font-mono opacity-50 italic truncate max-w-full">
+                                <span className={cn(
+                                  "text-[10px] font-bold font-mono italic truncate max-w-full transition-colors",
+                                  resolvedTheme === 'dark' ? "text-slate-400 group-hover/cell:text-slate-200" : "text-slate-600 group-hover/cell:text-slate-900"
+                                )}>
                                   {effective?.chord ? `(${formatChordName(effective.chord)})` : '—'}
                                 </span>
                               )}

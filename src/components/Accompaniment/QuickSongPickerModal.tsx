@@ -205,19 +205,19 @@ export default function QuickSongPickerModal({
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h4 className="font-bold text-sm truncate group-hover:text-emerald-500 transition-colors">
+                          <h4 className="font-black text-sm truncate text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                             {song.title}
                           </h4>
-                          <p className="text-[11px] text-slate-400 truncate">{song.artist}</p>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium truncate">{song.artist}</p>
                         </div>
-                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 shrink-0">
+                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                           {song.genre}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-white/5">
+                      <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 pt-1 border-t border-slate-200/80 dark:border-white/5">
                         <span>{song.key} • {song.bpm} BPM • {song.timeSignature}</span>
-                        <div className="flex items-center gap-1 text-emerald-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-black opacity-0 group-hover:opacity-100 transition-opacity">
                           <span>Load</span>
                           <ArrowRight className="w-3 h-3" />
                         </div>
@@ -227,7 +227,7 @@ export default function QuickSongPickerModal({
                 })}
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 text-xs">
+              <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs font-medium">
                 No songs match your search.
               </div>
             )
@@ -245,22 +245,22 @@ export default function QuickSongPickerModal({
                         onClose();
                       }}
                       className={cn(
-                        "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all cursor-pointer group text-left",
+                        "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all cursor-pointer group text-left shadow-2xs",
                         isCurrent
                           ? "bg-emerald-500/15 border-emerald-500 shadow-sm"
                           : resolvedTheme === 'dark'
-                            ? "bg-white/[0.02] border-white/10 hover:border-emerald-500/50 hover:bg-white/[0.04]"
-                            : "bg-white border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40 shadow-2xs"
+                            ? "bg-white/[0.03] border-white/10 hover:border-emerald-500/50 hover:bg-white/[0.06]"
+                            : "bg-white border-slate-300 hover:border-emerald-500 hover:bg-emerald-50/40"
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h4 className="font-bold text-sm truncate group-hover:text-emerald-500 transition-colors">
+                          <h4 className="font-black text-sm truncate text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                             {prog.name}
                           </h4>
-                          <p className="text-[11px] text-slate-400 line-clamp-1">{prog.description}</p>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium line-clamp-1">{prog.description}</p>
                         </div>
-                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 shrink-0">
+                        <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20 shrink-0">
                           {prog.genre}
                         </span>
                       </div>
@@ -268,18 +268,18 @@ export default function QuickSongPickerModal({
                       {/* Chords preview chips */}
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {previewChords.map((c, i) => (
-                          <span key={i} className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-white/10 font-mono text-[9px] font-black">
+                          <span key={i} className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white border border-slate-200 dark:border-white/15 font-mono text-[9px] font-black">
                             {formatChordName(c)}
                           </span>
                         ))}
                         {prog.chordsPerBeat.filter(c => c && c.trim() !== '').length > 4 && (
-                          <span className="text-[9px] text-slate-400">...</span>
+                          <span className="text-[9px] text-slate-500 dark:text-slate-400 font-bold">...</span>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-white/5">
+                      <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 pt-1 border-t border-slate-200/80 dark:border-white/5">
                         <span>{prog.timeSignature} {prog.bpm ? `• ${prog.bpm} BPM` : ''}</span>
-                        <div className="flex items-center gap-1 text-emerald-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-black opacity-0 group-hover:opacity-100 transition-opacity">
                           <span>Load</span>
                           <ArrowRight className="w-3 h-3" />
                         </div>

@@ -60,6 +60,7 @@ interface AudioContextType {
   playNote: (noteIndex: number, duration?: number, instrument?: InstrumentType, volume?: number, time?: number) => void;
   playPercussion: (sound: MetronomeSound, isAccent?: boolean, volume?: number, time?: number) => void;
   getAudioContext: () => AudioContext;
+  getMasterOutput: () => AudioNode;
   registerBeatScheduler: (callback: ((stepIndex: number, audioTime: number, beatDuration: number) => void) | null) => void;
 }
 
@@ -1843,12 +1844,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (frequencies.length === 0) return;
 
     let staggerStepMs = 0;
-    if (options?.isStrummed !== false) {
-      if (instrument === InstrumentType.Guitar) {
-        staggerStepMs = 22;
-      } else if (instrument === InstrumentType.Piano || instrument === InstrumentType.ElectricPiano) {
-        staggerStepMs = 12;
-      } else if (instrument === InstrumentType.Marimba) {
+    // User explicitly instructed: "don't strum the guitars - they sound odd."
+    // Guitars strike all chord notes synchronously (staggerStepMs = 0) for tight, clean comping rhythm.
+    if (options?.isStrummed === true) {
+      if (instrument === InstrumentType.Marimba) {
         staggerStepMs = 8;
       }
     }
@@ -1947,6 +1946,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     playNote,
     playPercussion,
     getAudioContext,
+    getMasterOutput: () => getMasterOutput(initAudio()),
     registerBeatScheduler
   };
 

@@ -427,43 +427,43 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
                   {/* Left: Metadata & Clickable Chords */}
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="text-xs font-black tracking-tight group-hover:text-emerald-500 transition-colors">
+                      <h3 className="text-xs font-black tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                         {song.title}
                       </h3>
-                      <span className="text-[10px] text-slate-400 font-bold">
+                      <span className="text-[10px] text-slate-600 dark:text-slate-400 font-bold">
                         • {song.artist}
                       </span>
                       {song.isCustom && (
-                        <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+                        <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 uppercase tracking-wider">
                           ★ Custom
                         </span>
                       )}
-                      <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
                         {song.key} {shift !== 0 ? `(${shift > 0 ? '+' : ''}${shift}st)` : ''}
                       </span>
-                      <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                      <span className="text-[8px] font-mono font-black px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-500/30">
                         ♩={song.bpm}
                       </span>
-                      <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                      <span className="text-[8px] font-mono font-black px-1.5 py-0.2 rounded bg-violet-500/15 text-violet-800 dark:text-violet-300 border border-violet-500/30">
                         {song.timeSignature}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1 flex-wrap">
-                      <span className="font-mono text-slate-400 text-[8px] mr-0.5">Chords ({totalMeasures}b):</span>
+                      <span className="font-mono text-slate-700 dark:text-slate-300 text-[8px] font-bold mr-0.5">Chords ({totalMeasures}b):</span>
                       {uniqueExplicitChords.slice(0, 7).map((chord, idx) => (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => playChord(chord, selectedInstrument, accompanimentVolume)}
-                          className="font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 text-[8px] hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                          className="font-mono font-black px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-[8px] hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors cursor-pointer"
                           title={`Click to play ${chord}`}
                         >
                           {formatChordName(chord)}
                         </button>
                       ))}
                       {uniqueExplicitChords.length > 7 && (
-                        <span className="text-[8px] text-slate-400 font-mono">+{uniqueExplicitChords.length - 7}</span>
+                        <span className="text-[8px] text-slate-600 dark:text-slate-400 font-mono font-bold">+{uniqueExplicitChords.length - 7}</span>
                       )}
                     </div>
                   </div>
@@ -529,35 +529,35 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-xs font-black tracking-tight group-hover:text-emerald-500 transition-colors">
+                      <h3 className="text-xs font-black tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                         {song.title}
                       </h3>
                       {song.isCustom && (
-                        <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+                        <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 uppercase tracking-wider">
                           ★ Custom
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-slate-400 font-bold">
+                    <span className="text-[10px] text-slate-600 dark:text-slate-400 font-bold">
                       {song.artist}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                    <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    <span className="text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
                       {song.key} {shift !== 0 ? `(${shift > 0 ? '+' : ''}${shift}st)` : ''}
                     </span>
-                    <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                    <span className="text-[8px] font-mono font-black px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-500/30">
                       ♩ = {song.bpm}
                     </span>
-                    <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                    <span className="text-[8px] font-mono font-black px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-800 dark:text-violet-300 border border-violet-500/30">
                       {song.timeSignature}
                     </span>
 
                     {song.isCustom && (
                       <button
                         onClick={(e) => handleDeleteUserSong(song.id, e)}
-                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
+                        className="p-1 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
                         title="Delete custom song"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -567,20 +567,20 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
                 </div>
 
                 {/* Description & Groove Preset Info */}
-                <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
                   {song.description}
                 </p>
 
                 {matchingGroove && (
                   <div className={cn(
                     "flex items-center justify-between p-2 rounded-xl border text-[9px] font-medium gap-2",
-                    resolvedTheme === 'dark' ? "bg-black/30 border-white/5" : "bg-slate-50 border-slate-200"
+                    resolvedTheme === 'dark' ? "bg-black/30 border-white/5" : "bg-slate-100 border-slate-300"
                   )}>
                     <div className="flex items-center gap-1.5 overflow-hidden">
-                      <Disc className="w-3 h-3 text-emerald-500 shrink-0 animate-spin-slow" />
-                      <span className="font-bold text-emerald-400 truncate">Groove: {matchingGroove.name}</span>
+                      <Disc className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0 animate-spin-slow" />
+                      <span className="font-extrabold text-emerald-800 dark:text-emerald-300 truncate">Groove: {matchingGroove.name}</span>
                     </div>
-                    <span className="text-[8px] font-mono text-slate-400 shrink-0">
+                    <span className="text-[8px] font-mono text-slate-700 dark:text-slate-300 font-bold shrink-0">
                       {matchingGroove.genre}
                     </span>
                   </div>
@@ -589,17 +589,17 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
                 {/* Transposition Controls Preview */}
                 <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-white/5 text-[9px]">
                   <div className="flex items-center gap-1 flex-wrap">
-                    <span className="font-mono text-slate-400 text-[8px] mr-1">Chords ({totalMeasures} bars):</span>
+                    <span className="font-mono text-slate-700 dark:text-slate-300 font-bold text-[8px] mr-1">Chords ({totalMeasures} bars):</span>
                     {uniqueExplicitChords.slice(0, 8).map((chord, idx) => (
                       <span
                         key={idx}
-                        className="font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px]"
+                        className="font-mono font-black px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-[9px]"
                       >
                         {formatChordName(chord)}
                       </span>
                     ))}
                     {uniqueExplicitChords.length > 8 && (
-                      <span className="text-[8px] text-slate-400 font-mono">+{uniqueExplicitChords.length - 8} more</span>
+                      <span className="text-[8px] text-slate-600 dark:text-slate-400 font-mono font-bold">+{uniqueExplicitChords.length - 8} more</span>
                     )}
                   </div>
 
