@@ -117,39 +117,25 @@ function transposeNoteInKey(
   const parsed = parseNote(noteStr);
   if (!parsed) return noteStr;
 
-  const origKey = parseKeyContext(origKeyContext);
-  const targetPitchClass = (origKey.rootPitchClass + semitones + 120) % 12;
+  // Calculate clean chromatic pitch class (0..11)
+  const targetPitchClass = ((parsed.pitchClass + semitones) % 12 + 12) % 12;
 
-  // Determine accidental preference if not forced
+  // Determine accidental preference
   let useFlats = forceAccidental === 'flat';
   if (!forceAccidental) {
-    useFlats = noteStr.includes('b') || noteStr.includes('♭') || (origKeyContext ? origKeyContext.includes('b') : false);
+    if (parsed.accidental < 0 || noteStr.includes('b') || noteStr.includes('♭')) {
+      useFlats = true;
+    } else if (parsed.accidental > 0 || noteStr.includes('#') || noteStr.includes('♯')) {
+      useFlats = false;
+    } else if (origKeyContext) {
+      const k = origKeyContext.toUpperCase();
+      useFlats = (k.includes('B') && !k.startsWith('B#')) || k.includes('FLAT') || k === 'F' || k.includes('♭');
+    } else {
+      useFlats = semitones < 0;
+    }
   }
 
-  const keyCenters = useFlats ? FLAT_KEY_CENTERS : SHARP_KEY_CENTERS;
-  const targetKeyCenter = keyCenters[targetPitchClass];
-
-  // Diatonic letter step difference between orig key and target key
-  const deltaL = (targetKeyCenter.letter - origKey.rootLetter + 7) % 7;
-
-  // Target note letter and pitch class
-  const targetLetter = (parsed.letter + deltaL) % 7;
-  const noteTargetPitch = (parsed.pitchClass + semitones + 120) % 12;
-
-  // Accidental offset needed for targetLetter to equal noteTargetPitch
-  const basePitch = BASE_PITCHES[targetLetter];
-  let accidental = (noteTargetPitch - basePitch) % 12;
-  if (accidental > 6) accidental -= 12;
-  if (accidental < -6) accidental += 12;
-
-  const letterChar = LETTER_CHARS[targetLetter];
-  let accStr = '';
-  if (accidental === 1) accStr = '#';
-  else if (accidental === 2) accStr = '##';
-  else if (accidental === -1) accStr = 'b';
-  else if (accidental === -2) accStr = 'bb';
-
-  return `${letterChar}${accStr}`;
+  return useFlats ? CHORD_ROOTS_FLAT[targetPitchClass] : CHORD_ROOTS_SHARP[targetPitchClass];
 }
 
 export function transposeChord(

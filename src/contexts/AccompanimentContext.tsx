@@ -26,6 +26,11 @@ import {
   playSynthSound
 } from '../lib/accompanimentAudioEngine.ts';
 import { getDrumSetInfo } from '../components/Accompaniment/instrumentCatalog.ts';
+import { 
+  transposeChord, 
+  toggleEnharmonicSpelling, 
+  ROOT_OFFSETS_MAP 
+} from '../components/Accompaniment/constants.ts';
 
 export function isValidChordName(name?: string | null): boolean {
   if (!name) return false;
@@ -178,6 +183,25 @@ interface AccompanimentContextType {
   setMeasureLabels: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   setMeasureLabel: (measureIndex: number, label: string) => void;
   deleteMeasureLabel: (measureIndex: number) => void;
+
+  // Tools Drawer & Playback Navigation Integration
+  isToolsDrawerOpen: boolean;
+  setIsToolsDrawerOpen: (open: boolean) => void;
+  activeToolsTab: 'library' | 'songs' | 'explorer';
+  setActiveToolsTab: (tab: 'library' | 'songs' | 'explorer') => void;
+  currentSongTitle: string;
+  setCurrentSongTitle: (title: string) => void;
+  currentKey: string;
+  setCurrentKey: (key: string) => void;
+  transposeShift: number;
+  setTransposeShift: React.Dispatch<React.SetStateAction<number>>;
+  handleTranspose: (semitones: number, mode?: 'sharp' | 'flat') => void;
+  handleToggleProgressionEnharmonics: () => void;
+  handleSelectDirectKey: (newKeyRoot: string) => void;
+  isGrooveEngineOpen: boolean;
+  setIsGrooveEngineOpen: (open: boolean) => void;
+  isVoicingInspectorOpen: boolean;
+  setIsVoicingInspectorOpen: (open: boolean) => void;
 
   // Backwards compatibility aliases
   isRhythmEngineEnabled: boolean;
@@ -1019,6 +1043,50 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsPlaying(false);
   };
 
+  // Tools Drawer & Navigation Integration State
+  const [isToolsDrawerOpen, setIsToolsDrawerOpen] = useState(true);
+  const [activeToolsTab, setActiveToolsTab] = useState<'library' | 'songs' | 'explorer'>('library');
+  const [currentSongTitle, setCurrentSongTitle] = useState('Standard Progression');
+  const [currentKey, setCurrentKey] = useState('C');
+  const [transposeShift, setTransposeShift] = useState(0);
+  const [isGrooveEngineOpen, setIsGrooveEngineOpen] = useState(false);
+  const [isVoicingInspectorOpen, setIsVoicingInspectorOpen] = useState(false);
+
+  const handleTranspose = (semitones: number, mode?: 'sharp' | 'flat') => {
+    const keyCtx = currentKey;
+    setProgression(prev => prev.map(slot => ({
+      ...slot,
+      name: slot.name ? transposeChord(slot.name, semitones, mode, keyCtx) : '',
+    })));
+    setCurrentKey(prev => transposeChord(prev, semitones, mode, keyCtx));
+    setTransposeShift(prev => prev + semitones);
+  };
+
+  const handleToggleProgressionEnharmonics = () => {
+    setProgression(prev => prev.map(slot => ({
+      ...slot,
+      name: slot.name ? toggleEnharmonicSpelling(slot.name) : '',
+    })));
+    setCurrentKey(prev => toggleEnharmonicSpelling(prev));
+  };
+
+  const handleSelectDirectKey = (newKeyRoot: string) => {
+    const getCleanRoot = (k: string) => {
+      const match = k.match(/^[A-G](?:#|b)?/i);
+      return match ? match[0] : 'C';
+    };
+    const oldRoot = getCleanRoot(currentKey);
+    const oldOffset = ROOT_OFFSETS_MAP[oldRoot] ?? 0;
+    const newOffset = ROOT_OFFSETS_MAP[newKeyRoot] ?? 0;
+    let delta = (newOffset - oldOffset + 12) % 12;
+    if (delta > 6) delta -= 12;
+    if (delta !== 0) {
+      const targetMode: 'sharp' | 'flat' = (newKeyRoot.includes('b') || newKeyRoot === 'F') ? 'flat' : 'sharp';
+      handleTranspose(delta, targetMode);
+    }
+    setCurrentKey(newKeyRoot);
+  };
+
   const value = {
     progression, setProgression,
     selectedBeatIndex, setSelectedBeatIndex,
@@ -1071,6 +1139,16 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     addPercussionLayer, removePercussionLayer,
     currentSubStepIndex, setCurrentSubStepIndex,
     earlyPushEvent, setEarlyPushEvent,
+
+    // Tools Drawer & Navigation Integration
+    isToolsDrawerOpen, setIsToolsDrawerOpen,
+    activeToolsTab, setActiveToolsTab,
+    currentSongTitle, setCurrentSongTitle,
+    currentKey, setCurrentKey,
+    transposeShift, setTransposeShift,
+    handleTranspose, handleToggleProgressionEnharmonics, handleSelectDirectKey,
+    isGrooveEngineOpen, setIsGrooveEngineOpen,
+    isVoicingInspectorOpen, setIsVoicingInspectorOpen,
 
     // Aliases
     isRhythmEngineEnabled: isGrooveEngineEnabled,

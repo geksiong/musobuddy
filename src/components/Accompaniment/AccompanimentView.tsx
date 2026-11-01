@@ -4,129 +4,204 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Play, Pause, Plus, Trash2, Guitar as GuitarIcon, Music, Layers, 
-  Radio, ChevronDown, Volume2, X, RefreshCw, BookOpen, Compass, ListMusic, Sparkles,
-  ArrowLeftRight, BookmarkPlus, Save, Hash, Search, Tag, LayoutGrid, Rows, Edit2, Edit3, FileCode, Timer,
-  Disc, Sliders, SlidersHorizontal, ChevronRight, Eye, EyeOff, LocateFixed
+  Plus, Trash2, Music, Layers, ChevronDown, X, RefreshCw, 
+  BookOpen, Compass, Sparkles, ArrowLeftRight, BookmarkPlus, Save, Tag, Edit3, 
+  FileCode, Disc, SlidersHorizontal, LocateFixed, PanelRightClose, PanelRightOpen,
+  Play, Pause, Timer
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useMetronome } from '../../hooks/useMetronome.ts';
 import { useAudio } from '../../contexts/AudioContext.tsx';
 import { useAccompaniment, getEffectiveChord } from '../../contexts/AccompanimentContext.tsx';
-import { InstrumentType } from '../../types.ts';
 import ChordExplorer from '../ChordExplorer/ChordExplorer.tsx';
-import GrooveEnginePanel from './GrooveEnginePanel.tsx';
 import SongLibraryPanel from './SongLibraryPanel.tsx';
 import ChordProgressionsModal from './ChordProgressionsModal.tsx';
 import ImportAbcChordsModal from './ImportAbcChordsModal.tsx';
-import VoicingInspectorPanel, { VOICING_STYLES } from './VoicingInspectorPanel.tsx';
 import CompactPlaybackChart from './CompactPlaybackChart.tsx';
 import QuickSongPickerModal from './QuickSongPickerModal.tsx';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { 
-  CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES, ARPEGGIO_PRESETS, ARPEGGIO_RATES,
-  getChordTypeInfo, transposeChord, toggleEnharmonicSpelling, formatChordName, ROOT_OFFSETS_MAP
+  CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES,
+  formatChordName, toggleEnharmonicSpelling
 } from './constants.ts';
 import { 
-  PROGRESSION_PRESETS, ProgressionPreset, getUserPresets, saveUserPreset, deleteUserPreset 
+  ProgressionPreset, getUserPresets, saveUserPreset
 } from './progressionPresets.ts';
-import { Song, POPULAR_STANDARDS } from './songLibrary.ts';
+import { Song } from './songLibrary.ts';
 import { GROOVE_PRESETS } from './grooveEngine.ts';
 import { DEFAULT_PRESETS } from '../Metronome/constants.ts';
-import { 
-  RHYTHM_INSTRUMENTS, 
-  BASS_INSTRUMENTS, 
-  SYNTH_INSTRUMENTS, 
-  PERCUSSION_SOUNDS 
-} from './instrumentCatalog.ts';
 import { getSuggestedChords } from '../../lib/chordSuggestions.ts';
-
-const ALL_ROOT_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-
-const INSTRUMENTS = [
-  { id: InstrumentType.Piano, label: 'Acoustic Piano', icon: Music },
-  { id: InstrumentType.ElectricPiano, label: 'Electric Piano (Rhodes)', icon: KeyboardIcon },
-  { id: InstrumentType.Guitar, label: 'Acoustic Guitar', icon: GuitarIcon },
-  { id: InstrumentType.Bass, label: 'Plucked Bass', icon: GuitarIcon },
-  { id: InstrumentType.Strings, label: 'Symphonic Strings', icon: Layers },
-  { id: InstrumentType.Organ, label: 'Hammond Organ', icon: KeyboardIcon },
-  { id: InstrumentType.Flute, label: 'Concert Flute', icon: Sparkles },
-  { id: InstrumentType.Brass, label: 'Brass Section', icon: Radio },
-  { id: InstrumentType.Marimba, label: 'Acoustic Marimba', icon: ListMusic },
-];
-
-function KeyboardIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="18" rx="2" ry="2" />
-      <line x1="2" y1="13" x2="22" y2="13" />
-      <line x1="6" y1="13" x2="6" y2="21" />
-      <line x1="10" y1="13" x2="10" y2="21" />
-      <line x1="14" y1="13" x2="14" y2="21" />
-      <line x1="18" y1="13" x2="18" y2="21" />
-    </svg>
-  );
-}
 
 export default function AccompanimentView() {
   const { 
     progression, setProgression,
     measureLabels, setMeasureLabels, setMeasureLabel, deleteMeasureLabel,
     selectedBeatIndex, setSelectedBeatIndex,
-    clearBeat, deleteBeat, insertBeat, addBeat, addMeasure, clearAll,
-    arpeggioPreset, setArpeggioPreset,
-    arpeggioRate, setArpeggioRate,
-    selectedInstrument, setSelectedInstrument,
-    selectedRhythmInstrument, setSelectedRhythmInstrument,
-    selectedBassInstrument, setSelectedBassInstrument,
-    selectedSynthInstrument, setSelectedSynthInstrument,
-    trackVolumes, setTrackVolume,
-    trackMutes, setTrackMute,
-    isBassEnabled, setIsBassEnabled,
+    clearBeat, deleteBeat, insertBeat, addMeasure, clearAll,
+    selectedInstrument,
     selectedLibraryRoot, setSelectedLibraryRoot,
     trackedChord, setTrackedChord,
     isPlaying, setIsPlaying,
-    isPendingStart,
+    isPendingStart, isCountingIn, countInBeat,
     currentIndex,
     accompanimentVolume,
-    setAccompanimentVolume,
-    voicingStyle,
-    setVoicingStyle,
     progressionVoicings,
-    isCountInEnabled,
-    setIsCountInEnabled,
-    isCountingIn,
-    countInBeat,
-    activeGroovePattern,
     setActiveGroovePattern,
-    customGroovePresets,
-    isGrooveEngineEnabled,
     setIsGrooveEngineEnabled,
     isTrackMeasuresEnabled,
-    setIsTrackMeasuresEnabled
+    setIsTrackMeasuresEnabled,
+    isToolsDrawerOpen,
+    setIsToolsDrawerOpen,
+    activeToolsTab,
+    setActiveToolsTab,
+    currentSongTitle,
+    setCurrentSongTitle,
+    currentKey,
+    setCurrentKey,
+    transposeShift,
+    setTransposeShift,
+    handleTranspose,
+    handleToggleProgressionEnharmonics,
+    handleSelectDirectKey,
+    isGrooveEngineOpen,
+    setIsGrooveEngineOpen,
+    isVoicingInspectorOpen,
+    setIsVoicingInspectorOpen
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
-  const [activeRightTab, setActiveRightTab] = useState<'library' | 'songs' | 'explorer'>('library');
   const [isChordModalOpen, setIsChordModalOpen] = useState(false);
   const [isImportAbcModalOpen, setIsImportAbcModalOpen] = useState(false);
-  const [isVoicingInspectorOpen, setIsVoicingInspectorOpen] = useState(false);
-  const [isGrooveEngineOpen, setIsGrooveEngineOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'compact' | 'editor'>('compact');
   const [isQuickPickerOpen, setIsQuickPickerOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [currentTitle, setCurrentTitle] = useState<string>('Standard Progression');
-  const [currentKey, setCurrentKey] = useState<string>('C');
+
+  // Section Label modal state
+  const [editingMeasureIndex, setEditingMeasureIndex] = useState<number | null>(null);
+  const [customLabelInput, setCustomLabelInput] = useState<string>('');
+
+  // Enharmonic root display mode in chord library
+  const [accidentalMode, setAccidentalMode] = useState<'sharp' | 'flat'>('sharp');
+
+  // User Custom Presets state
+  const [, setUserPresets] = useState<ProgressionPreset[]>(() => getUserPresets());
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [presetNameInput, setPresetNameInput] = useState('');
+  const [presetGenreInput, setPresetGenreInput] = useState('Rock');
+  const [presetDescInput, setPresetDescInput] = useState('');
+
+  const { activePattern, setActivePattern, setBpm } = useMetronome();
+  const { playChord } = useAudio();
+
+  const handleSwapSelectedBeatEnharmonic = () => {
+    if (selectedBeatIndex === null || !progression[selectedBeatIndex]?.name) return;
+    const currentChord = progression[selectedBeatIndex].name;
+    const swapped = toggleEnharmonicSpelling(currentChord);
+    const updated = [...progression];
+    updated[selectedBeatIndex] = { ...updated[selectedBeatIndex], name: swapped };
+    setProgression(updated);
+    playChord(swapped, selectedInstrument, accompanimentVolume);
+    setTrackedChord(swapped);
+  };
+
+  // Preset Save handler
+  const handleSaveCustomPreset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!presetNameInput.trim()) return;
+
+    const chordsPerBeat = progression.map(p => p.name || '');
+    const timeSig = (activePattern?.timeSignature as '4/4' | '3/4' | '6/8' | '5/4') || '4/4';
+
+    const updatedList = saveUserPreset({
+      name: presetNameInput.trim(),
+      genre: presetGenreInput,
+      timeSignature: timeSig,
+      description: presetDescInput.trim() || 'Custom chord progression',
+      bpm: activePattern?.voices[0]?.beats ? 120 : undefined,
+      chordsPerBeat,
+    });
+
+    setUserPresets(updatedList);
+    setIsSaveModalOpen(false);
+    setPresetNameInput('');
+    setPresetDescInput('');
+    setActiveToolsTab('library');
+  };
+
+  const handleSelectPreset = (preset: ProgressionPreset) => {
+    const newProg = preset.chordsPerBeat.map((chordName, i) => ({
+      id: `preset_beat_${Date.now()}_${i}`,
+      name: chordName,
+    }));
+    setProgression(newProg);
+    setSelectedBeatIndex(0);
+
+    const targetPattern = DEFAULT_PRESETS.find(p => p.timeSignature === preset.timeSignature);
+    if (targetPattern) {
+      setActivePattern(targetPattern);
+    }
+    if (preset.bpm) {
+      setBpm(preset.bpm);
+    }
+
+    const firstChord = preset.chordsPerBeat.find(c => c.trim() !== '');
+    if (firstChord) {
+      playChord(firstChord, selectedInstrument, accompanimentVolume);
+      setTrackedChord(firstChord);
+    }
+  };
+
+  // Load Song from Quick Picker
+  const handleSelectSongFromQuickPicker = (song: Song) => {
+    const newProg = song.chordsPerBeat.map((chordName, i) => ({
+      id: `song_beat_${Date.now()}_${i}`,
+      name: chordName,
+    }));
+    setProgression(newProg);
+    setMeasureLabels(song.sectionLabels || {});
+    setSelectedBeatIndex(0);
+
+    const targetPattern = DEFAULT_PRESETS.find(p => p.timeSignature === song.timeSignature);
+    if (targetPattern) {
+      setActivePattern(targetPattern);
+    }
+    if (song.bpm) {
+      setBpm(song.bpm);
+    }
+
+    const matchingGroove = GROOVE_PRESETS.find(g => g.id === song.grooveId);
+    if (matchingGroove) {
+      setActiveGroovePattern(matchingGroove);
+      setIsGrooveEngineEnabled(true);
+    }
+
+    setCurrentSongTitle(song.title);
+    const root = song.key.split(' ')[0] || 'C';
+    setCurrentKey(root);
+    setTransposeShift(0);
+
+    const firstChord = song.chordsPerBeat.find(c => c && c.trim() !== '');
+    if (firstChord) {
+      playChord(firstChord, selectedInstrument, accompanimentVolume);
+      setTrackedChord(firstChord);
+    }
+  };
+
+  // Load Progression from Quick Picker
+  const handleSelectProgressionFromQuickPicker = (prog: ProgressionPreset) => {
+    handleSelectPreset(prog);
+    setCurrentSongTitle(prog.name);
+    setCurrentKey('C');
+    setTransposeShift(0);
+  };
 
   const handleLoadChordProgression = (
     chordsPerBeat: string[],
     timeSignature: '4/4' | '3/4' | '6/8' | '5/4',
     songBpm: number | undefined,
     mode: 'replace' | 'add',
-    progressionName: string,
-    shift: number
+    progressionName: string
   ) => {
     const targetPattern = DEFAULT_PRESETS.find(p => p.timeSignature === timeSignature);
     if (targetPattern) {
@@ -160,181 +235,9 @@ export default function AccompanimentView() {
     setIsChordModalOpen(false);
   };
 
-  // Compact layout and Section Label modal state
-  const [gridColumns, setGridColumns] = useState<1 | 2>(2);
-  const [editingMeasureIndex, setEditingMeasureIndex] = useState<number | null>(null);
-  const [customLabelInput, setCustomLabelInput] = useState<string>('');
-
-  // Enharmonic and Transposition state
-  const [accidentalMode, setAccidentalMode] = useState<'sharp' | 'flat'>('sharp');
-  const [transposeShift, setTransposeShift] = useState<number>(0);
-
-  // User Custom Presets state
-  const [userPresets, setUserPresets] = useState<ProgressionPreset[]>(() => getUserPresets());
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [presetNameInput, setPresetNameInput] = useState('');
-  const [presetGenreInput, setPresetGenreInput] = useState('Rock');
-  const [presetDescInput, setPresetDescInput] = useState('');
-
-  const { isPlaying: isMetronomeRunning, start: startMetronome, stop: stopMetronome, activePattern, setActivePattern, bpm, setBpm } = useMetronome();
-  const { playChord } = useAudio();
-
-  // Transpose handlers
-  const handleTranspose = (semitones: number) => {
-    const updated = progression.map(slot => ({
-      ...slot,
-      name: slot.name ? transposeChord(slot.name, semitones, accidentalMode) : '',
-    }));
-    setProgression(updated);
-    setTransposeShift(prev => prev + semitones);
-  };
-
-  const handleResetTranspose = () => {
-    if (transposeShift === 0) return;
-    handleTranspose(-transposeShift);
-    setTransposeShift(0);
-  };
-
-  const handleToggleProgressionEnharmonics = () => {
-    const updated = progression.map(slot => ({
-      ...slot,
-      name: slot.name ? toggleEnharmonicSpelling(slot.name) : '',
-    }));
-    setProgression(updated);
-  };
-
-  const handleSwapSelectedBeatEnharmonic = () => {
-    if (selectedBeatIndex === null || !progression[selectedBeatIndex]?.name) return;
-    const currentChord = progression[selectedBeatIndex].name;
-    const swapped = toggleEnharmonicSpelling(currentChord);
-    const updated = [...progression];
-    updated[selectedBeatIndex] = { ...updated[selectedBeatIndex], name: swapped };
-    setProgression(updated);
-    playChord(swapped, selectedInstrument, accompanimentVolume);
-    setTrackedChord(swapped);
-  };
-
-  // Preset Save & Delete handlers
-  const handleSaveCustomPreset = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!presetNameInput.trim()) return;
-
-    const chordsPerBeat = progression.map(p => p.name || '');
-    const timeSig = (activePattern?.timeSignature as '4/4' | '3/4' | '6/8' | '5/4') || '4/4';
-
-    const updatedList = saveUserPreset({
-      name: presetNameInput.trim(),
-      genre: presetGenreInput,
-      timeSignature: timeSig,
-      description: presetDescInput.trim() || 'Custom chord progression',
-      bpm: activePattern?.voices[0]?.beats ? 120 : undefined,
-      chordsPerBeat,
-    });
-
-    setUserPresets(updatedList);
-    setIsSaveModalOpen(false);
-    setPresetNameInput('');
-    setPresetDescInput('');
-    setActiveRightTab('library');
-  };
-
-  const handleDeleteUserPreset = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updatedList = deleteUserPreset(id);
-    setUserPresets(updatedList);
-  };
-
-  const handleSelectPreset = (preset: ProgressionPreset) => {
-    // 1. Convert preset chordsPerBeat to progression slots
-    const newProg = preset.chordsPerBeat.map((chordName, i) => ({
-      id: `preset_beat_${Date.now()}_${i}`,
-      name: chordName,
-    }));
-    setProgression(newProg);
-    setSelectedBeatIndex(0);
-
-    // 2. Sync metronome pattern and BPM
-    const targetPattern = DEFAULT_PRESETS.find(p => p.timeSignature === preset.timeSignature);
-    if (targetPattern) {
-      setActivePattern(targetPattern);
-    }
-    if (preset.bpm) {
-      setBpm(preset.bpm);
-    }
-
-    // 3. Audio feedback on first chord
-    const firstChord = preset.chordsPerBeat.find(c => c.trim() !== '');
-    if (firstChord) {
-      playChord(firstChord, selectedInstrument, accompanimentVolume);
-      setTrackedChord(firstChord);
-    }
-  };
-
-  // Direct Key Selection (calculates semitone offset and transposes progression)
-  const handleSelectDirectKey = (newKeyRoot: string) => {
-    const getCleanRoot = (k: string) => {
-      const match = k.match(/^[A-G](?:#|b)?/i);
-      return match ? match[0] : 'C';
-    };
-    const oldRoot = getCleanRoot(currentKey);
-    const oldOffset = ROOT_OFFSETS_MAP[oldRoot] ?? 0;
-    const newOffset = ROOT_OFFSETS_MAP[newKeyRoot] ?? 0;
-    let delta = (newOffset - oldOffset + 12) % 12;
-    if (delta > 6) delta -= 12;
-    if (delta !== 0) {
-      handleTranspose(delta);
-    }
-    setCurrentKey(newKeyRoot);
-  };
-
-  // Load Song from Quick Picker
-  const handleSelectSongFromQuickPicker = (song: Song) => {
-    const newProg = song.chordsPerBeat.map((chordName, i) => ({
-      id: `song_beat_${Date.now()}_${i}`,
-      name: chordName,
-    }));
-    setProgression(newProg);
-    setMeasureLabels(song.sectionLabels || {});
-    setSelectedBeatIndex(0);
-
-    const targetPattern = DEFAULT_PRESETS.find(p => p.timeSignature === song.timeSignature);
-    if (targetPattern) {
-      setActivePattern(targetPattern);
-    }
-    if (song.bpm) {
-      setBpm(song.bpm);
-    }
-
-    const matchingGroove = GROOVE_PRESETS.find(g => g.id === song.grooveId);
-    if (matchingGroove) {
-      setActiveGroovePattern(matchingGroove);
-      setIsGrooveEngineEnabled(true);
-    }
-
-    setCurrentTitle(song.title);
-    const root = song.key.split(' ')[0] || 'C';
-    setCurrentKey(root);
-    setTransposeShift(0);
-
-    const firstChord = song.chordsPerBeat.find(c => c && c.trim() !== '');
-    if (firstChord) {
-      playChord(firstChord, selectedInstrument, accompanimentVolume);
-      setTrackedChord(firstChord);
-    }
-  };
-
-  // Load Progression from Quick Picker
-  const handleSelectProgressionFromQuickPicker = (prog: ProgressionPreset) => {
-    handleSelectPreset(prog);
-    setCurrentTitle(prog.name);
-    setCurrentKey('C');
-    setTransposeShift(0);
-  };
-
   const masterVoice = activePattern?.voices[0];
   const masterLength = masterVoice?.pattern?.length || masterVoice?.beats || 4;
   const timeSigLabel = activePattern?.timeSignature || `${masterLength}/4`;
-
   const totalMeasures = Math.ceil(progression.length / masterLength) || 1;
 
   const handleLibraryChordClick = (chordName: string) => {
@@ -344,7 +247,9 @@ export default function AccompanimentView() {
       setProgression(nextProg);
       setSelectedBeatIndex((selectedBeatIndex + 1) % nextProg.length);
     } else {
-      addBeat(chordName);
+      const newId = Math.random().toString(36).substr(2, 9);
+      setProgression([...progression, { id: newId, name: chordName }]);
+      setSelectedBeatIndex(progression.length);
     }
 
     playChord(chordName, selectedInstrument, accompanimentVolume);
@@ -357,7 +262,9 @@ export default function AccompanimentView() {
       nextProg[selectedBeatIndex] = { ...nextProg[selectedBeatIndex], name: chordName };
       setProgression(nextProg);
     } else {
-      addBeat(chordName);
+      const newId = Math.random().toString(36).substr(2, 9);
+      setProgression([...progression, { id: newId, name: chordName }]);
+      setSelectedBeatIndex(progression.length);
     }
 
     playChord(chordName, selectedInstrument, accompanimentVolume);
@@ -387,1255 +294,654 @@ export default function AccompanimentView() {
   const activeExplorerChord = trackedChord || (isPlaying && activePlayChordInfo?.chord) || selectedBeatChordInfo?.chord || 'C';
 
   return (
-    <div className="p-4 md:p-6 w-full max-w-none min-h-full flex flex-col gap-5">
-      {/* 1. PLAYER-FIRST QUICK-START LAUNCHPAD */}
-      <section className={cn(
-        "w-full rounded-2xl border p-4 md:p-5 flex flex-col gap-3.5 transition-all shadow-sm",
-        resolvedTheme === 'dark' ? "bg-white/[0.03] border-white/10" : "bg-white border-slate-200"
+    <div className="p-4 md:p-6 w-full max-w-7xl mx-auto min-h-full flex flex-col gap-4 pb-20">
+      {/* 1. CLEAN LEAD-SHEET HEADER */}
+      <header className={cn(
+        "flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-all",
+        resolvedTheme === 'dark' ? "bg-slate-900/60 border-white/10" : "bg-white border-slate-200/90 shadow-2xs"
       )}>
-        {/* Row 1: The 4 Practice Essentials (Pick & Go) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full min-w-0">
-          {/* 1. Song / Progression Picker */}
-          <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
-            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10 hover:border-emerald-500/40" : "bg-white border-slate-300 hover:border-emerald-500"
-          )}>
-            <div className="flex items-center justify-between min-w-0">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Song / Progression</span>
-              <button
-                onClick={() => setIsQuickPickerOpen(true)}
-                className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer shrink-0"
-              >
-                <span>Browse</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            </div>
-            <button
-              onClick={() => setIsQuickPickerOpen(true)}
-              className="w-full flex items-center justify-between gap-2 text-left group cursor-pointer min-w-0"
-            >
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <Disc className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-black text-xs md:text-sm truncate text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    {currentTitle || 'Custom Progression'}
-                  </div>
-                  <div className="text-[10px] text-slate-600 dark:text-slate-300 font-mono font-bold truncate">
-                    {totalMeasures} {totalMeasures === 1 ? 'bar' : 'bars'} • {timeSigLabel}
-                  </div>
-                </div>
+        {/* Left: Quick Play Transport & Song Title / Metadata */}
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => {
+              if (!isPlaying) setTrackedChord(null);
+              setIsPlaying(!isPlaying);
+            }}
+            disabled={progression.length === 0}
+            className={cn(
+              "px-3 py-1.5 rounded-xl font-black uppercase tracking-wider text-xs flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer shrink-0",
+              isPlaying
+                ? (isCountingIn ? "bg-amber-600 text-white animate-pulse" : "bg-red-500 text-white shadow-red-500/20")
+                : (progression.length > 0 ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-600/20" : "bg-slate-200 dark:bg-white/10 text-slate-400 cursor-not-allowed")
+            )}
+            title={isPlaying ? "Stop Playback" : "Start Playback"}
+          >
+            {isPendingStart ? (
+              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : isCountingIn ? (
+              <div className="flex items-center gap-1">
+                <Timer className="w-3.5 h-3.5 animate-spin" />
+                <span className="font-mono">{countInBeat}</span>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors shrink-0" />
-            </button>
-          </div>
+            ) : (
+              <>
+                {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                <span>{isPlaying ? 'Stop' : 'Play'}</span>
+              </>
+            )}
+          </button>
 
-          {/* 2. Key & Transposition */}
-          <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
-            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-white border-slate-300"
-          )}>
-            <div className="flex items-center justify-between min-w-0">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Key & Transpose</span>
-              <button
-                onClick={handleToggleProgressionEnharmonics}
-                className="text-[10px] font-extrabold text-slate-700 hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400 flex items-center gap-1 cursor-pointer shrink-0"
-                title="Swap ♯ / ♭ Enharmonics"
-              >
-                <ArrowLeftRight className="w-2.5 h-2.5" />
-                <span>♯ ↔ ♭</span>
-              </button>
+          <button
+            onClick={() => setIsQuickPickerOpen(true)}
+            className="flex items-center gap-2 group cursor-pointer text-left min-w-0"
+            title="Browse songs and chord progressions"
+          >
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20 transition-colors shrink-0">
+              <Disc className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <select
-                value={currentKey}
-                onChange={(e) => handleSelectDirectKey(e.target.value)}
-                className={cn(
-                  "flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border text-xs font-black font-mono outline-none cursor-pointer truncate shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-slate-900 border-white/15 text-white" : "bg-white border-slate-300 text-slate-900"
-                )}
-              >
-                {ALL_ROOT_KEYS.map(k => (
-                  <option key={k} value={k} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900 font-bold")}>
-                    {k} Key
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={() => handleTranspose(-1)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
-                )}
-                title="Transpose down 1 semitone"
-              >
-                -1
-              </button>
-              <button
-                onClick={() => handleTranspose(1)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
-                )}
-                title="Transpose up 1 semitone"
-              >
-                +1
-              </button>
-            </div>
-          </div>
-
-          {/* 3. Tempo & Meter */}
-          <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
-            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-white border-slate-300"
-          )}>
-            <div className="flex items-center justify-between min-w-0">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Tempo & Meter</span>
-              <span className="text-[10px] font-mono font-black text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded shrink-0">
-                {timeSigLabel}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <button
-                onClick={() => setBpm(Math.max(30, bpm - 5))}
-                className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
-                )}
-                title="-5 BPM"
-              >
-                -5
-              </button>
-              <button
-                onClick={() => setBpm(Math.max(30, bpm - 1))}
-                className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
-                )}
-                title="-1 BPM"
-              >
-                -
-              </button>
-              <div className="flex-1 text-center font-mono font-black text-xs text-slate-950 dark:text-white truncate">
-                {bpm} <span className="text-[9px] text-slate-600 dark:text-slate-400 font-bold">BPM</span>
-              </div>
-              <button
-                onClick={() => setBpm(Math.min(300, bpm + 1))}
-                className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
-                )}
-                title="+1 BPM"
-              >
-                +
-              </button>
-              <button
-                onClick={() => setBpm(Math.min(300, bpm + 5))}
-                className={cn(
-                  "px-2 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all cursor-pointer shrink-0 shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-white/10 border-white/15 hover:bg-white/20 text-white" : "bg-white border-slate-300 hover:bg-slate-100 text-slate-900"
-                )}
-                title="+5 BPM"
-              >
-                +5
-              </button>
-            </div>
-          </div>
-
-          {/* 4. Groove Pattern */}
-          <div className={cn(
-            "p-3 rounded-xl border flex flex-col justify-between gap-2 transition-all min-w-0 overflow-hidden shadow-2xs",
-            resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/10" : "bg-white border-slate-300"
-          )}>
-            <div className="flex items-center justify-between min-w-0 gap-1">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate">Groove Pattern</span>
-              <button
-                onClick={() => setIsGrooveEngineOpen(!isGrooveEngineOpen)}
-                className={cn(
-                  "text-[10px] font-extrabold flex items-center gap-1 transition-colors cursor-pointer shrink-0",
-                  isGrooveEngineOpen ? "text-emerald-700 dark:text-emerald-400 font-black" : "text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400"
-                )}
-              >
-                <SlidersHorizontal className="w-3 h-3" />
-                <span className="whitespace-nowrap">{isGrooveEngineOpen ? 'Hide Sequencer' : 'Edit Steps'}</span>
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5 min-w-0 w-full">
-              <div className="relative flex-1 min-w-0">
-                <select
-                  value={activeGroovePattern?.id || ''}
-                  onChange={(e) => {
-                    const allAvailable = [...GROOVE_PRESETS, ...(customGroovePresets || [])];
-                    const found = allAvailable.find(g => g.id === e.target.value);
-                    if (found) {
-                      setActiveGroovePattern(found);
-                      setIsGrooveEngineEnabled(true);
-                    }
-                  }}
-                  className={cn(
-                    "w-full min-w-0 appearance-none pl-2.5 pr-7 py-1.5 rounded-lg border text-xs font-bold outline-none cursor-pointer truncate shadow-2xs",
-                    resolvedTheme === 'dark' ? "bg-slate-900 border-white/15 text-white" : "bg-white border-slate-300 text-slate-900"
-                  )}
-                  title={activeGroovePattern ? `${activeGroovePattern.name} (${activeGroovePattern.genre})` : 'Select Groove Pattern'}
-                >
-                  {[...GROOVE_PRESETS, ...(customGroovePresets || [])].map(g => (
-                    <option key={g.id} value={g.id} title={`${g.name} (${g.genre})`} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900 font-bold")}>
-                      {g.name} ({g.genre})
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-              </div>
-
-              <button
-                onClick={() => setIsGrooveEngineEnabled(!isGrooveEngineEnabled)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase transition-all shrink-0 cursor-pointer shadow-2xs",
-                  isGrooveEngineEnabled
-                    ? "bg-emerald-600 text-white border-emerald-500 shadow-xs"
-                    : "bg-white dark:bg-white/10 border-slate-300 dark:border-white/15 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-100"
-                )}
-                title="Toggle Groove Engine On/Off"
-              >
-                {isGrooveEngineEnabled ? 'On' : 'Off'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2: Playback Action Center & Audio Settings */}
-        <div className={cn(
-          "flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-200/80 dark:border-white/10"
-        )}>
-          {/* Left: Play/Stop & Count-in */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => {
-                if (!isPlaying) setTrackedChord(null);
-                setIsPlaying(!isPlaying);
-              }}
-              className={cn(
-                "px-5 py-2 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center min-w-[100px] gap-2 transition-all shadow-md active:scale-95 shrink-0 cursor-pointer",
-                isPlaying
-                  ? (isCountingIn ? "bg-amber-600 text-white shadow-amber-600/30 animate-pulse" : "bg-red-500 text-white shadow-red-500/20")
-                  : (progression.length > 0 ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-600/20" : "bg-slate-200 dark:bg-white/10 text-slate-400 cursor-not-allowed")
-              )}
-              disabled={progression.length === 0}
-            >
-              {isPendingStart ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Syncing...</span>
-                </div>
-              ) : isCountingIn ? (
-                <div className="flex items-center gap-1.5">
-                  <Timer className="w-3.5 h-3.5 animate-spin" />
-                  <span>Count {countInBeat}/{masterLength}</span>
-                </div>
-              ) : (
-                <>
-                  {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                  <span>{isPlaying ? 'Stop' : 'Play'}</span>
-                </>
-              )}
-            </button>
-
-            {/* 1-Bar Count-In */}
-            <button
-              onClick={() => setIsCountInEnabled(!isCountInEnabled)}
-              className={cn(
-                "px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
-                isCountInEnabled
-                  ? "bg-amber-500/15 border-amber-500/50 text-amber-700 dark:text-amber-300"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
-              )}
-              title="Toggle 1-measure count-in clicks before playback"
-            >
-              <Timer className="w-3.5 h-3.5" />
-              <span>Count-In</span>
-              <div className={cn("w-1.5 h-1.5 rounded-full ml-0.5", isCountInEnabled ? "bg-amber-500 animate-pulse" : "bg-slate-300 dark:bg-white/20")} />
-            </button>
-
-            {/* Metronome Click */}
-            <button
-              onClick={() => isMetronomeRunning ? stopMetronome() : startMetronome()}
-              className={cn(
-                "px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
-                isMetronomeRunning
-                  ? "bg-orange-500/15 border-orange-500/50 text-orange-700 dark:text-orange-300"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
-              )}
-              title="Toggle Metronome Click"
-            >
-              <div className={cn("w-1.5 h-1.5 rounded-full", isMetronomeRunning ? "bg-orange-500 animate-pulse" : "bg-slate-300 dark:bg-white/20")} />
-              <span>Click</span>
-            </button>
-
-            {/* Bass Pulse Toggle */}
-            <button
-              onClick={() => setIsBassEnabled(!isBassEnabled)}
-              className={cn(
-                "px-3 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
-                isBassEnabled
-                  ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
-              )}
-              title="Toggle Plucked Bass Notes"
-            >
-              <div className={cn("w-1.5 h-1.5 rounded-full", isBassEnabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-white/20")} />
-              <span>Bass</span>
-            </button>
-          </div>
-
-          {/* Right: Sound & Voicing Options */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* 4-Track Mixer Quick Drawer */}
-            <button
-              onClick={() => setIsGrooveEngineOpen(!isGrooveEngineOpen)}
-              className={cn(
-                "px-2.5 py-2 rounded-xl text-[10px] font-extrabold flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer shadow-2xs",
-                isGrooveEngineOpen
-                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
-              )}
-              title="Open 4-Track Accompaniment Mixer & Step Sequencer"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>4-Track Engine</span>
-            </button>
-
-            {/* Voicing Style */}
-            <div className="relative group shrink-0">
-              <select
-                value={voicingStyle}
-                onChange={(e) => {
-                  setVoicingStyle(e.target.value as any);
-                  e.target.blur();
-                }}
-                className={cn(
-                  "appearance-none border px-3 pr-7 py-2 rounded-xl text-[10px] font-bold transition-all cursor-pointer outline-none shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-slate-900 border-white/15 text-emerald-400" : "bg-white border-slate-300 text-emerald-800 hover:bg-slate-50"
-                )}
-                title="Select keyboard voicing algorithm"
-              >
-                {VOICING_STYLES.map(style => (
-                  <option key={style.id} value={style.id} className={cn(resolvedTheme === 'dark' ? "bg-slate-900 text-white" : "bg-white text-slate-900 font-bold")}>
-                    Voicing: {style.shortLabel}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-slate-400" />
-            </div>
-
-            {/* Voice Leading Drawer Toggle */}
-            <button
-              onClick={() => setIsVoicingInspectorOpen(!isVoicingInspectorOpen)}
-              className={cn(
-                "px-2.5 py-2 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all border shrink-0 cursor-pointer",
-                isVoicingInspectorOpen
-                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-500 dark:text-emerald-400"
-                  : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
-              )}
-              title="Inspect voice leading & inversions"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Voice Leading</span>
-            </button>
-
-            {/* Volume */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-white/10 bg-slate-50 dark:bg-white/5 min-w-0 overflow-hidden">
-              <Volume2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-              <input 
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={accompanimentVolume}
-                onChange={(e) => setAccompanimentVolume(parseFloat(e.target.value))}
-                className="w-16 min-w-0 flex-1 accent-emerald-500 h-1.5 rounded-lg appearance-none bg-slate-200 dark:bg-white/20 cursor-pointer"
-              />
-              <span className="text-[9px] font-mono font-extrabold text-emerald-700 dark:text-emerald-400 w-8 text-right shrink-0">
-                {Math.round(accompanimentVolume * 100)}%
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 2. MAIN STAGE & SIDEBAR */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full min-w-0 items-start">
-        {/* Main Canvas Area */}
-        <div className={cn(
-          isSidebarOpen ? "lg:col-span-7 xl:col-span-8" : "lg:col-span-12",
-          "w-full min-w-0 rounded-2xl border p-4 md:p-6 relative overflow-hidden flex flex-col transition-all min-h-[520px]",
-          resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/10" : "bg-white border-slate-200 shadow-sm"
-        )}>
-          {/* Main Stage Top Navigation Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200 dark:border-white/10">
-            {/* View Mode Switcher & Measure Tracking Toggle */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center p-1 rounded-xl bg-slate-200/80 dark:bg-white/10 border border-slate-300 dark:border-white/15 shadow-2xs">
-                <button
-                  onClick={() => setViewMode('compact')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
-                    viewMode === 'compact'
-                      ? "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-xs"
-                      : "text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white"
-                  )}
-                >
-                  <Music className="w-3.5 h-3.5" />
-                  <span>Compact Chart</span>
-                </button>
-
-                <button
-                  onClick={() => setViewMode('editor')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
-                    viewMode === 'editor'
-                      ? "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-xs"
-                      : "text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white"
-                  )}
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Beat Grid Editor</span>
-                </button>
-              </div>
-
-              {/* Measure Tracking Toggle Button */}
-              <button
-                onClick={() => setIsTrackMeasuresEnabled(!isTrackMeasuresEnabled)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-extrabold transition-all cursor-pointer shadow-2xs",
-                  isTrackMeasuresEnabled
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
-                    : (resolvedTheme === 'dark'
-                        ? "bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10"
-                        : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100")
-                )}
-                title={isTrackMeasuresEnabled ? "Measure tracking is active (Click to disable auto-scroll)" : "Measure tracking is paused (Click to follow playback)"}
-              >
-                <LocateFixed className={cn("w-3.5 h-3.5", isTrackMeasuresEnabled ? "text-emerald-500" : "text-slate-400")} />
-                <span className="hidden sm:inline">Track Measures</span>
-                <span className={cn(
-                  "text-[8px] font-mono px-1 py-0.2 rounded font-black uppercase tracking-wider",
-                  isTrackMeasuresEnabled ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-white/15 text-slate-700 dark:text-slate-300"
-                )}>
-                  {isTrackMeasuresEnabled ? "ON" : "OFF"}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-sm md:text-base text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                  {currentSongTitle || 'Custom Progression'}
                 </span>
-              </button>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 transition-colors shrink-0" />
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                <span>{totalMeasures} {totalMeasures === 1 ? 'bar' : 'bars'}</span>
+                <span>·</span>
+                <span>{timeSigLabel}</span>
+              </div>
             </div>
+          </button>
+        </div>
 
-            {/* Quick Actions & Panels */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => setIsGrooveEngineOpen(!isGrooveEngineOpen)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
-                  isGrooveEngineOpen
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
-                    : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
-                )}
-              >
-                <Sliders className="w-3 h-3 text-emerald-500" />
-                <span>Groove Sequencer</span>
-              </button>
+        {/* Center: Key & Transposition Controls */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs shrink-0">
+          {/* Reset button placed on the left side of Key with stable layout */}
+          <button
+            onClick={() => handleTranspose(-transposeShift)}
+            disabled={transposeShift === 0}
+            className={cn(
+              "px-1.5 py-0.5 rounded text-[10px] font-bold transition-all w-[58px] text-center truncate",
+              transposeShift !== 0
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer"
+                : "invisible pointer-events-none select-none"
+            )}
+            title={transposeShift !== 0 ? `Reset transposition to original key (${transposeShift > 0 ? `+${transposeShift}` : transposeShift})` : undefined}
+          >
+            {transposeShift !== 0 ? `Reset (${transposeShift > 0 ? `+${transposeShift}` : transposeShift})` : 'Reset'}
+          </button>
 
-              <button
-                onClick={() => setIsImportAbcModalOpen(true)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
-                )}
-                title="Import Chords from ABC notation or Sheet"
-              >
-                <FileCode className="w-3 h-3 text-indigo-500" />
-                <span>Import ABC</span>
-              </button>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pl-0.5">Key</span>
+          <select
+            value={currentKey}
+            onChange={(e) => handleSelectDirectKey(e.target.value)}
+            className="w-14 px-1.5 py-0.5 rounded-lg bg-white dark:bg-slate-800 font-mono font-bold text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-white/10 cursor-pointer outline-none text-xs text-center"
+            title="Select Progression Key"
+          >
+            {['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'].map((k) => (
+              <option key={k} value={k}>
+                {formatChordName(k)}
+              </option>
+            ))}
+          </select>
 
-              <button
-                onClick={() => setIsSaveModalOpen(true)}
-                disabled={progression.every(p => !p.name || p.name.trim() === '')}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
-                  progression.some(p => p.name && p.name.trim() !== '')
-                    ? (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100")
-                    : "opacity-40 cursor-not-allowed"
-                )}
-                title="Save current progression as a preset"
-              >
-                <BookmarkPlus className="w-3 h-3 text-amber-500" />
-                <span>Save</span>
-              </button>
-
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className={cn(
-                  "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs",
-                  !isSidebarOpen
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
-                    : resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/80 hover:bg-white/10" : "bg-white border-slate-300 text-slate-800 hover:bg-slate-100"
-                )}
-                title={isSidebarOpen ? "Expand chart to full width" : "Show reference sidebar"}
-              >
-                {isSidebarOpen ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                <span>{isSidebarOpen ? 'Full Chart' : 'Sidebar'}</span>
-              </button>
-            </div>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => handleTranspose(-1)}
+              className="w-7 h-6 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 font-bold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer text-xs flex items-center justify-center"
+              title="Transpose down 1 semitone (-1)"
+            >
+              -1
+            </button>
+            <button
+              onClick={() => handleTranspose(1)}
+              className="w-7 h-6 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 font-bold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer text-xs flex items-center justify-center"
+              title="Transpose up 1 semitone (+1)"
+            >
+              +1
+            </button>
           </div>
 
-          {/* Collapsible Groove Sequencer Drawer */}
-          {isGrooveEngineOpen && (
-            <div className="mb-4 rounded-2xl border border-emerald-500/30 overflow-hidden bg-emerald-950/10 dark:bg-emerald-950/20 p-3">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-emerald-500/20">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>Groove & Syncopation Step Sequencer</span>
-                </div>
-                <button
-                  onClick={() => setIsGrooveEngineOpen(false)}
-                  className="p-1 rounded-lg hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-500 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <GrooveEnginePanel />
-            </div>
-          )}
+          <button
+            onClick={handleToggleProgressionEnharmonics}
+            className="px-2 py-0.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 font-bold text-slate-600 dark:text-slate-300 transition-colors cursor-pointer border-l border-slate-200 dark:border-white/10 text-xs"
+            title="Toggle enharmonic spelling (♯ ↔ ♭)"
+          >
+            ♯/♭
+          </button>
+        </div>
 
-          {/* Collapsible Voicing Inspector Drawer */}
-          {isVoicingInspectorOpen && (
-            <div className="mb-4 rounded-2xl border border-indigo-500/30 overflow-hidden bg-indigo-950/10 dark:bg-indigo-950/20 p-3">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-indigo-500/20">
-                <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Piano Voicing & Voice Leading Visualizer</span>
-                </div>
-                <button
-                  onClick={() => setIsVoicingInspectorOpen(false)}
-                  className="p-1 rounded-lg hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-500 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <VoicingInspectorPanel />
-            </div>
-          )}
+        {/* Right: View Mode, Track Follower, Utilities & Integrated Drawer Toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View Mode Segmented Switcher */}
+          <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
+            <button
+              onClick={() => setViewMode('compact')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                viewMode === 'compact'
+                  ? "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-2xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              )}
+            >
+              <Music className="w-3.5 h-3.5" />
+              <span>Lead-Sheet</span>
+            </button>
 
-          {/* Mode 1: Compact Playback Chart (Default) */}
-          {viewMode === 'compact' && (
+            <button
+              onClick={() => setViewMode('editor')}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                viewMode === 'editor'
+                  ? "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-2xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              )}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Grid Editor</span>
+            </button>
+          </div>
+
+          {/* Follow Playback Toggle */}
+          <button
+            onClick={() => setIsTrackMeasuresEnabled(!isTrackMeasuresEnabled)}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer",
+              isTrackMeasuresEnabled
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                : "border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"
+            )}
+            title="Auto-scroll to follow playback"
+          >
+            <LocateFixed className={cn("w-3.5 h-3.5", isTrackMeasuresEnabled ? "text-emerald-500" : "text-slate-400")} />
+            <span className="hidden sm:inline">Follow</span>
+          </button>
+
+          {/* Import ABC */}
+          <button
+            onClick={() => setIsImportAbcModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+            title="Import chords from ABC notation score"
+          >
+            <FileCode className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="hidden sm:inline">Import ABC</span>
+          </button>
+
+          {/* Save Preset */}
+          <button
+            onClick={() => setIsSaveModalOpen(true)}
+            disabled={progression.every(p => !p.name || p.name.trim() === '')}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all",
+              progression.some(p => p.name && p.name.trim() !== '')
+                ? "border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer"
+                : "opacity-40 cursor-not-allowed border-transparent text-slate-400"
+            )}
+            title="Save progression as a custom preset"
+          >
+            <BookmarkPlus className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden sm:inline">Save</span>
+          </button>
+
+          {/* Sequencer Drawer Toggle */}
+          <button
+            onClick={() => {
+              if (isGrooveEngineOpen) {
+                setIsGrooveEngineOpen(false);
+              } else {
+                setIsGrooveEngineOpen(true);
+                setIsVoicingInspectorOpen(false);
+              }
+            }}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer",
+              isGrooveEngineOpen
+                ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                : "border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+            )}
+            title={isGrooveEngineOpen ? "Close Groove Step Sequencer" : "Open 4-Track Groove Step Sequencer"}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="hidden sm:inline">Sequencer</span>
+          </button>
+
+          {/* Voicings Drawer Toggle */}
+          <button
+            onClick={() => {
+              if (isVoicingInspectorOpen) {
+                setIsVoicingInspectorOpen(false);
+              } else {
+                setIsVoicingInspectorOpen(true);
+                setIsGrooveEngineOpen(false);
+              }
+            }}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer",
+              isVoicingInspectorOpen
+                ? "bg-indigo-500/15 border-indigo-500/50 text-indigo-700 dark:text-indigo-300 shadow-2xs"
+                : "border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+            )}
+            title={isVoicingInspectorOpen ? "Close Voice Leading Visualizer" : "Open Piano Voice Leading Visualizer"}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="hidden sm:inline">Voicings</span>
+          </button>
+
+          {/* Accompaniment Tools Drawer Toggle (Synced with Dock) */}
+          <button
+            onClick={() => setIsToolsDrawerOpen(!isToolsDrawerOpen)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer",
+              isToolsDrawerOpen
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                : "border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+            )}
+            title={isToolsDrawerOpen ? "Hide Chords & Tools Drawer" : "Show Chords & Tools Drawer"}
+          >
+            {isToolsDrawerOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
+            <span>Tools</span>
+          </button>
+        </div>
+      </header>
+
+      {/* 2. MAIN WORKSPACE: LEAD-SHEET CHART & ACCOMPANIMENT TOOLS DRAWER */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
+        {/* Main Chart Canvas */}
+        <main className={cn(
+          isToolsDrawerOpen ? "lg:col-span-8" : "lg:col-span-12",
+          "w-full transition-all min-w-0"
+        )}>
+          {viewMode === 'compact' ? (
             <CompactPlaybackChart
               masterLength={masterLength}
               timeSigLabel={timeSigLabel}
               onEditBeat={(beatIdx) => {
                 setSelectedBeatIndex(beatIdx);
-                setViewMode('editor');
+                if (!isToolsDrawerOpen) setIsToolsDrawerOpen(true);
               }}
               onOpenEditor={() => setViewMode('editor')}
+              onOpenLabelModal={(mIdx) => {
+                setEditingMeasureIndex(mIdx);
+                setCustomLabelInput(measureLabels[mIdx] || '');
+              }}
             />
-          )}
+          ) : (
+            /* Mode 2: Streamlined Beat Grid Editor */
+            <div className={cn(
+              "rounded-2xl border p-4 flex flex-col gap-4 transition-all",
+              resolvedTheme === 'dark' ? "bg-slate-900/60 border-white/10" : "bg-white border-slate-200/90 shadow-2xs"
+            )}>
+              {/* Editor Beat Controls Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold">
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "px-2.5 py-1 rounded-lg border font-mono text-[10px]",
+                    selectedBeatIndex !== null 
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                      : "opacity-40 border-slate-200 dark:border-white/10"
+                  )}>
+                    {selectedBeatIndex !== null 
+                      ? `Selected: Beat ${selectedBeatIndex + 1} (m.${Math.floor(selectedBeatIndex / masterLength) + 1}, b.${(selectedBeatIndex % masterLength) + 1})`
+                      : 'Click any beat cell to edit'}
+                  </span>
 
-          {/* Mode 2: Beat Grid Editor */}
-          {viewMode === 'editor' && (
-            <div className="flex flex-col">
+                  {selectedBeatIndex !== null && progression[selectedBeatIndex]?.name && (
+                    <button
+                      onClick={handleSwapSelectedBeatEnharmonic}
+                      className="px-2 py-1 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-[10px] flex items-center gap-1 cursor-pointer"
+                      title="Swap enharmonic spelling (e.g. C# ↔ Db)"
+                    >
+                      <ArrowLeftRight className="w-3 h-3 text-emerald-500" />
+                      <span>♯/♭</span>
+                    </button>
+                  )}
+                </div>
 
-          {/* Transposition & Preset Toolbar */}
-          <div className={cn(
-            "flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-xl border text-[10px] font-bold transition-colors",
-            resolvedTheme === 'dark' ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"
-          )}>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-slate-400 font-mono uppercase text-[9px] mr-0.5">Transpose:</span>
-              <button
-                onClick={() => handleTranspose(-1)}
-                className={cn(
-                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px] font-mono",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700 shadow-xs"
-                )}
-                title="Transpose current progression down 1 semitone (-1)"
-              >
-                -1 st
-              </button>
-
-              <button
-                onClick={() => handleTranspose(1)}
-                className={cn(
-                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px] font-mono",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700 shadow-xs"
-                )}
-                title="Transpose current progression up 1 semitone (+1)"
-              >
-                +1 st
-              </button>
-
-              {transposeShift !== 0 && (
-                <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-2 py-0.5 rounded-lg text-[9px] font-mono">
-                  <span>{transposeShift > 0 ? `+${transposeShift}` : transposeShift} st</span>
-                  <button 
-                    onClick={handleResetTranspose}
-                    className="hover:text-emerald-400 text-slate-400 ml-1 font-bold"
-                    title="Reset transposition to original key"
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => selectedBeatIndex !== null && insertBeat(selectedBeatIndex, '')}
+                    disabled={selectedBeatIndex === null}
+                    className="px-2 py-1 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer text-[10px] flex items-center gap-1"
+                    title="Insert empty beat before selection"
                   >
-                    ✕
+                    <Plus className="w-3 h-3" /> Insert
+                  </button>
+
+                  <button
+                    onClick={() => selectedBeatIndex !== null && clearBeat(selectedBeatIndex)}
+                    disabled={selectedBeatIndex === null}
+                    className="px-2 py-1 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer text-[10px] flex items-center gap-1"
+                    title="Clear chord from beat"
+                  >
+                    <X className="w-3 h-3" /> Clear
+                  </button>
+
+                  <button
+                    onClick={() => selectedBeatIndex !== null && deleteBeat(selectedBeatIndex)}
+                    disabled={selectedBeatIndex === null}
+                    className="px-2 py-1 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-red-500/10 hover:border-red-500/30 text-red-500 disabled:opacity-30 cursor-pointer text-[10px] flex items-center gap-1"
+                    title="Delete beat"
+                  >
+                    <Trash2 className="w-3 h-3" /> Delete
+                  </button>
+
+                  <button
+                    onClick={addMeasure}
+                    className="px-2.5 py-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer text-[10px] flex items-center gap-1"
+                    title={`Add 1 measure (${masterLength} beats)`}
+                  >
+                    <Plus className="w-3 h-3" /> +1 Measure
+                  </button>
+
+                  <button
+                    onClick={clearAll}
+                    className="px-2 py-1 rounded-lg border border-transparent hover:bg-red-500/10 text-red-500 cursor-pointer text-[10px] flex items-center gap-1"
+                    title="Clear all chords in progression"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Clear All
                   </button>
                 </div>
-              )}
-
-              <button
-                onClick={handleToggleProgressionEnharmonics}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px] ml-1",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white/80" : "bg-white border-slate-200 hover:bg-slate-100 text-slate-700 shadow-xs"
-                )}
-                title="Swap enharmonic spelling across all chords in progression (e.g. C# ↔ Db)"
-              >
-                <ArrowLeftRight className="w-3 h-3 text-emerald-500" />
-                <span>♯ ↔ ♭ All</span>
-              </button>
-
-              <div className="h-4 w-px bg-slate-300 dark:bg-white/10 mx-1 hidden sm:block" />
-
-              <span className="text-slate-400 font-mono uppercase text-[9px] mr-0.5 hidden sm:inline">Speed:</span>
-              <div className="flex items-center gap-1">
-                {ARPEGGIO_RATES.map(rate => (
-                  <button
-                    key={rate.id}
-                    onClick={() => setArpeggioRate(rate.id)}
-                    className={cn(
-                      "px-2 py-0.5 rounded-md border text-[9px] font-mono transition-all",
-                      arpeggioRate === rate.id
-                        ? "bg-emerald-500 text-white border-emerald-500 font-bold shadow-xs"
-                        : (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 text-white/60 hover:text-white" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100")
-                    )}
-                    title={rate.description}
-                  >
-                    {rate.shortLabel}
-                  </button>
-                ))}
               </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsImportAbcModalOpen(true)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all text-[9px] font-bold shadow-xs cursor-pointer",
-                  resolvedTheme === 'dark' ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30" : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
-                )}
-                title="Import chord progression from a loaded ABC score or chord sheet (overwrites progression)"
-              >
-                <FileCode className="w-3.5 h-3.5" />
-                <span>Import ABC score or chord sheet</span>
-              </button>
+              {/* Grid of Measures with Lead-sheet Bar Lines */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Array.from({ length: totalMeasures }).map((_, mIdx) => {
+                  const startBeatIndex = mIdx * masterLength;
+                  const isCurrentMeasure = isPlaying && Math.floor(currentIndex / masterLength) === mIdx;
+                  const currentLabel = measureLabels[mIdx];
 
-              <button
-                onClick={() => setIsSaveModalOpen(true)}
-                disabled={progression.every(p => !p.name || p.name.trim() === '')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all text-[9px] font-bold shadow-xs cursor-pointer",
-                  progression.some(p => p.name && p.name.trim() !== '')
-                    ? (resolvedTheme === 'dark' ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30" : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700")
-                    : "opacity-40 cursor-not-allowed"
-                )}
-                title="Save current progression as a custom preset"
-              >
-                <BookmarkPlus className="w-3.5 h-3.5" />
-                <span>Save as Preset</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Actions & Selection Banner */}
-          <div className="flex flex-wrap items-center justify-between mb-4 gap-2 text-[10px] font-bold">
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "px-2.5 py-1 rounded-lg border uppercase tracking-wider text-[9px]",
-                selectedBeatIndex !== null 
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                  : "opacity-40"
-              )}>
-                {selectedBeatIndex !== null 
-                  ? `Editing Beat ${selectedBeatIndex + 1} (m.${Math.floor(selectedBeatIndex / masterLength) + 1}, beat ${(selectedBeatIndex % masterLength) + 1})`
-                  : 'Select beat to edit'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {selectedBeatIndex !== null && progression[selectedBeatIndex]?.name ? (
-                <button
-                  onClick={handleSwapSelectedBeatEnharmonic}
-                  className={cn(
-                    "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px]",
-                    resolvedTheme === 'dark' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                  )}
-                  title="Swap enharmonic spelling for selected chord (e.g. C#7 ↔ Db7)"
-                >
-                  <ArrowLeftRight className="w-3 h-3" /> Swap ♯/♭
-                </button>
-              ) : null}
-
-              <button
-                onClick={() => selectedBeatIndex !== null && insertBeat(selectedBeatIndex, '')}
-                disabled={selectedBeatIndex === null}
-                className={cn(
-                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px]",
-                  selectedBeatIndex !== null
-                    ? (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-white/10 text-white" : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700")
-                    : "opacity-30 cursor-not-allowed"
-                )}
-                title="Insert empty beat at selected position"
-              >
-                <Plus className="w-3 h-3" /> Insert
-              </button>
-
-              <button
-                onClick={() => selectedBeatIndex !== null && clearBeat(selectedBeatIndex)}
-                disabled={selectedBeatIndex === null}
-                className={cn(
-                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px]",
-                  selectedBeatIndex !== null
-                    ? (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-amber-500/10 hover:border-amber-500/30 hover:text-amber-400 text-white/70" : "bg-slate-100 border-slate-200 hover:bg-amber-50 hover:text-amber-600 text-slate-700")
-                    : "opacity-30 cursor-not-allowed"
-                )}
-                title="Clear chord from selected beat"
-              >
-                <X className="w-3 h-3" /> Clear
-              </button>
-
-              <button
-                onClick={() => selectedBeatIndex !== null && deleteBeat(selectedBeatIndex)}
-                disabled={selectedBeatIndex === null}
-                className={cn(
-                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px]",
-                  selectedBeatIndex !== null
-                    ? (resolvedTheme === 'dark' ? "bg-white/5 border-white/10 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 text-white/70" : "bg-slate-100 border-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-700")
-                    : "opacity-30 cursor-not-allowed"
-                )}
-                title="Delete selected beat"
-              >
-                <Trash2 className="w-3 h-3" /> Delete
-              </button>
-
-              <button
-                onClick={addMeasure}
-                className={cn(
-                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-[9px]",
-                  resolvedTheme === 'dark' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                )}
-                title={`Add 1 measure (${masterLength} beats)`}
-              >
-                <Plus className="w-3 h-3" /> +1 Measure
-              </button>
-
-              <button
-                onClick={clearAll}
-                className={cn(
-                  "px-2 py-1 rounded-lg border flex items-center gap-1 transition-all text-red-500/70 hover:text-red-500 text-[9px]",
-                  resolvedTheme === 'dark' ? "border-white/5 hover:bg-red-500/10" : "border-slate-200 hover:bg-red-50"
-                )}
-                title="Clear all chords"
-              >
-                <RefreshCw className="w-3 h-3" /> Clear All
-              </button>
-
-              {/* Layout Mode Toggle: 2 Meas/Row vs 1 Meas/Row */}
-              <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-black/20 ml-1">
-                <button
-                  onClick={() => setGridColumns(2)}
-                  className={cn(
-                    "px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 transition-all",
-                    gridColumns === 2
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                  )}
-                  title="2 measures per line (Compact mode for long songs)"
-                >
-                  <LayoutGrid className="w-3 h-3" /> 2 / Line
-                </button>
-                <button
-                  onClick={() => setGridColumns(1)}
-                  className={cn(
-                    "px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 transition-all",
-                    gridColumns === 1
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                  )}
-                  title="1 measure per line (Expanded view)"
-                >
-                  <Rows className="w-3 h-3" /> 1 / Line
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Beat Grid Area - Supporting Compact 2-Measures-Per-Row */}
-          <div className="w-full pb-2">
-            <div className={cn(
-              "grid gap-3 transition-all",
-              gridColumns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
-            )}>
-              {Array.from({ length: totalMeasures }).map((_, mIdx) => {
-                const startBeatIndex = mIdx * masterLength;
-                const isCurrentMeasure = isPlaying && Math.floor(currentIndex / masterLength) === mIdx;
-                const currentLabel = measureLabels[mIdx];
-
-                return (
-                  <div 
-                    key={mIdx}
-                    className={cn(
-                      "group/measure flex flex-col p-2.5 rounded-2xl border transition-all relative overflow-hidden",
-                      isCurrentMeasure 
-                        ? (resolvedTheme === 'dark' ? "bg-emerald-500/10 border-emerald-500/40 shadow-sm shadow-emerald-500/10" : "bg-emerald-50/90 border-emerald-400 shadow-sm")
-                        : (resolvedTheme === 'dark' ? "bg-white/[0.02] border-white/10 hover:border-white/20" : "bg-slate-50/80 border-slate-200 hover:border-slate-300 shadow-2xs")
-                    )}
-                  >
-                    {/* Measure Card Top Bar: Measure number + Section Label Tag */}
-                    <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200 dark:border-white/10">
-                      <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        <span className="text-[10px] font-black font-mono text-slate-500 dark:text-slate-400">
-                          m.{mIdx + 1}
-                        </span>
-
-                        {isCountingIn && mIdx === 0 && (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 text-[8px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1 border border-amber-500/30">
-                            <Timer className="w-2.5 h-2.5" />
-                            <span>Lead-in: Beat {countInBeat}/{masterLength}</span>
-                          </span>
-                        )}
-
-                        {currentLabel ? (
-                          <button
-                            onClick={() => {
-                              setEditingMeasureIndex(mIdx);
-                              setCustomLabelInput(currentLabel);
-                            }}
-                            className="px-2 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/25 text-[9px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-2xs transition-all truncate"
-                            title="Click to edit section label"
-                          >
-                            <Tag className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
-                            <span className="truncate">{currentLabel}</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingMeasureIndex(mIdx);
-                              setCustomLabelInput('');
-                            }}
-                            className="opacity-40 group-hover/measure:opacity-100 hover:opacity-100 px-1.5 py-0.5 rounded border border-dashed border-slate-300 dark:border-white/20 text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 text-[9px] font-medium transition-all flex items-center gap-1"
-                            title="Add section label (e.g. Chorus 1, Verse 1, Bridge)"
-                          >
-                            <Plus className="w-2.5 h-2.5" />
-                            <span>Label</span>
-                          </button>
-                        )}
+                  return (
+                    <div
+                      key={mIdx}
+                      className={cn(
+                        "flex flex-col p-3 rounded-xl border transition-all",
+                        isCurrentMeasure
+                          ? "bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/30"
+                          : "border-slate-200/80 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                      )}
+                    >
+                      <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200/60 dark:border-white/10 text-[9px] font-mono">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-400">m.{mIdx + 1}</span>
+                          {currentLabel ? (
+                            <button
+                              onClick={() => {
+                                setEditingMeasureIndex(mIdx);
+                                setCustomLabelInput(currentLabel);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-indigo-500/15 border border-indigo-500/30 text-indigo-700 dark:text-indigo-400 text-[8.5px] uppercase font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Tag className="w-2.5 h-2.5" />
+                              <span>{currentLabel}</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingMeasureIndex(mIdx);
+                                setCustomLabelInput('');
+                              }}
+                              className="text-[8px] text-slate-400 hover:text-indigo-500 flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> Label
+                            </button>
+                          )}
+                        </div>
+                        <span className="text-slate-400">{masterLength} beats</span>
                       </div>
 
-                      <div className="text-[8px] font-mono text-slate-400 uppercase tracking-wider pl-1">
-                        {masterLength} Beats
+                      <div 
+                        className="grid gap-1.5 items-center w-full"
+                        style={{ gridTemplateColumns: `repeat(${masterLength}, minmax(0, 1fr))` }}
+                      >
+                        {Array.from({ length: masterLength }).map((_, bIdx) => {
+                          const globalBeatIndex = startBeatIndex + bIdx;
+                          const chordSlot = progression[globalBeatIndex];
+                          const effective = getEffectiveChord(progression, globalBeatIndex);
+                          const isSelected = selectedBeatIndex === globalBeatIndex;
+                          const isCellPlaying = isPlaying && currentIndex === globalBeatIndex;
+
+                          return (
+                            <button
+                              key={globalBeatIndex}
+                              onClick={() => {
+                                setSelectedBeatIndex(globalBeatIndex);
+                                const playTarget = chordSlot?.name || effective?.chord;
+                                if (playTarget) {
+                                  playChord(playTarget, selectedInstrument, accompanimentVolume);
+                                  setTrackedChord(playTarget);
+                                }
+                                if (!isToolsDrawerOpen) setIsToolsDrawerOpen(true);
+                              }}
+                              className={cn(
+                                "flex flex-col justify-between h-14 p-1.5 rounded-lg border text-center transition-all cursor-pointer",
+                                isCellPlaying
+                                  ? "bg-emerald-600 text-white border-emerald-500 font-bold scale-[1.03]"
+                                  : isSelected
+                                    ? "bg-emerald-500/15 border-emerald-500 text-emerald-800 dark:text-emerald-300 ring-2 ring-emerald-500 font-black"
+                                    : chordSlot?.name
+                                      ? "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-emerald-500/40 text-slate-900 dark:text-white"
+                                      : "border-dashed border-slate-200 dark:border-white/10 text-slate-400 hover:border-slate-300"
+                              )}
+                            >
+                              <div className="flex items-center justify-between w-full text-[8px] font-mono opacity-60">
+                                <span>b.{bIdx + 1}</span>
+                                {progressionVoicings[globalBeatIndex]?.inversionName && (
+                                  <span className="truncate max-w-[40px] text-[7px] text-emerald-600 dark:text-emerald-400">
+                                    {progressionVoicings[globalBeatIndex]?.inversionName}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="font-mono font-black text-xs md:text-sm truncate w-full">
+                                {chordSlot?.name ? formatChordName(chordSlot.name) : (effective?.chord ? `(${formatChordName(effective.chord)})` : '—')}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* Right Side Drawer: Chords Palette, Song Library, Chord Explorer */}
+        {isToolsDrawerOpen && (
+          <aside className={cn(
+            "lg:col-span-4 w-full rounded-2xl border flex flex-col min-h-[500px] overflow-hidden transition-all",
+            resolvedTheme === 'dark' ? "bg-slate-900/60 border-white/10" : "bg-white border-slate-200/90 shadow-2xs"
+          )}>
+            {/* Drawer Tab Headers */}
+            <div className="flex items-center justify-between px-3 pt-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveToolsTab('library')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-[11px] font-bold border-b-2 transition-all cursor-pointer",
+                    activeToolsTab === 'library'
+                      ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                      : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  )}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Chords</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveToolsTab('songs')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-[11px] font-bold border-b-2 transition-all cursor-pointer",
+                    activeToolsTab === 'songs'
+                      ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                      : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  )}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Repertoire</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveToolsTab('explorer')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-[11px] font-bold border-b-2 transition-all cursor-pointer",
+                    activeToolsTab === 'explorer'
+                      ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                      : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                  )}
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Voicings</span>
+                </button>
+              </div>
+
+              {/* Close Drawer Button */}
+              <button
+                onClick={() => setIsToolsDrawerOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                title="Collapse Drawer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Drawer Tab Content */}
+            <div className="p-4 flex-1 flex flex-col overflow-y-auto">
+              {activeToolsTab === 'library' ? (
+                <div className="flex flex-col gap-4">
+                  {/* Target Beat Header & Presets Trigger */}
+                  <div className="flex items-center justify-between text-[11px] font-bold">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
+                      {selectedBeatIndex !== null ? `Target Beat ${selectedBeatIndex + 1}` : 'Target: Append Beat'}
+                    </span>
+
+                    <button
+                      onClick={() => setIsChordModalOpen(true)}
+                      className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      <Layers className="w-3 h-3" />
+                      <span>Progressions</span>
+                    </button>
+                  </div>
+
+                  {/* Harmonic Suggestions for Selected Beat */}
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Suggested Substitutions</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">{suggestedChords.length} options</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-0.5">
+                      {suggestedChords.map(s => (
+                        <button
+                          key={`${s.chord}_${s.label}`}
+                          onClick={() => handleSelectSuggestedChord(s.chord)}
+                          className="flex flex-col p-1.5 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 hover:border-emerald-500 text-left transition-all cursor-pointer shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-mono font-black text-xs text-slate-900 dark:text-white">
+                              {formatChordName(s.chord)}
+                            </span>
+                            <span className="text-[7px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
+                              {s.label}
+                            </span>
+                          </div>
+                          <span className="text-[8px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            {s.reason}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Root Key Palette with Enharmonic Toggle */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold">
+                      <span className="text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px]">Root Note</span>
+                      <div className="flex items-center gap-1 text-[10px]">
+                        <button
+                          onClick={() => {
+                            setAccidentalMode('sharp');
+                            if (selectedLibraryRoot.includes('b')) {
+                              setSelectedLibraryRoot(toggleEnharmonicSpelling(selectedLibraryRoot));
+                            }
+                          }}
+                          className={cn("px-1.5 py-0.5 rounded cursor-pointer", accidentalMode === 'sharp' ? "bg-slate-200 dark:bg-white/20 font-bold" : "text-slate-400")}
+                        >
+                          ♯
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAccidentalMode('flat');
+                            if (selectedLibraryRoot.includes('#')) {
+                              setSelectedLibraryRoot(toggleEnharmonicSpelling(selectedLibraryRoot));
+                            }
+                          }}
+                          className={cn("px-1.5 py-0.5 rounded cursor-pointer", accidentalMode === 'flat' ? "bg-slate-200 dark:bg-white/20 font-bold" : "text-slate-400")}
+                        >
+                          ♭
+                        </button>
                       </div>
                     </div>
 
-                    {/* Beat Slots Grid for this Measure */}
-                    <div 
-                      className="grid gap-1.5 items-center w-full"
-                      style={{ gridTemplateColumns: `repeat(${masterLength}, minmax(0, 1fr))` }}
-                    >
-                      {Array.from({ length: masterLength }).map((_, bIdx) => {
-                        const globalBeatIndex = startBeatIndex + bIdx;
-                        const chordSlot = progression[globalBeatIndex];
-                        const exists = !!chordSlot;
+                    <div className="grid grid-cols-6 sm:grid-cols-6 gap-1">
+                      {(accidentalMode === 'flat' ? CHORD_ROOTS_FLAT : CHORD_ROOTS_SHARP).map(root => (
+                        <button
+                          key={root}
+                          onClick={() => setSelectedLibraryRoot(root)}
+                          className={cn(
+                            "py-1.5 rounded-lg text-xs font-mono font-bold transition-all text-center cursor-pointer",
+                            selectedLibraryRoot === root 
+                              ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs"
+                              : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
+                          )}
+                        >
+                          {formatChordName(root)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                        if (!exists) {
-                          return (
-                            <button
-                              key={bIdx}
-                              onClick={() => {
-                                addBeat('');
-                                setSelectedBeatIndex(progression.length);
-                              }}
-                              className={cn(
-                                "h-14 sm:h-16 rounded-xl border border-dashed flex flex-col items-center justify-center transition-all opacity-40 hover:opacity-100",
-                                resolvedTheme === 'dark' ? "border-white/10 hover:border-emerald-500 text-white/40" : "border-slate-300 hover:border-emerald-500 text-slate-400"
-                              )}
-                            >
-                              <Plus className="w-3.5 h-3.5 mb-0.5" />
-                              <span className="text-[7px] font-bold uppercase tracking-wider">Add</span>
-                            </button>
-                          );
-                        }
+                  {/* Chord Quality / Type Grid */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[9px] font-bold">
+                      Chord Types ({formatChordName(selectedLibraryRoot)})
+                    </span>
 
-                        const isExplicit = chordSlot.name.trim() !== '';
-                        const effective = getEffectiveChord(progression, globalBeatIndex);
-                        const isSelected = selectedBeatIndex === globalBeatIndex;
-                        const isCellPlaying = isPlaying && currentIndex === globalBeatIndex;
-                        const targetChordName = isExplicit ? chordSlot.name : effective?.chord || '';
-                        const chordTypeInfo = getChordTypeInfo(targetChordName);
-
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                      {CHORD_TYPES.map(type => {
+                        const chordName = `${selectedLibraryRoot}${type.suffix}`;
                         return (
-                          <div
-                            key={chordSlot.id}
-                            onClick={() => {
-                              setSelectedBeatIndex(globalBeatIndex);
-                              const playTarget = isExplicit ? chordSlot.name : effective?.chord;
-                              if (playTarget) {
-                                playChord(playTarget, selectedInstrument, accompanimentVolume);
-                                setTrackedChord(playTarget);
-                              }
-                            }}
-                            className={cn(
-                              "relative group/cell h-14 sm:h-16 rounded-xl flex flex-col justify-between p-1.5 transition-all cursor-pointer overflow-hidden border",
-                              isCellPlaying
-                                ? "bg-emerald-500 text-white border-emerald-400 ring-2 ring-emerald-300 shadow-md z-10 font-bold scale-[1.02]"
-                                : isSelected
-                                  ? (isExplicit
-                                      ? (resolvedTheme === 'dark'
-                                          ? "bg-emerald-950/70 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500 shadow-xs z-10"
-                                          : "bg-emerald-50 text-emerald-950 border-emerald-500 ring-2 ring-emerald-500 shadow-xs z-10 font-black")
-                                      : (resolvedTheme === 'dark'
-                                          ? "bg-white/10 text-white border-emerald-500 ring-2 ring-emerald-500 z-10"
-                                          : "bg-slate-200 text-slate-950 border-emerald-500 ring-2 ring-emerald-500 z-10 font-black"))
-                                  : isExplicit
-                                    ? (resolvedTheme === 'dark'
-                                        ? "bg-white/[0.04] border-white/10 text-white hover:bg-emerald-950/40 hover:border-emerald-500/60 hover:text-emerald-300 shadow-2xs"
-                                        : "bg-white border-slate-300 text-slate-900 hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-950 shadow-2xs")
-                                    : (resolvedTheme === 'dark'
-                                        ? "bg-black/20 border-dashed border-white/10 text-slate-400 hover:bg-white/5 hover:text-white"
-                                        : "bg-slate-100/80 border-dashed border-slate-300 text-slate-600 hover:bg-slate-200 hover:text-slate-900")
-                            )}
+                          <button
+                            key={type.label}
+                            onClick={() => handleLibraryChordClick(chordName)}
+                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:border-emerald-500 hover:bg-emerald-500/10 text-slate-900 dark:text-white transition-all cursor-pointer"
                           >
-                            {/* Cell Top Header */}
-                            <div className="flex items-center justify-between w-full leading-none">
-                              <span className={cn(
-                                "text-[7px] font-black font-mono px-1 py-0.2 rounded",
-                                isCellPlaying
-                                  ? "bg-white/20 text-white"
-                                  : (resolvedTheme === 'dark' ? "bg-white/10 text-slate-300" : "bg-slate-200 text-slate-800 font-extrabold")
-                              )}>
-                                b.{bIdx + 1}
-                              </span>
-
-                              {progressionVoicings[globalBeatIndex] && targetChordName ? (
-                                <span className={cn(
-                                  "text-[6.5px] font-mono font-bold truncate max-w-[48px] px-0.5 rounded",
-                                  isCellPlaying ? "bg-white/20 text-white" : (resolvedTheme === 'dark' ? "text-emerald-400" : "text-emerald-800 font-extrabold")
-                                )} title={progressionVoicings[globalBeatIndex]?.description}>
-                                  {progressionVoicings[globalBeatIndex]?.inversionName}
-                                </span>
-                              ) : !isExplicit ? (
-                                <span className="text-[6px] font-bold uppercase tracking-tight text-slate-400 dark:text-slate-500">sus</span>
-                              ) : null}
-                            </div>
-
-                            {/* Center Chord Name Display */}
-                            <div className="flex flex-col items-center justify-center my-0.5 leading-none">
-                              {isCellPlaying && (chordSlot.name.trim() === '-' || chordSlot.name.trim() === '—' || chordSlot.name.trim() === '–') ? (
-                                <span className="text-sm sm:text-base font-black font-mono tracking-tighter truncate max-w-full text-emerald-100">
-                                  {formatChordName(effective?.chord || '—')}
-                                </span>
-                              ) : isExplicit ? (
-                                <span className={cn(
-                                  "text-sm sm:text-base font-black font-mono tracking-tighter truncate max-w-full transition-colors",
-                                  resolvedTheme === 'dark' ? "text-white group-hover/cell:text-emerald-300" : "text-slate-900 group-hover/cell:text-emerald-950"
-                                )}>
-                                  {formatChordName(chordSlot.name)}
-                                </span>
-                              ) : (
-                                <span className={cn(
-                                  "text-[10px] font-bold font-mono italic truncate max-w-full transition-colors",
-                                  resolvedTheme === 'dark' ? "text-slate-400 group-hover/cell:text-slate-200" : "text-slate-600 group-hover/cell:text-slate-900"
-                                )}>
-                                  {effective?.chord ? `(${formatChordName(effective.chord)})` : '—'}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Cell Bottom Hover Quick Actions */}
-                            <div className="flex items-center justify-between w-full opacity-0 group-hover/cell:opacity-100 transition-opacity leading-none">
-                              <button
-                                title="Insert empty beat before"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  insertBeat(globalBeatIndex, '');
-                                }}
-                                className="p-0.5 hover:bg-emerald-500/20 rounded text-emerald-500 transition-colors"
-                              >
-                                <Plus className="w-2.5 h-2.5" />
-                              </button>
-
-                              <button
-                                title="Clear chord"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  clearBeat(globalBeatIndex);
-                                }}
-                                className="p-0.5 hover:bg-amber-500/20 rounded text-amber-500 transition-colors"
-                              >
-                                <X className="w-2.5 h-2.5" />
-                              </button>
-
-                              <button
-                                title="Delete beat"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteBeat(globalBeatIndex);
-                                }}
-                                className="p-0.5 hover:bg-red-500/20 rounded text-red-500 transition-colors"
-                              >
-                                <Trash2 className="w-2.5 h-2.5" />
-                              </button>
-                            </div>
-                          </div>
+                            <span className="text-xs font-mono font-black">{formatChordName(chordName)}</span>
+                            <span className="text-[7.5px] text-slate-400 truncate max-w-full">{type.label}</span>
+                          </button>
                         );
                       })}
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ) : activeToolsTab === 'songs' ? (
+                <SongLibraryPanel />
+              ) : (
+                <div className="flex-1 min-h-0">
+                  <ChordExplorer initialChord={activeExplorerChord} />
+                </div>
+              )}
             </div>
-          </div>
-          </div>
-        )}
-        </div>
-
-        {/* Right Side Tabbed Panel: Chord Library / Chord Explorer / Presets */}
-        {isSidebarOpen && (
-        <section className={cn(
-          "lg:col-span-5 xl:col-span-4 w-full min-w-0 rounded-2xl border flex flex-col min-h-[580px] lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-5rem)] overflow-hidden transition-colors",
-          resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl"
-        )}>
-          {/* Tab Header Bar */}
-          <div className="p-4 pb-0 flex items-center justify-between border-b border-slate-200 dark:border-white/10">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-              <button
-                onClick={() => setActiveRightTab('library')}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
-                  activeRightTab === 'library'
-                    ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
-                    : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
-                )}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                Chords
-              </button>
-
-              <button
-                onClick={() => setActiveRightTab('songs')}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
-                  activeRightTab === 'songs'
-                    ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
-                    : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
-                )}
-              >
-                <Music className="w-3.5 h-3.5 text-emerald-500" />
-                Song Library
-              </button>
-
-              <button
-                onClick={() => setActiveRightTab('explorer')}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 shrink-0 cursor-pointer",
-                  activeRightTab === 'explorer'
-                    ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
-                    : (resolvedTheme === 'dark' ? "border-transparent text-white/40 hover:text-white/70" : "border-transparent text-slate-400 hover:text-slate-700")
-                )}
-              >
-                <Compass className="w-3.5 h-3.5" />
-                Explorer
-              </button>
-            </div>
-
-            {/* Active Chord Badge */}
-            <div className="text-[9px] font-mono font-black text-emerald-500 px-2.5 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-1 shrink-0 min-w-[56px] text-center inline-block">
-              {formatChordName(activeExplorerChord)}
-            </div>
-          </div>
-
-          {/* Tab Content Area */}
-          <div className="flex-1 p-4 flex flex-col overflow-y-auto min-h-0">
-            {activeRightTab === 'library' ? (
-              <div className="flex flex-col gap-4 h-full">
-                {/* Target Beat, Enharmonic Toggle & Chord Progressions Modal Trigger Banner */}
-                <div className="flex items-center justify-between text-[10px] font-bold flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 uppercase tracking-widest text-[9px]">Root Note:</span>
-                    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-200/60 dark:bg-white/10 border border-slate-300 dark:border-white/10">
-                      <button
-                        onClick={() => {
-                          setAccidentalMode('sharp');
-                          if (selectedLibraryRoot.includes('b')) {
-                            setSelectedLibraryRoot(toggleEnharmonicSpelling(selectedLibraryRoot));
-                          }
-                        }}
-                        className={cn(
-                          "px-2 py-0.5 rounded text-[8px] font-black transition-all cursor-pointer",
-                          accidentalMode === 'sharp'
-                            ? "bg-emerald-500 text-white shadow-xs"
-                            : "text-slate-500 dark:text-white/40 hover:text-slate-800 dark:hover:text-white"
-                        )}
-                        title="Display Sharp roots (#)"
-                      >
-                        ♯ Sharps
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAccidentalMode('flat');
-                          if (selectedLibraryRoot.includes('#')) {
-                            setSelectedLibraryRoot(toggleEnharmonicSpelling(selectedLibraryRoot));
-                          }
-                        }}
-                        className={cn(
-                          "px-2 py-0.5 rounded text-[8px] font-black transition-all cursor-pointer",
-                          accidentalMode === 'flat'
-                            ? "bg-emerald-500 text-white shadow-xs"
-                            : "text-slate-500 dark:text-white/40 hover:text-slate-800 dark:hover:text-white"
-                        )}
-                        title="Display Flat roots (♭)"
-                      >
-                        ♭ Flats
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setIsChordModalOpen(true)}
-                      className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] uppercase tracking-wider flex items-center gap-1 shadow-xs border border-indigo-500 transition-all cursor-pointer active:scale-95 shrink-0"
-                      title="Pick from common chord progressions and variations (J-Pop, Anime, Jazz, Rock, etc.)"
-                    >
-                      <Layers className="w-3 h-3" />
-                      <span>Chord Progressions</span>
-                    </button>
-
-                    <span className="text-[9px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
-                      {selectedBeatIndex !== null ? `Target Beat ${selectedBeatIndex + 1}` : 'Target: New Beat'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* SUGGESTED ALTERNATIVE CHORDS SECTION */}
-                <div className={cn(
-                  "p-2.5 rounded-xl border flex flex-col gap-1.5 transition-all shadow-xs shrink-0",
-                  resolvedTheme === 'dark'
-                    ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
-                    : "bg-emerald-50/80 border-emerald-200 text-emerald-950"
-                )}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 truncate">
-                        {isSelectedBeatExplicit
-                          ? `Alternatives for ${formatChordName(selectedBeatSlot?.name || '')}`
-                          : selectedBeatIndex !== null
-                            ? `Suggested for Beat ${selectedBeatIndex + 1}`
-                            : 'Suggested Chords'}
-                      </span>
-                    </div>
-                    <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 shrink-0">
-                      {suggestedChords.length} options
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1 max-h-36 overflow-y-auto pr-0.5">
-                    {suggestedChords.map((s) => {
-                      const isCurrentSelected = isSelectedBeatExplicit && selectedBeatSlot?.name === s.chord;
-                      return (
-                        <button
-                          key={`${s.chord}_${s.label}`}
-                          onClick={() => handleSelectSuggestedChord(s.chord)}
-                          className={cn(
-                            "group flex flex-col p-1.5 rounded-lg border text-left transition-all active:scale-95 shadow-2xs cursor-pointer",
-                            isCurrentSelected
-                              ? "bg-emerald-500 text-white border-emerald-400 font-bold"
-                              : resolvedTheme === 'dark'
-                                ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-emerald-500/50"
-                                : "bg-white border-slate-200 hover:bg-emerald-50 hover:border-emerald-400"
-                          )}
-                          title={`${s.chord}: ${s.reason}`}
-                        >
-                          <div className="flex items-center justify-between w-full leading-none mb-0.5">
-                            <span className="text-xs font-black font-mono tracking-tight group-hover:text-emerald-500 dark:group-hover:text-emerald-400">
-                              {formatChordName(s.chord)}
-                            </span>
-                            <span className={cn(
-                              "text-[6.5px] font-extrabold uppercase tracking-wider px-1 py-0.2 rounded shrink-0 ml-1",
-                              isCurrentSelected
-                                ? "bg-white/20 text-white"
-                                : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
-                            )}>
-                              {s.label}
-                            </span>
-                          </div>
-                          <span className="text-[7.5px] opacity-75 line-clamp-1 font-medium leading-tight">
-                            {s.reason}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Root Note Selector Pills */}
-                <div className={cn(
-                  "grid grid-cols-6 sm:grid-cols-12 gap-1 p-1 rounded-xl border transition-colors",
-                  resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-slate-100 border-black/5"
-                )}>
-                  {(accidentalMode === 'flat' ? CHORD_ROOTS_FLAT : CHORD_ROOTS_SHARP).map(root => (
-                    <button
-                      key={root}
-                      onClick={() => setSelectedLibraryRoot(root)}
-                      className={cn(
-                        "py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all text-center",
-                        selectedLibraryRoot === root 
-                          ? (resolvedTheme === 'dark' ? "bg-white text-black shadow-xs" : "bg-slate-900 text-white shadow-xs")
-                          : (resolvedTheme === 'dark' ? "text-white/40 hover:text-white" : "text-slate-500 hover:text-slate-900")
-                      )}
-                    >
-                      {formatChordName(root)}
-                    </button>
-                  ))}
-                </div>
-
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                  Chord Types ({formatChordName(selectedLibraryRoot)}):
-                </span>
-
-                {/* Grid of Chords for Selected Root */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 overflow-y-auto pr-1">
-                  {CHORD_TYPES.map(type => {
-                    const chordName = `${selectedLibraryRoot}${type.suffix}`;
-                    return (
-                      <button 
-                        key={type.label}
-                        onClick={() => handleLibraryChordClick(chordName)}
-                        className={cn(
-                          "group flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-lg transition-all active:scale-95 min-h-[46px] shadow-2xs hover:brightness-105 cursor-pointer",
-                          type.color
-                        )}
-                      >
-                        <span className="text-xs sm:text-sm font-black font-mono tracking-tighter leading-none">{formatChordName(chordName)}</span>
-                        <span className="text-[6.5px] font-extrabold uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity text-center leading-tight truncate max-w-full px-0.5">
-                          {type.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : activeRightTab === 'songs' ? (
-              <SongLibraryPanel />
-            ) : (
-              <div className="flex-1 min-h-0">
-                <ChordExplorer initialChord={activeExplorerChord} />
-              </div>
-            )}
-          </div>
-        </section>
+          </aside>
         )}
       </div>
+
+      {/* 4. MODALS & OVERLAYS */}
 
       {/* Save Custom Preset Modal */}
       {isSaveModalOpen && (
@@ -1656,7 +962,7 @@ export default function AccompanimentView() {
               </div>
               <button 
                 onClick={() => setIsSaveModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 transition-colors"
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1710,7 +1016,7 @@ export default function AccompanimentView() {
                 <label className="text-[10px] font-bold uppercase text-slate-400">Description (Optional)</label>
                 <input 
                   type="text"
-                  placeholder="e.g. Smooth 7th chords with chromatic walkthrough"
+                  placeholder="e.g. Smooth 7th chords with chromatic turnaround"
                   value={presetDescInput}
                   onChange={(e) => setPresetDescInput(e.target.value)}
                   className={cn(
@@ -1720,29 +1026,17 @@ export default function AccompanimentView() {
                 />
               </div>
 
-              {/* Chords Sequence Preview */}
-              <div className="flex flex-col gap-1 p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                <span className="text-[9px] font-bold uppercase text-slate-400">Progression Preview ({totalMeasures} {totalMeasures === 1 ? 'Bar' : 'Bars'})</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {progression.filter(p => p.name && p.name.trim() !== '').map((p, i) => (
-                    <span key={i} className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-mono font-bold">
-                      {formatChordName(p.name)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setIsSaveModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-md"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" /> Save Preset
                 </button>
@@ -1752,7 +1046,7 @@ export default function AccompanimentView() {
         </div>
       )}
 
-      {/* Section Label Selection Modal */}
+      {/* Section Rehearsal Label Selection Modal */}
       {editingMeasureIndex !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <motion.div
@@ -1773,14 +1067,14 @@ export default function AccompanimentView() {
               </div>
               <button
                 onClick={() => setEditingMeasureIndex(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Select a quick section preset or enter custom label text (e.g. Chorus 1, Bridge, Guitar Solo):
+              Select a rehearsal mark or enter custom label text (e.g. Intro, Chorus 1, Bridge, Solo):
             </p>
 
             {/* Quick Presets */}
@@ -1798,7 +1092,7 @@ export default function AccompanimentView() {
                     setEditingMeasureIndex(null);
                   }}
                   className={cn(
-                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border",
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer",
                     measureLabels[editingMeasureIndex] === label
                       ? "bg-indigo-600 text-white border-indigo-500 shadow-xs"
                       : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-indigo-500 hover:text-indigo-500"
@@ -1836,7 +1130,7 @@ export default function AccompanimentView() {
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-all shrink-0"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-all shrink-0 cursor-pointer"
                 >
                   Set
                 </button>
@@ -1851,7 +1145,7 @@ export default function AccompanimentView() {
                     deleteMeasureLabel(editingMeasureIndex);
                     setEditingMeasureIndex(null);
                   }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                 >
                   Clear Label
                 </button>
@@ -1860,7 +1154,7 @@ export default function AccompanimentView() {
               <button
                 type="button"
                 onClick={() => setEditingMeasureIndex(null)}
-                className="px-4 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+                className="px-4 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
               >
                 Close
               </button>
@@ -1889,7 +1183,7 @@ export default function AccompanimentView() {
         onClose={() => setIsQuickPickerOpen(false)}
         onSelectSong={handleSelectSongFromQuickPicker}
         onSelectProgression={handleSelectProgressionFromQuickPicker}
-        currentTitle={currentTitle}
+        currentTitle={currentSongTitle}
       />
     </div>
   );

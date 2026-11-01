@@ -1,148 +1,112 @@
-# MusoBuddy Minimalist UI/UX Overhaul
+# Accompaniment UX Simplification & Lead-Sheet Redesign
 
-Streamline MusoBuddy into a calm, intuitive, and distraction-free workspace ("Modern Zen Studio") with a sleek top bar, unified action menu, contextual score controls, and an unobtrusive bottom quick-dock for practice tools—preserving 100% of existing sheet music, audio, transcription, and accompaniment capabilities.
+A complete decluttering and structural reorganization of the Accompaniment screen, transforming it from a heavily boxed, multi-card interface with duplicate controls into an elegant, distraction-free music lead-sheet layout with a floating bottom playback dock and a collapsible reference drawer.
 
-## User Review & Critical Decisions
+### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following directions were confirmed during interactive clarification and form the foundation of this redesign:
-> - **Navigation & Toolbar**: Sleek top bar with unified "+" action menu and contextual controls.
-> - **Practice Tools Integration**: Compact bottom quick-dock with slide-out mini controls and one-touch toggles.
-> - **Visual Aesthetic**: Modern Zen Studio—soft dark neutral tones (`#121316`, `#1A1C20`), refined typography, and subtle warm ember accents.
-> - **Feature Preservation**: Full retention of ABC notation, MusicXML, GuitarPro, PDF sheet reading, melody transcription, chord accompaniment engine, tuner, drone, metronome, and gamepads/MIDI controllers.
+> The following design and architectural choices have been confirmed and will guide the implementation:
+>
+> - **Confirmed Transport Layout**: Primary playback controls, tempo, meter, and audio settings are consolidated into a sleek, floating bottom playback dock that stays accessible during practice while freeing up the main viewport.
+> - **Confirmed Reference & Library UX**: The Chord Library, Song Explorer, and Preset tools are organized into a clean, collapsible right-side slide-over drawer with segmented tabs, giving 100% full width to the music chart when closed.
+> - **Confirmed Chart Aesthetics**: The chord progression chart replaces heavy nested rounded boxes with a clean musical lead-sheet visual style featuring subtle hairline dividers, rhythmic measure bar-lines, clear typography, and active beat highlights.
+> - **De-duplication Policy**: All redundant copies of controls (transposition buttons, import buttons, save buttons, groove triggers, and measure tracking toggles) will be deduplicated into single, authoritative locations.
 
 ---
 
-## 1. Overview & Core Concept
+### 1. Overview & Core Concept
 
-- **What It Does**: Transforms MusoBuddy from a tool-dense interface into a focused, distraction-free music workstation. Sheet music and practice tools coexist cleanly with zero visual clutter.
-- **Target Audience / Persona**: Performing musicians, music students, composers, and instrument learners who need immediate access to sheet music, metronome, tuner, drone, and accompaniment without being distracted by complex multi-tiered menus.
-- **Key Value**: Musicians can focus purely on reading or playing their score, while keeping essential tools (tempo, tuning, root drone, backing track) one tap away in a minimal bottom dock.
+- **What It Does**: Provides musicians with a clean, responsive chord progression chart and accompaniment backing band. Users can instantly load songs or presets, transpose keys, adjust tempo and groove styles, edit chords beat-by-beat, and practice without visual noise.
+- **Target Audience / Persona**: Practicing musicians, jazz students, guitarists, pianists, and songwriters who need an immediate, legible chord chart with rhythmic backing and minimal distractions.
+- **Key Value**: Replaces multiple stacked nested cards and duplicated toolbar buttons with an authentic lead-sheet experience, maximizing score readability while keeping all essential playback controls within immediate reach.
 
 ---
 
-## 2. User Experience & Visual Design
+### 2. User Experience & Visual Design
 
-### Key User Flows
+#### Key User Flows
+1. **Instant Practice (Zero-State to Play)**: The musician opens Accompaniment and immediately sees a clean, legible lead-sheet chart with the current song or chord progression. Tapping **Play** in the floating bottom dock triggers the count-in and starts the rhythm backing.
+2. **Key & Tempo Adjustments**: In the floating dock, the musician can transpose semitones, toggle enharmonic spellings (♯/♭), change tempo (BPM), or swap groove styles in a single unified strip.
+3. **Song / Progression Selection**: Clicking the active song title in the top header or dock opens the fast search modal or the side drawer to pick from standards, anime/J-pop progressions, or custom presets.
+4. **Beat & Chord Editing**: Clicking any measure or beat activates selection mode without page clutter. Opening the collapsible right drawer provides the Chord Palette and harmonic suggestions.
+5. **Full-Width Immersion**: Toggling the tools drawer closed expands the lead-sheet chart across the full screen width, perfect for live practice or sheet-reading.
 
-1. **Focused Score Reading**:
-   - The user opens MusoBuddy directly into the score view with maximum viewport height and clean margins.
-   - The top bar displays a clean single-line brand mark, view switcher tabs (`Score`, `Accompaniment`, `Metronome`, `Tuner`, `Drone`), and a single unified "+" button for adding or importing scores.
-   - Contextual score controls (Transpose, Zoom, Annotation, Audio Player) sit quietly in a slim contextual strip that fades or tucks away in Distraction-Free mode.
-
-2. **Practice Tools Quick-Dock**:
-   - Pinned at the bottom of the screen is an ultra-slim Quick-Dock (44px height) displaying live readouts: Metronome BPM, Tuner pitch/cents, Drone note, and Accompaniment chord.
-   - Tapping any tool toggle starts/stops it instantly without leaving the score.
-   - Tapping the tool label slides out a smooth, compact mini-control popover (e.g. tempo dial, note picker, volume fader).
-   - A quick collapse button allows users to fold the dock entirely into a subtle floating pill.
-
-3. **Unified Action Menu ("+")**:
-   - Consolidates "Transcribe Melody (Mic)", "Upload Score File", "Open Score from URL", and "New Blank Score" into a single, beautifully organized action sheet or dropdown.
-
-4. **Refined Score Library Sidebar**:
-   - Collapsible slide-over drawer with search, format filtering, and tune switcher that tucks away cleanly when practicing.
-
-### Visual Identity & Theme (Modern Zen Studio)
-
-```
-Visual Architecture: Modern Zen Studio
-┌──────────────────────────────────────────────────────────┐
-│ Canvas: Dark (#121316) / Light (#F7F8FA)                 │
-│ Surfaces: Dark (#1A1C20, #22252B) / Light (#FFFFFF)     │
-│ Accent: Burnt Ember (#E05A2B) - focused actions & states │
-│ Borders: Hairline 1px (rgba(255,255,255,0.08) / 0.06)    │
-│ Typography: Geometric Sans + Tabular Monospace figures   │
-└──────────────────────────────────────────────────────────┘
-```
-
+#### Visual Identity & Theme
+- **Aesthetic Direction**: Minimalist, publication-grade music lead-sheet inspired by classic real-books and modern digital workstations. No heavy drop-shadows, no nested bordered cards inside bordered containers.
 - **Color Palette & Contrast**:
-  - Dominant Neutral (60%): `#121316` (Obsidian Charcoal) in dark mode, `#F8F9FA` in light mode.
-  - Structural Surfaces (30%): Elevated card layers at `#1A1C20` and `#22252B` with hairline borders (`border-white/5` or `border-black/5`).
-  - Accent Budget (10%): Warm ember (`#E05A2B`) used strictly on active view indicators, primary buttons, and live audio states.
-- **Typography & Hierarchy**:
-  - Wordmark & Section Headers: Clean contemporary geometric display typography.
-  - Controls & Labels: Clear title case with 12px–13px subdued metadata.
-  - Numerical Values: Strict `tabular-nums font-mono` for BPM, cents, Hertz, transpose semitones, and waypoint measure numbers.
-- **Anti-Slop & Restraint**:
-  - Zero pill-badge sandwiches or ornamental colored tags.
-  - Elimination of decorative pulsing status dots on static content.
-  - No nested cards-within-cards; clean hairline dividers and generous whitespace.
-  - Smooth 150ms compositor animations (`transform`, `opacity`).
+  - *Dominant Canvas*: Clean neutral slate (`bg-slate-50` light / `bg-slate-950` dark).
+  - *Lead-Sheet Surface*: Crisp paper-white (`bg-white` light / `bg-slate-900/80` dark) with refined hairline dividers (`border-slate-200/80` light / `border-white/10` dark).
+  - *Accents*: Emerald (`text-emerald-500`, `bg-emerald-600`) reserved exclusively for active playback highlights, current beat indicator, and primary play action.
+  - *Section Badges*: Subtle typographic markers and quiet indigo accents for rehearsal marks (Intro, Verse, Chorus).
+- **Typography & Lead-Sheet Hierarchy**:
+  - *Chord Symbols*: Bold monospace tabular figures (`font-mono font-black text-lg md:text-xl tracking-tight`) for instant readability at a glance.
+  - *Measure Numbers & Bar-lines*: Quiet subscript markers (`text-[10px] text-slate-400 font-mono`) and vertical bar-lines imitating musical notation.
+  - *Dock & Navigation*: Clean single-line sans typography with zero multi-line button wrapping.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+### 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Bottom Quick-Dock vs Floating Practice Tools Window**
-  - *Chosen Approach*: Replace the floating, multi-accordion Practice Tools panel with a pinned bottom dock that slides out mini controls on demand.
-  - *Why*: Floating panels often obscure sheet music measures, requiring constant dragging and closing. A fixed bottom dock keeps 90%+ of the score visible while keeping one-touch controls right in the ergonomic thumb zone.
-  - *Alternatives Considered*: Floating draggable widget (blocks music, high interaction cost) or hiding practice tools entirely inside their own views (slows down practice workflow).
-
-- **Decision 2: Top Bar Contract & Unified Action Hub**
-  - *Chosen Approach*: Adhere strictly to the Top Bar Contract (Wordmark — 5 View Tabs — Unified Action Hub + Settings/Theme).
-  - *Why*: Reduces cognitive load by eliminating multiple competing buttons ("Install App", "New Score", "Load File", "About", "Controller", "URL") from the top row.
-  - *Alternatives Considered*: Multi-row toolbar (eats vertical music viewport, feels busy).
-
-- **Decision 3: Contextual Score Strip**
-  - *Chosen Approach*: Keep score-specific tools (zoom, transpose, annotations, part picker) in a slim, non-intrusive bar directly attached to the score header, which collapses during playback or distraction-free mode.
-  - *Why*: Keeps controls relevant to the active score format without polluting the global navigation.
+- **Consolidating Duplicate Controls**:
+  - *What was removed/consolidated*: Previously, transposition controls (-1, +1, semitone badge, enharmonics) existed in three separate places: the top launchpad, the editor toolbar, and the sidebar. The "Import ABC" and "Save Preset" buttons existed in both the top stage bar and the editor toolbar. "Groove Sequencer" existed in three places. "Track Measures" was rendered in both the stage header and inside the compact HUD.
+  - *Chosen Approach*: Single authoritative locations: Transposition, Key, Tempo, and Playback live in the floating bottom dock; Rehearsal/Section editing and Mode toggles live in the chart header; Chord tools and song libraries live in the collapsible drawer.
+- **Lead-Sheet Layout vs. Boxed Measure Cards**:
+  - *Chosen Approach*: Replace the nested 4-level card hierarchy with an authentic lead-sheet grid where measures are separated by vertical bar-lines and clean horizontal rules.
+  - *Why*: Eliminates the "boxy" appearance and saves over 35% vertical screen space, allowing 4 to 8 measures per system to be visible simultaneously without scrolling.
+- **Floating Bottom Playback Dock**:
+  - *Chosen Approach*: A slim, rounded dock pinned to the bottom of the viewport with Play/Stop, BPM slider/stepper, Key/Transpose picker, and quick access to 4-Track mixer and Voicing style.
+  - *Why*: Keeps the most frequently clicked practice controls anchored under the user's thumbs or mouse while giving the entire screen area to the musical score.
 
 ---
 
-## 4. Technical Architecture & Component Flow
+### 4. Technical Architecture & Data Strategy *(Technical Reference)*
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                          App.tsx                              │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │   TopNavigationBar (Zen Contract: Brand — Views — "+")   │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │                     Main Workspace Area                 │  │
-│  │  ┌───────────────────┐  ┌────────────────────────────┐  │  │
-│  │  │ ScoreLibraryDrawer│  │ ScoreView / Full Views     │  │  │
-│  │  │ (Collapsible)     │  │ (ABC, PDF, XML, GP, Chords)│  │  │
-│  │  └───────────────────┘  └────────────────────────────┘  │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │   PracticeToolsDock (Bottom Quick-Dock & Slide-Outs)    │  │
-│  │   [ Metronome: 120 ] [ Drone: A4 ] [ Accompaniment ]   │  │
-│  └─────────────────────────────────────────────────────────┘  │
-└───────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ Accompaniment View Container                                           │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ Chart Header: Song Title · Key Badge · View Mode · Drawer Toggle │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│  ┌───────────────────────────────────────────────┬──────────────────┐  │
+│  │ Main Lead-Sheet Chart Canvas                  │ Collapsible      │  │
+│  │                                               │ Drawer (Right)   │  │
+│  │  [A] Verse 1                                  │                  │  │
+│  │  | Cmaj7  | Am7    | Dm7    | G7alt  |        │ ┌──────────────┐ │  │
+│  │  | Em7    | A7b9   | Dm7    | G7     |        │ │ Chords Tab   │ │  │
+│  │                                               │ │ Song Lib Tab │ │  │
+│  │  [B] Chorus                                   │ │ Explorer Tab │ │  │
+│  │  | Fmaj7  | Fm7    | Em7    | A7     |        │ └──────────────┘ │  │
+│  │  | Dm7    | G7     | Cmaj7  | Cmaj7  |        │                  │  │
+│  │                                               │                  │  │
+│  └───────────────────────────────────────────────┴──────────────────┘  │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ Floating Bottom Playback Dock                                    │  │
+│  │ [ ▶ Play ] [ 120 BPM ± ] [ Key: C ±1 ] [ Groove: Bossa ] [ Mixer ]│  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Updates Planned
-
-1. **`src/components/Navigation/TopNavigationBar.tsx`**:
-   - Modern, unified top bar meeting the 3-zone contract.
-   - Clean wordmark with subtle brand identity.
-   - View tabs with elegant active indicator.
-   - Unified Action Menu modal/dropdown containing all import/creation options.
-   - Discreet theme switcher and settings/controller shortcut.
-
-2. **`src/components/Navigation/PracticeToolsDock.tsx` (replaces cluttered floating panel)**:
-   - Persistent bottom dock with live indicators:
-     - Metronome: Play/Stop toggle, tap tempo button, tempo stepper, and popover slider.
-     - Tuner: Real-time note badge, cents deviation, and mic mute toggle.
-     - Drone: Root tone indicator, octave switcher, and play/pause.
-     - Accompaniment: Current chord indicator and playback toggle.
-     - Integrated score audio scrubber when an audio backing track or MIDI is present.
-   - Expandable slide-up drawer for deeper parameter adjustments without leaving the score.
-
-3. **`src/components/Score/ScoreView.tsx`**:
-   - Streamlined contextual toolbar (format tag, transpose, zoom, annotations, print/export).
-   - Redesigned collapsible score library drawer with clean typography and fast search.
-   - Refined distraction-free full-screen mode with subtle escape hint.
-
-4. **Global Styling & Theming**:
-   - Modern Zen Studio CSS variables in `src/index.css` and Tailwind classes.
-   - Clean tabular numerals across all music metric inputs.
+#### State & Component Restructuring
+- **`AccompanimentView.tsx`**:
+  - Houses the top title banner, lead-sheet container, and bottom floating dock.
+  - Manages drawer open/closed state and active modal triggers.
+  - Replaces nested card boxes with a unified lead-sheet layout.
+- **`CompactPlaybackChart.tsx`**:
+  - Refactored to render clean musical bar lines (`|`), rehearsal mark badges (`[A]`, `[Chorus]`), and rhythmic beat ticks rather than heavy rounded card boxes.
+  - Removes redundant internal HUD and duplicate Track Measures buttons, deferring transport display to the unified dock.
+- **Floating Dock Component**:
+  - Pinned at bottom (`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 max-w-5xl w-[calc(100%-2rem)]`).
+  - Contains primary Play/Stop with pulse indicator, count-in toggle, metronome click toggle, key & transpose controls, tempo stepper, and drawers for 4-track groove mixer and voicings.
+- **Collapsible Drawer Component**:
+  - Slides in smoothly from the right without shifting the chart unexpectedly.
+  - Houses the Chord Type Matrix, Root Key selector, harmonic suggestions, Song Library, and Chord Explorer.
 
 ---
 
-## 5. Verification & Acceptance Criteria
-
-1. **Visual Quality**: Clean, quiet aesthetic with no jarring gradients, no static pill sandwiches, no decorative pulsing dots, and balanced typographic hierarchy.
-2. **Ergonomics**: Bottom practice dock allows instant access to metronome/drone/tuner without hiding sheet music notes.
-3. **Feature Parity**: All score formats (ABC, PDF, MusicXML, GuitarPro, Chord sheets), melody recording/transcription, MIDI playback, drone textures, and controller mappings work seamlessly.
-4. **Build & Performance**: Clean compilation with `npm run build` and zero regressions.
+### 5. Transposition & Footer Dock Fixes (Completed)
+- **Standard Practice Tools Footer Dock**: Restored the multi-tool dock strip (Metronome, Drone, Accompaniment mini widget, A440 reference pitch, and Score Audio player) across ALL application views including Accompaniment view, preserving a unified practice layout.
+- **Transposition Arithmetic**: Fixed the calculation in `transposeNoteInKey` and `transposeChord` to compute direct modulo-12 chromatic pitch classes without key-offset diatonic drift or negative modulo index issues. Transposing C up twice yields D; down twice yields C cleanly without double-sharps (`Cx`) or jumping to A.
+- **In-Header Transposition Controls**: Added direct Key picker (`C`, `Db`, `D`, `Eb`...), semitone transposer buttons (`-1`, `+1`), enharmonic toggle (`♯/♭`), and 1-click transpose reset to the lead sheet header.

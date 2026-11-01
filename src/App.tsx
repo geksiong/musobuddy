@@ -144,6 +144,7 @@ export default function App() {
       {/* Practice Tools Compact Bottom Dock */}
       {!isDistractionFree && (
         <PracticeToolsDock 
+          currentView={currentView}
           onNavigate={(view) => setCurrentView(view)}
           fileInputRef={fileInputRef}
         />

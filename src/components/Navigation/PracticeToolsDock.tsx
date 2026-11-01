@@ -17,13 +17,13 @@ import {
   Plus, 
   Minus, 
   Volume2, 
-  VolumeX, 
   X, 
   Music, 
   ExternalLink,
-  ChevronRight,
-  Sliders,
-  RotateCcw
+  SlidersHorizontal,
+  Sparkles,
+  BookOpen,
+  Timer
 } from 'lucide-react';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
@@ -35,16 +35,21 @@ import { useAccompaniment, getEffectiveChord } from '../../contexts/Accompanimen
 import { NOTES } from '../../constants.ts';
 import { DroneTone } from '../Drone/types.ts';
 import { GROOVE_PRESETS } from '../Accompaniment/grooveEngine.ts';
+import GrooveEnginePanel from '../Accompaniment/GrooveEnginePanel.tsx';
+import VoicingInspectorPanel, { VOICING_STYLES } from '../Accompaniment/VoicingInspectorPanel.tsx';
 import ScoreAudioPlayer from '../Score/ScoreAudioPlayer.tsx';
 
+const ALL_ROOT_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
 interface PracticeToolsDockProps {
+  currentView?: 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment';
   onNavigate?: (view: 'metronome' | 'tuner' | 'drone' | 'score' | 'accompaniment') => void;
   fileInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 type ActiveDrawer = 'metronome' | 'drone' | 'tuner' | 'accompaniment' | 'audio' | null;
 
-export default function PracticeToolsDock({ onNavigate, fileInputRef }: PracticeToolsDockProps) {
+export default function PracticeToolsDock({ currentView, onNavigate, fileInputRef }: PracticeToolsDockProps) {
   const { resolvedTheme } = useTheme();
   const { globalAudio, activeScore } = useScores();
   const { playingRefNote, playRefNote, stopRefNote } = useAudio();
@@ -69,8 +74,6 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
     setSelectedDroneNote, 
     droneTone, 
     setDroneTone,
-    droneVolume,
-    setDroneVolume,
     userDroneNotes,
     toggleDroneNote
   } = useDrone();
@@ -79,6 +82,19 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
   const { 
     isPlaying: isAccompanimentPlaying, 
     setIsPlaying: setIsAccompanimentPlaying,
+    isPendingStart,
+    isCountingIn,
+    countInBeat,
+    isCountInEnabled,
+    setIsCountInEnabled,
+    isBassEnabled,
+    setIsBassEnabled,
+    currentKey,
+    handleSelectDirectKey,
+    handleTranspose,
+    handleToggleProgressionEnharmonics,
+    isToolsDrawerOpen,
+    setIsToolsDrawerOpen,
     accompanimentVolume,
     setAccompanimentVolume,
     progression,
@@ -86,19 +102,28 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
     activeGroovePattern,
     setActiveGroovePattern,
     customGroovePresets,
-    isGrooveEngineEnabled,
     setIsGrooveEngineEnabled,
-    arpeggioPreset,
-    setArpeggioPreset,
     voicingStyle,
-    setVoicingStyle
+    setVoicingStyle,
+    isGrooveEngineOpen,
+    setIsGrooveEngineOpen,
+    isVoicingInspectorOpen,
+    setIsVoicingInspectorOpen,
+    setTrackedChord
   } = useAccompaniment();
 
   const [activeDrawer, setActiveDrawer] = useState<ActiveDrawer>(null);
-  const [isDockCollapsed, setIsDockCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem('musobuddy_dock_collapsed') === 'true';
-  });
-  const [droneOctave, setDroneOctave] = useState<'2' | '3' | '4'>('4');
+  const [isDockCollapsed, setIsDockCollapsed] = useState<boolean>(false);
+
+  // Guarantee dock is visible in accompaniment view and clean any stale localStorage collapse state
+  useEffect(() => {
+    if (currentView === 'accompaniment') {
+      setIsDockCollapsed(false);
+      try {
+        localStorage.removeItem('musobuddy_dock_collapsed');
+      } catch (e) {}
+    }
+  }, [currentView]);
 
   // Tap Tempo state
   const tapTimesRef = useRef<number[]>([]);
@@ -135,6 +160,30 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
     if (next) setActiveDrawer(null);
   };
 
+  // Keyboard shortcut: ESC closes open drawers
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isGrooveEngineOpen || isVoicingInspectorOpen) {
+          setIsGrooveEngineOpen(false);
+          setIsVoicingInspectorOpen(false);
+        } else if (activeDrawer) {
+          setActiveDrawer(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isGrooveEngineOpen, isVoicingInspectorOpen, activeDrawer, setIsGrooveEngineOpen, setIsVoicingInspectorOpen]);
+
+  // Auto-expand dock when groove sequencer or voicing inspector is toggled open
+  useEffect(() => {
+    if ((isGrooveEngineOpen || isVoicingInspectorOpen) && isDockCollapsed) {
+      setIsDockCollapsed(false);
+      localStorage.setItem('musobuddy_dock_collapsed', 'false');
+    }
+  }, [isGrooveEngineOpen, isVoicingInspectorOpen, isDockCollapsed]);
+
   // Determine active chord in accompaniment
   const lastDisplayedChordRef = useRef<string>('—');
   const effectiveActive = getEffectiveChord(progression, currentIndex);
@@ -145,7 +194,6 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
   let activeChordName: string;
   if (isAccompanimentPlaying) {
     if (!rawChordName || rawChordName === '-' || rawChordName === '—' || rawChordName === '–') {
-      // If the active chord is "-", display the last displayed active chord instead of "-"
       activeChordName = (lastDisplayedChordRef.current && lastDisplayedChordRef.current !== '—' && lastDisplayedChordRef.current !== '-')
         ? lastDisplayedChordRef.current
         : (effectiveActive?.chord || '—');
@@ -162,8 +210,8 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
 
   const hasScoreAudio = !!(globalAudio || activeScore?.audioUrl);
 
-  // If dock is collapsed, render minimal floating pill trigger
-  if (isDockCollapsed) {
+  // If dock is collapsed, render minimal floating pill trigger (only in non-accompaniment views)
+  if (isDockCollapsed && currentView !== 'accompaniment') {
     return (
       <div className="fixed bottom-4 right-4 z-40">
         <button
@@ -535,14 +583,119 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
         )}
       </AnimatePresence>
 
+      {/* Accompaniment Slide-out Drawer: Groove Step Sequencer & Voice Leading Visualizer */}
+      <AnimatePresence>
+        {currentView === 'accompaniment' && (isGrooveEngineOpen || isVoicingInspectorOpen) && (
+          <>
+            {/* Backdrop click to dismiss */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsGrooveEngineOpen(false);
+                setIsVoicingInspectorOpen(false);
+              }}
+              className="fixed inset-0 bottom-12 bg-black/40 backdrop-blur-[2px] z-40"
+            />
+
+            {/* Elevated Slide-up Drawer Container */}
+            <motion.div
+              initial={{ opacity: 0, y: 32, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 32, scale: 0.99 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className={cn(
+                "fixed bottom-12 inset-x-0 z-50 max-h-[82vh] overflow-y-auto border-t shadow-2xl backdrop-blur-2xl transition-colors custom-scrollbar",
+                resolvedTheme === 'dark'
+                  ? "bg-[#14161C]/98 border-white/[0.12] text-neutral-200 shadow-black/80"
+                  : "bg-white/98 border-neutral-200 text-neutral-800 shadow-xl"
+              )}
+            >
+              <div className="max-w-6xl mx-auto p-3 sm:p-5 flex flex-col gap-4">
+                {/* Drawer Header with Segmented Switcher & Close Button */}
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-white/[0.08] gap-3">
+                  <div className="flex items-center gap-2">
+                    {/* Tab 1: Groove Sequencer */}
+                    <button
+                      onClick={() => {
+                        setIsGrooveEngineOpen(true);
+                        setIsVoicingInspectorOpen(false);
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border",
+                        isGrooveEngineOpen
+                          ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 shadow-xs"
+                          : "border-transparent text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5"
+                      )}
+                    >
+                      <SlidersHorizontal className="w-4 h-4 text-emerald-500" />
+                      <span>4-Track Groove Step Sequencer</span>
+                      {activeGroovePattern?.name && (
+                        <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono">
+                          {activeGroovePattern.name}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Tab 2: Voice Leading Visualizer */}
+                    <button
+                      onClick={() => {
+                        setIsVoicingInspectorOpen(true);
+                        setIsGrooveEngineOpen(false);
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border",
+                        isVoicingInspectorOpen
+                          ? "bg-indigo-500/15 border-indigo-500/50 text-indigo-700 dark:text-indigo-300 shadow-xs"
+                          : "border-transparent text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5"
+                      )}
+                    >
+                      <Sparkles className="w-4 h-4 text-indigo-500" />
+                      <span>Voice Leading Visualizer</span>
+                      <span className="hidden sm:inline px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-mono">
+                        {VOICING_STYLES.find(s => s.id === voicingStyle)?.shortLabel || 'Voicings'}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Header Actions: Close Button */}
+                  <div className="flex items-center gap-2">
+                    <span className="hidden md:inline text-[11px] text-neutral-400">
+                      Press Esc or click outside to dismiss
+                    </span>
+                    <button
+                      onClick={() => {
+                        setIsGrooveEngineOpen(false);
+                        setIsVoicingInspectorOpen(false);
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-neutral-200 dark:hover:bg-white/10 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                      title="Close drawer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Panel Body */}
+                <div className="w-full">
+                  {isGrooveEngineOpen && <GrooveEnginePanel />}
+                  {isVoicingInspectorOpen && !isGrooveEngineOpen && <VoicingInspectorPanel />}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Persistent Dock Bar */}
       <div className={cn(
-        "h-12 px-3 sm:px-6 flex items-center justify-between border-t transition-colors backdrop-blur-xl relative",
+        "h-12 px-3 sm:px-6 flex items-center justify-between border-t transition-colors backdrop-blur-xl relative z-40",
         resolvedTheme === 'dark'
-          ? "bg-[#141518]/95 border-white/[0.08] text-neutral-300"
-          : "bg-white/95 border-neutral-200 text-neutral-700 shadow-[0_-1px_3px_rgba(0,0,0,0.03)]"
+          ? "bg-[#141518] border-white/[0.12] text-neutral-200 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]"
+          : "bg-white border-neutral-200 text-neutral-800 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
       )}>
-        {/* Tool Stations Strip */}
+        {/* STANDARD PRACTICE TOOLS DOCK STRIP (Unified across all views) */}
         <div className="flex items-center gap-1.5 sm:gap-3 overflow-x-auto no-scrollbar py-1">
           {/* 1. Metronome Widget */}
           <div className={cn(
@@ -623,7 +776,7 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
             </button>
           </div>
 
-          {/* 3. Accompaniment Widget */}
+          {/* 3. Accompaniment Mini Widget */}
           <div className={cn(
             "flex items-center gap-1 p-0.5 rounded-lg border transition-colors",
             isAccompanimentPlaying 
@@ -678,41 +831,44 @@ export default function PracticeToolsDock({ onNavigate, fileInputRef }: Practice
         </div>
 
         {/* Right Dock Utilities: Tuner Quick Pitch & Dock Hide */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Quick Pitch Reference A440 */}
-          <button
-            onClick={() => {
-              if (playingRefNote) {
-                stopRefNote();
-              } else {
-                playRefNote('A4');
-              }
-            }}
-            title={playingRefNote ? "Stop Reference Pitch" : "Play Reference Pitch (A440)"}
-            className={cn(
-              "h-7 px-2 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border",
-              playingRefNote
-                ? "bg-blue-600 border-blue-500 text-white"
-                : resolvedTheme === 'dark'
-                  ? "border-white/[0.06] hover:bg-white/[0.08] text-neutral-400"
-                  : "border-neutral-200 hover:bg-neutral-100 text-neutral-600"
-            )}
-          >
-            <Mic2 className="w-3 h-3" />
-            <span className="hidden sm:inline">A440</span>
-          </button>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {currentView !== 'accompaniment' && (
+            <button
+              onClick={() => {
+                if (playingRefNote) {
+                  stopRefNote();
+                } else {
+                  playRefNote('A4');
+                }
+              }}
+              title={playingRefNote ? "Stop Reference Pitch" : "Play Reference Pitch (A440)"}
+              className={cn(
+                "h-7 px-2 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border",
+                playingRefNote
+                  ? "bg-blue-600 border-blue-500 text-white"
+                  : resolvedTheme === 'dark'
+                    ? "border-white/[0.06] hover:bg-white/[0.08] text-neutral-400"
+                    : "border-neutral-200 hover:bg-neutral-100 text-neutral-600"
+              )}
+            >
+              <Mic2 className="w-3 h-3" />
+              <span className="hidden sm:inline">A440</span>
+            </button>
+          )}
 
-          {/* Minimize Dock Button */}
-          <button
-            onClick={handleCollapseToggle}
-            title="Minimize Practice Dock"
-            className={cn(
-              "w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer text-neutral-400 hover:text-neutral-900 dark:hover:text-white",
-              resolvedTheme === 'dark' ? "hover:bg-white/[0.08]" : "hover:bg-neutral-100"
-            )}
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
+          {/* Minimize Dock Button (Only on non-accompaniment views) */}
+          {currentView !== 'accompaniment' && (
+            <button
+              onClick={handleCollapseToggle}
+              title="Minimize Practice Dock"
+              className={cn(
+                "w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer text-neutral-400 hover:text-neutral-900 dark:hover:text-white",
+                resolvedTheme === 'dark' ? "hover:bg-white/[0.08]" : "hover:bg-neutral-100"
+              )}
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>
