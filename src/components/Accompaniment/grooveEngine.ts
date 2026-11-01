@@ -141,32 +141,33 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     subdivisionsPerBeat: 2,
     defaultBpm: 124,
     hasEarlyPush: true,
-    description: 'Driving syncopated rock rhythm. Strums Beat 1, then anticipates (pushes) Beat 3 on the "and" of Beat 2, and Beat 1 on the "and" of Beat 4.',
+    description: 'Driving syncopated rock rhythm with crisp acoustic steel guitar strums, articulate picked rock bass, and early chord pushes.',
+    drumSetId: 'drumset_acoustic_studio',
     rhythmInstrument: 'rhythm_guitar_acoustic',
     bassInstrument: 'bass_picked_rock',
     synthInstrument: 'synth_analog_saw',
     chordPattern: [
-      'CHORD_ACCENT',  // Beat 1
-      'OFF',           // 1 and
-      'OFF',           // Beat 2
+      'CHORD_ACCENT',     // Beat 1
+      'OFF',              // 1 and
+      'OFF',              // Beat 2
       'PUSH_NEXT_ACCENT', // 2 and (Pushes Beat 3 chord early!)
-      'OFF',           // Beat 3 (Sustains pushed chord)
-      'CHORD',         // 3 and
-      'OFF',           // Beat 4
-      'PUSH_NEXT_CHORD'  // 4 and (Pushes next measure Beat 1 early!)
+      'OFF',              // Beat 3 (Sustains pushed chord)
+      'CHORD',            // 3 and
+      'OFF',              // Beat 4
+      'PUSH_NEXT_CHORD'   // 4 and (Pushes next measure Beat 1 early!)
     ],
     bassPattern: [
       'ROOT_ACCENT', 'ROOT', 'ROOT', 'PUSH_NEXT_ROOT',
       'ROOT', 'ROOT', 'ROOT', 'PUSH_NEXT_ROOT'
     ],
     synthPattern: [
-      'PAD', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
-      'PAD', 'OFF', 'OFF', 'PUSH_NEXT_LEAD'
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD'
     ],
     percussionLayers: [
-      { id: 'p1', name: '8th Hi-Hat', sound: 'hihat_closed', volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Rock Snare (2 & 4)', sound: 'snare_acoustic', volume: 0.9, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
-      { id: 'p3', name: 'Punchy Kick', sound: 'kick_acoustic', volume: 0.95, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
+      { id: 'p1', name: '8th Hi-Hat', sound: 'hihat_closed', volume: 0.75, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Rock Snare (2 & 4)', sound: 'snare_acoustic', volume: 0.85, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
+      { id: 'p3', name: 'Punchy Kick', sound: 'kick_acoustic', volume: 0.9, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
     ]
   },
   {
@@ -177,7 +178,8 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     subdivisionsPerBeat: 4,
     defaultBpm: 108,
     hasEarlyPush: true,
-    description: 'High-energy 16th-note funk rock rhythm with sharp guitar cuts and early chord pushes on step 8 and step 16.',
+    description: 'High-energy 16th-note funk rock rhythm with sharp clavinet cuts, slap bass pocket, and brass accents on syncopated pushes.',
+    drumSetId: 'drumset_funk_pocket',
     rhythmInstrument: 'rhythm_clavinet',
     bassInstrument: 'bass_slap_funk',
     synthInstrument: 'synth_poly_brass',
@@ -194,10 +196,10 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF'
     ],
     synthPattern: [
-      'LEAD_ROOT', 'OFF', 'LEAD_FIFTH', 'OFF',
-      'OFF', 'LEAD_ROOT', 'OFF', 'PUSH_NEXT_LEAD',
-      'OFF', 'LEAD_ROOT', 'OFF', 'LEAD_OCTAVE',
-      'OFF', 'LEAD_ROOT', 'OFF', 'PUSH_NEXT_LEAD'
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD'
     ],
     percussionLayers: [
       { id: 'p1', name: '16th Hi-Hat', sound: 'hihat_closed', volume: 0.75, pattern: [2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1] },
@@ -214,11 +216,11 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     defaultBpm: 108,
     swingRatio: 0.667,
     hasEarlyPush: true,
-    description: 'Authentic 12-bar blues shuffle rhythm with triplet swing feel, walking bassline, and backbeat snare.',
-    drumSetId: 'drumset_acoustic_studio',
+    description: 'Authentic 12-bar blues shuffle rhythm with triplet swing feel, Hammond B3 organ comping, walking bass, and vintage brush snare.',
+    drumSetId: 'drumset_vintage_jazz_brush',
     rhythmInstrument: 'rhythm_organ_b3',
     bassInstrument: 'bass_electric_finger',
-    synthInstrument: 'synth_lofi_tape',
+    synthInstrument: 'synth_poly_brass',
     chordPattern: [
       'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
       'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF'
@@ -228,13 +230,13 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'ROOT', 'WALKING', 'FIFTH', 'WALKING'
     ],
     synthPattern: [
-      'PAD', 'OFF', 'LEAD_ROOT', 'PUSH_NEXT_LEAD',
-      'PAD', 'OFF', 'LEAD_FIFTH', 'OFF'
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Shuffle Hi-Hat', sound: 'hihat_closed', volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Backbeat Snare', sound: 'snare_brush', volume: 0.85, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
-      { id: 'p3', name: 'Blues Kick', sound: 'kick_acoustic', volume: 0.9, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
+      { id: 'p1', name: 'Shuffle Hi-Hat', sound: 'hihat_closed', volume: 0.75, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Backbeat Snare', sound: 'snare_brush', volume: 0.8, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
+      { id: 'p3', name: 'Blues Kick', sound: 'kick_acoustic', volume: 0.85, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
     ]
   },
 
@@ -247,25 +249,41 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     genre: 'Pop',
     timeSignature: '4/4',
     subdivisionsPerBeat: 2,
-    defaultBpm: 110,
+    defaultBpm: 108,
     hasEarlyPush: true,
-    description: 'Standard modern Pop acoustic strum pattern with syncopated chord anticipation on the "and" of Beat 2.',
-    rhythmInstrument: 'rhythm_piano',
+    description: 'Crisp acoustic steel guitar strumming groove with syncopated chord anticipation on Beat 2 "and", punchy P-bass pocket, and sparkling chime turnaround.',
+    drumSetId: 'drumset_acoustic_studio',
+    rhythmInstrument: 'rhythm_guitar_acoustic',
     bassInstrument: 'bass_electric_finger',
-    synthInstrument: 'synth_silk_pad',
+    synthInstrument: 'synth_fm_bell',
     chordPattern: [
-      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD', 'OFF', 'CHORD', 'CHORD', 'PUSH_NEXT_CHORD'
+      'CHORD_ACCENT',     // Beat 1 (Downstroke)
+      'OFF',              // 1 and (ring)
+      'CHORD',            // Beat 2 (Downstroke)
+      'PUSH_NEXT_CHORD',  // 2 and (Syncopated upstroke push into Beat 3)
+      'OFF',              // Beat 3 (ring)
+      'CHORD',            // 3 and (Upstroke)
+      'OFF',              // Beat 4
+      'PUSH_NEXT_CHORD'   // 4 and (Push into next measure Beat 1)
     ],
     bassPattern: [
-      'ROOT_ACCENT', 'OFF', 'ROOT', 'PUSH_NEXT_ROOT', 'ROOT', 'OFF', 'FIFTH', 'PUSH_NEXT_ROOT'
+      'ROOT_ACCENT',      // Beat 1 (Solid downbeat)
+      'OFF',
+      'ROOT',             // Beat 2
+      'PUSH_NEXT_ROOT',   // 2 and (Early push)
+      'ROOT',             // Beat 3
+      'OFF',
+      'ROOT',             // Beat 4
+      'PUSH_NEXT_ROOT'    // 4 and (Early push)
     ],
     synthPattern: [
-      'PAD', 'OFF', 'OFF', 'PUSH_NEXT_LEAD', 'PAD', 'OFF', 'LEAD_ROOT', 'PUSH_NEXT_LEAD'
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Hi-Hat', sound: 'hihat_closed', volume: 0.75, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Snare / Clap', sound: 'clap_acoustic', volume: 0.8, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
-      { id: 'p3', name: 'Kick', sound: 'kick_acoustic', volume: 0.9, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
+      { id: 'p1', name: 'Studio Hi-Hat (8th)', sound: 'hihat_closed', volume: 0.7, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Snare Rimshot (2 & 4)', sound: 'snare_rimshot', volume: 0.8, pattern: [0, 0, 2, 0, 0, 0, 2, 0] },
+      { id: 'p3', name: 'Acoustic Kick', sound: 'kick_acoustic', volume: 0.85, pattern: [2, 0, 0, 1, 2, 0, 0, 0] }
     ]
   },
   {
@@ -276,7 +294,8 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     subdivisionsPerBeat: 2,
     defaultBpm: 68,
     hasEarlyPush: false,
-    description: 'Rolling 6/8 compound meter rhythm with arpeggiated piano/guitar feels, snare rim click on beat 4, and warm bass pulses.',
+    description: 'Rolling 6/8 compound meter soul ballad with arpeggiated Rhodes Mark I keys, upright bass, soft brush snare on beat 4, and gentle ambient background pad.',
+    drumSetId: 'drumset_vintage_jazz_brush',
     rhythmInstrument: 'rhythm_rhodes',
     bassInstrument: 'bass_upright',
     synthInstrument: 'synth_silk_pad',
@@ -289,13 +308,13 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'ROOT', 'OFF', 'OFF', 'FIFTH', 'OFF', 'OFF'
     ],
     synthPattern: [
-      'PAD', 'OFF', 'OFF', 'LEAD_ROOT', 'OFF', 'OFF',
-      'PAD', 'OFF', 'OFF', 'LEAD_FIFTH', 'OFF', 'OFF'
+      'PAD', 'OFF', 'OFF', 'OFF', 'OFF', 'OFF',
+      'PAD', 'OFF', 'OFF', 'OFF', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Hi-Hat 6/8 Pulse', sound: 'hihat_pedal', volume: 0.7, pattern: [2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1] },
-      { id: 'p2', name: 'Snare Rim (Beat 4)', sound: 'snare_rimshot', volume: 0.85, pattern: [0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0] },
-      { id: 'p3', name: 'Kick (Beats 1 & 4)', sound: 'kick_acoustic', volume: 0.9, pattern: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0] }
+      { id: 'p1', name: 'Pedal Hi-Hat Pulse', sound: 'hihat_pedal', volume: 0.65, pattern: [2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1] },
+      { id: 'p2', name: 'Snare Rim (Beat 4)', sound: 'snare_rimshot', volume: 0.75, pattern: [0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0] },
+      { id: 'p3', name: 'Feathered Kick (1 & 4)', sound: 'kick_acoustic', volume: 0.8, pattern: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0] }
     ]
   },
 
@@ -308,34 +327,35 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     genre: 'Funk',
     timeSignature: '4/4',
     subdivisionsPerBeat: 4,
-    defaultBpm: 112,
+    defaultBpm: 114,
     hasEarlyPush: true,
-    description: 'Bouncy 80s Japanese City Pop rhythm with crisp 16th guitar muted chugs, synth slap bass, and driving disco hi-hats.',
-    rhythmInstrument: 'rhythm_dx7_keys',
-    bassInstrument: 'bass_moog_analog',
+    description: 'Authentic 80s Japanese City Pop groove (Tatsuro Yamashita / Mariya Takeuchi style) with crisp 16th electric guitar comping, tight slap bass pocket, and syncopated brass stabs.',
+    drumSetId: 'drumset_funk_pocket',
+    rhythmInstrument: 'rhythm_guitar_electric',
+    bassInstrument: 'bass_slap_funk',
     synthInstrument: 'synth_poly_brass',
     chordPattern: [
-      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
-      'OFF', 'CHORD', 'OFF', 'CHORD',
-      'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_ACCENT',
-      'OFF', 'CHORD', 'OFF', 'CHORD'
+      'CHORD_ACCENT', 'OFF', 'OFF', 'CHORD',      // Beat 1: Downbeat hit + syncopated 16th cut
+      'OFF', 'CHORD', 'PUSH_NEXT_CHORD', 'OFF',   // Beat 2: 16th comp + early push into Beat 3
+      'OFF', 'OFF', 'CHORD', 'OFF',               // Beat 3: Syncopated offbeat stab
+      'CHORD', 'OFF', 'PUSH_NEXT_ACCENT', 'OFF'   // Beat 4: Downbeat + early push into next measure
     ],
     bassPattern: [
-      'ROOT_ACCENT', 'OFF', 'ROOT', 'OFF',
-      'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF',
-      'ROOT_ACCENT', 'OFF', 'ROOT', 'OFF',
-      'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF'
+      'ROOT_ACCENT', 'OFF', 'OFF', 'ROOT',        // Beat 1: Thumb slap + octave snap
+      'OFF', 'FIFTH', 'PUSH_NEXT_ROOT', 'OFF',    // Beat 2: 5th pop + early push
+      'ROOT', 'OFF', 'OFF', 'ROOT',               // Beat 3
+      'OFF', 'FIFTH', 'PUSH_NEXT_ROOT', 'OFF'     // Beat 4: Early push
     ],
     synthPattern: [
-      'LEAD_ROOT', 'OFF', 'LEAD_FIFTH', 'PUSH_NEXT_LEAD',
-      'OFF', 'LEAD_OCTAVE', 'OFF', 'LEAD_ROOT',
-      'LEAD_ROOT', 'OFF', 'LEAD_FIFTH', 'PUSH_NEXT_LEAD',
-      'OFF', 'LEAD_OCTAVE', 'OFF', 'LEAD_ROOT'
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'OFF', 'PUSH_NEXT_LEAD', 'OFF',      // Tasteful syncopated brass stab on 2-and
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'OFF', 'PUSH_NEXT_LEAD', 'OFF'       // Brass stab anticipation into downbeat
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Disco 16th Hi-Hat', sound: 'hihat_808', volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Snare Slap (2 & 4)', sound: 'snare_808', volume: 0.85, pattern: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0] },
-      { id: 'p3', name: 'Four-on-the-Floor Kick', sound: 'kick_808', volume: 0.95, pattern: [2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0] }
+      { id: 'p1', name: '16th Pocket Hi-Hat', sound: 'hihat_closed', volume: 0.75, pattern: [2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1] },
+      { id: 'p2', name: 'Snare Rimshot (2 & 4)', sound: 'snare_rimshot', volume: 0.85, pattern: [0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 2, 0, 1, 0] },
+      { id: 'p3', name: 'Punchy Funk Kick', sound: 'kick_acoustic', volume: 0.9, pattern: [2, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 2, 0] }
     ]
   },
   {
@@ -344,12 +364,13 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     genre: 'Funk',
     timeSignature: '4/4',
     subdivisionsPerBeat: 4,
-    defaultBpm: 100,
+    defaultBpm: 102,
     hasEarlyPush: true,
-    description: 'Classic Funk 16th strumming pattern. Features tight syncopated chord scratches and anticipated hits on 16th sub-steps.',
+    description: 'Classic Funk 16th groove with percussive Clavinet D6 scratches, tight slap bass pocket, and syncopated brass accents.',
+    drumSetId: 'drumset_funk_pocket',
     rhythmInstrument: 'rhythm_clavinet',
     bassInstrument: 'bass_slap_funk',
-    synthInstrument: 'synth_acid_lead',
+    synthInstrument: 'synth_poly_brass',
     chordPattern: [
       'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF',
       'OFF', 'PUSH_NEXT_CHORD', 'OFF', 'CHORD',
@@ -363,15 +384,15 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'OFF', 'PUSH_NEXT_ROOT', 'ROOT', 'OFF'
     ],
     synthPattern: [
-      'OFF', 'OFF', 'LEAD_ROOT', 'OFF',
-      'OFF', 'PUSH_NEXT_LEAD', 'OFF', 'LEAD_FIFTH',
-      'OFF', 'OFF', 'LEAD_ROOT', 'OFF',
-      'OFF', 'PUSH_NEXT_LEAD', 'OFF', 'LEAD_OCTAVE'
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'PUSH_NEXT_LEAD', 'OFF', 'OFF',
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'PUSH_NEXT_LEAD', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Funk Hi-Hat', sound: 'hihat_closed', volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Snare Clap', sound: 'snare_acoustic', volume: 0.8, pattern: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0] },
-      { id: 'p3', name: 'Kick Drum', sound: 'kick_acoustic', volume: 0.9, pattern: [2, 0, 1, 0, 0, 0, 2, 0, 1, 0, 0, 1, 0, 0, 0, 0] }
+      { id: 'p1', name: 'Funk Hi-Hat', sound: 'hihat_closed', volume: 0.75, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Snare Backbeat', sound: 'snare_rimshot', volume: 0.85, pattern: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0] },
+      { id: 'p3', name: 'Funk Kick', sound: 'kick_acoustic', volume: 0.9, pattern: [2, 0, 1, 0, 0, 0, 2, 0, 1, 0, 0, 1, 0, 0, 0, 0] }
     ]
   },
 
@@ -387,7 +408,7 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     defaultBpm: 140,
     swingRatio: 0.667,
     hasEarlyPush: true,
-    description: 'Iconic Jazz Charleston comping with swing feel. Hits Beat 1 then pushes the Beat 3 chord early on the "and" of Beat 2.',
+    description: 'Iconic Jazz Charleston comping with medium swing. Hits Beat 1 then anticipates Beat 3 on Beat 2 "and", backed by acoustic upright walking bass.',
     drumSetId: 'drumset_vintage_jazz_brush',
     rhythmInstrument: 'rhythm_piano',
     bassInstrument: 'bass_upright',
@@ -401,13 +422,13 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'ROOT', 'WALKING', 'FIFTH', 'WALKING'
     ],
     synthPattern: [
-      'LEAD_ROOT', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
-      'OFF', 'OFF', 'LEAD_FIFTH', 'OFF'
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Pedal Hi-Hat Chick', sound: 'hihat_pedal', volume: 0.75, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Snare Brush Accent', sound: 'snare_brush', volume: 0.7, pattern: [0, 0, 0, 2, 0, 0, 0, 1] },
-      { id: 'p3', name: 'Feathered Kick', sound: 'kick_acoustic', volume: 0.7, pattern: [2, 0, 0, 0, 1, 0, 0, 0] }
+      { id: 'p1', name: 'Pedal Hi-Hat Chick', sound: 'hihat_pedal', volume: 0.7, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Snare Brush Swirl', sound: 'snare_brush', volume: 0.75, pattern: [0, 0, 0, 2, 0, 0, 0, 1] },
+      { id: 'p3', name: 'Feathered Kick', sound: 'kick_acoustic', volume: 0.65, pattern: [2, 0, 0, 0, 1, 0, 0, 0] }
     ]
   },
   {
@@ -419,11 +440,11 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     defaultBpm: 120,
     swingRatio: 0.600,
     hasEarlyPush: true,
-    description: 'Smooth Bossa-Jazz comping with medium swing and early chord stabs pushing beats 3 and 1.',
+    description: 'Smooth Bossa-Jazz comping with nylon guitar plucks, upright bass, cross-stick rimshot, and silky bead shaker.',
     drumSetId: 'drumset_bossa_nova',
     rhythmInstrument: 'rhythm_guitar_nylon',
     bassInstrument: 'bass_upright',
-    synthInstrument: 'synth_silk_pad',
+    synthInstrument: 'synth_fm_bell',
     chordPattern: [
       'CHORD', 'PUSH_NEXT_CHORD', 'OFF', 'CHORD', 'CHORD', 'PUSH_NEXT_CHORD', 'OFF', 'CHORD'
     ],
@@ -431,11 +452,11 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'ROOT', 'OFF', 'FIFTH', 'OFF', 'ROOT', 'OFF', 'WALKING', 'OFF'
     ],
     synthPattern: [
-      'PAD', 'PUSH_NEXT_LEAD', 'OFF', 'PAD', 'PAD', 'PUSH_NEXT_LEAD', 'OFF', 'LEAD_ROOT'
+      'OFF', 'PUSH_NEXT_LEAD', 'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Silky Shaker Pulse', sound: 'shaker', volume: 0.7, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Cross-Stick Rimshot', sound: 'snare_rimshot', volume: 0.8, pattern: [1, 0, 1, 2, 1, 0, 1, 0] },
+      { id: 'p1', name: 'Silky Shaker Pulse', sound: 'shaker', volume: 0.65, pattern: [2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Cross-Stick Rimshot', sound: 'snare_rimshot', volume: 0.75, pattern: [1, 0, 1, 2, 1, 0, 1, 0] },
       { id: 'p3', name: 'Soft Surdo / Kick', sound: 'kick_acoustic', volume: 0.75, pattern: [1, 0, 1, 0, 1, 0, 1, 0] }
     ]
   },
@@ -451,7 +472,8 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     subdivisionsPerBeat: 2,
     defaultBpm: 128,
     hasEarlyPush: true,
-    description: 'Classic Brazilian Bossa Nova guitar/piano rhythm. Features early chord anticipation on beat 2 "and" and beat 4 "and".',
+    description: 'Authentic Brazilian Bossa Nova nylon guitar rhythm (João Gilberto style) with syncopated anticipated chords and warm upright bass.',
+    drumSetId: 'drumset_bossa_nova',
     rhythmInstrument: 'rhythm_guitar_nylon',
     bassInstrument: 'bass_upright',
     synthInstrument: 'synth_fm_bell',
@@ -464,13 +486,13 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'ROOT', 'OFF', 'PUSH_NEXT_ROOT', 'ROOT'
     ],
     synthPattern: [
-      'LEAD_ROOT', 'OFF', 'PUSH_NEXT_LEAD', 'OFF',
-      'LEAD_FIFTH', 'OFF', 'PUSH_NEXT_LEAD', 'OFF'
+      'OFF', 'OFF', 'PUSH_NEXT_LEAD', 'OFF',
+      'OFF', 'OFF', 'PUSH_NEXT_LEAD', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Cabasa / Shaker', sound: 'shaker', volume: 0.65, pattern: [1, 1, 1, 1, 1, 1, 1, 1] },
-      { id: 'p2', name: 'Clave / Rim', sound: 'clave', volume: 0.8, pattern: [2, 0, 1, 0, 0, 2, 1, 0] },
-      { id: 'p3', name: 'Surdo / Kick', sound: 'kick_acoustic', volume: 0.9, pattern: [1, 0, 2, 0, 1, 0, 2, 0] }
+      { id: 'p1', name: 'Silky Shaker', sound: 'shaker', volume: 0.65, pattern: [1, 1, 1, 1, 1, 1, 1, 1] },
+      { id: 'p2', name: 'Son Clave / Rim', sound: 'clave', volume: 0.75, pattern: [2, 0, 1, 0, 0, 2, 1, 0] },
+      { id: 'p3', name: 'Surdo Bass Pulse', sound: 'kick_acoustic', volume: 0.8, pattern: [1, 0, 2, 0, 1, 0, 2, 0] }
     ]
   },
   {
@@ -482,9 +504,10 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     defaultBpm: 180,
     hasEarlyPush: true,
     description: 'Authentic 16th-note Piano Montuno pattern. Pushes the upcoming chord on the 4th sixteenth of beats 1 and 3 before downbeats arrive.',
+    drumSetId: 'drumset_latin_mambo',
     rhythmInstrument: 'rhythm_piano',
     bassInstrument: 'bass_upright',
-    synthInstrument: 'synth_marimba',
+    synthInstrument: 'synth_fm_bell',
     chordPattern: [
       'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
       'OFF', 'CHORD', 'OFF', 'CHORD',
@@ -498,15 +521,15 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'OFF', 'OFF', 'PUSH_NEXT_ROOT', 'OFF'
     ],
     synthPattern: [
-      'LEAD_ROOT', 'OFF', 'LEAD_FIFTH', 'PUSH_NEXT_LEAD',
-      'OFF', 'LEAD_ROOT', 'OFF', 'LEAD_OCTAVE',
-      'OFF', 'LEAD_ROOT', 'OFF', 'PUSH_NEXT_LEAD',
-      'OFF', 'LEAD_ROOT', 'OFF', 'LEAD_FIFTH'
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Cascara / Shaker', sound: 'shaker', volume: 0.7, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
-      { id: 'p2', name: 'Son Clave (3:2)', sound: 'clave', volume: 0.9, pattern: [2, 0, 0, 1, 0, 0, 2, 0, 0, 0, 2, 0, 2, 0, 0, 0] },
-      { id: 'p3', name: 'Conga / Kick', sound: 'conga_low', volume: 0.85, pattern: [1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 2, 0] }
+      { id: 'p1', name: 'Cascara / Shaker', sound: 'shaker', volume: 0.65, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'p2', name: 'Son Clave (3:2)', sound: 'clave', volume: 0.85, pattern: [2, 0, 0, 1, 0, 0, 2, 0, 0, 0, 2, 0, 2, 0, 0, 0] },
+      { id: 'p3', name: 'Conga Tumba', sound: 'conga_low', volume: 0.85, pattern: [1, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 2, 0] }
     ]
   },
 
@@ -521,7 +544,8 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     subdivisionsPerBeat: 2,
     defaultBpm: 84,
     hasEarlyPush: true,
-    description: 'Reggae One-Drop rhythm with offbeat skank chords on the "and" of each beat and early push into Beat 3.',
+    description: 'Reggae One-Drop rhythm with offbeat Hammond organ skank chords, deep focused sub bass, and sharp rim crack on Beat 3.',
+    drumSetId: 'drumset_reggae_one_drop',
     rhythmInstrument: 'rhythm_organ_b3',
     bassInstrument: 'bass_sub_808',
     synthInstrument: 'synth_fm_bell',
@@ -534,13 +558,13 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'ROOT', 'OFF', 'FIFTH', 'OFF'
     ],
     synthPattern: [
-      'OFF', 'LEAD_ROOT', 'OFF', 'PUSH_NEXT_LEAD',
-      'OFF', 'LEAD_ROOT', 'OFF', 'LEAD_FIFTH'
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'p1', name: 'Hi-Hat Offbeats', sound: 'hihat_closed', volume: 0.8, pattern: [0, 2, 0, 2, 0, 2, 0, 2] },
-      { id: 'p2', name: 'One-Drop Snare/Rim', sound: 'snare_rimshot', volume: 0.9, pattern: [0, 0, 0, 0, 2, 0, 0, 0] },
-      { id: 'p3', name: 'One-Drop Kick', sound: 'kick_acoustic', volume: 0.95, pattern: [0, 0, 0, 0, 2, 0, 0, 0] }
+      { id: 'p1', name: 'Hi-Hat Offbeats', sound: 'hihat_closed', volume: 0.75, pattern: [0, 2, 0, 2, 0, 2, 0, 2] },
+      { id: 'p2', name: 'One-Drop Snare/Rim', sound: 'snare_rimshot', volume: 0.85, pattern: [0, 0, 0, 0, 2, 0, 0, 0] },
+      { id: 'p3', name: 'One-Drop Kick', sound: 'kick_acoustic', volume: 0.9, pattern: [0, 0, 0, 0, 2, 0, 0, 0] }
     ]
   },
 
@@ -555,10 +579,11 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
     subdivisionsPerBeat: 4,
     defaultBpm: 118,
     hasEarlyPush: true,
-    description: 'Authentic 4/4 Tangos Flamencos with 16th-note contratiempo rasgueado syncopation, palmas sordas, and cajón accents.',
+    description: 'Authentic 4/4 Tangos Flamencos with 16th-note contratiempo nylon guitar rasgueado, palmas sordas, and Peruvian cajón accents.',
+    drumSetId: 'drumset_flamenco_cajon',
     rhythmInstrument: 'rhythm_guitar_nylon',
     bassInstrument: 'bass_upright',
-    synthInstrument: 'synth_lofi_tape',
+    synthInstrument: 'synth_fm_bell',
     chordPattern: [
       'CHORD_ACCENT', 'OFF', 'CHORD', 'PUSH_NEXT_CHORD',
       'CHORD_ACCENT', 'OFF', 'CHORD', 'OFF',
@@ -572,15 +597,15 @@ export const GROOVE_PRESETS: GroovePatternPreset[] = [
       'FIFTH', 'OFF', 'PUSH_NEXT_ROOT', 'OFF'
     ],
     synthPattern: [
-      'LEAD_ROOT', 'OFF', 'LEAD_ROOT', 'PUSH_NEXT_LEAD',
-      'LEAD_ROOT', 'OFF', 'OFF', 'OFF',
-      'LEAD_ROOT', 'OFF', 'LEAD_ROOT', 'PUSH_NEXT_LEAD',
-      'LEAD_ROOT', 'OFF', 'OFF', 'OFF'
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF',
+      'OFF', 'OFF', 'OFF', 'PUSH_NEXT_LEAD',
+      'OFF', 'OFF', 'OFF', 'OFF'
     ],
     percussionLayers: [
-      { id: 'palmas', name: 'Palmas Sordas', sound: 'palmas_sordas', volume: 0.85, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
+      { id: 'palmas', name: 'Palmas Sordas', sound: 'palmas_sordas', volume: 0.8, pattern: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1] },
       { id: 'cajon_slap', name: 'Cajón Agudo', sound: 'cajon_slap', volume: 0.75, pattern: [0, 2, 0, 1, 2, 0, 1, 0, 0, 2, 0, 1, 2, 0, 1, 0] },
-      { id: 'cajon_bass', name: 'Cajón Grave', sound: 'cajon_bass', volume: 0.9, pattern: [2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0] }
+      { id: 'cajon_bass', name: 'Cajón Grave', sound: 'cajon_bass', volume: 0.85, pattern: [2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0] }
     ]
   }
 ];

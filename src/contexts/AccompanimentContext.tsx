@@ -421,8 +421,6 @@ const SyncEngine: React.FC = () => {
       const baseIntervals = getIntervalsForChord(currentChord) || [0, 4, 7];
       const beatInMeasure = effectiveBeat % mLength;
 
-      const voicedMidiNotes = currentVoicing ? currentVoicing.allNotes : baseIntervals.map(i => i + 60);
-
       const isRhythmOn = isRhythmEngineEnabledRef.current;
       const activeGroove = activeRhythmPatternRef.current;
       const currentRhythmInst = selectedRhythmInstrumentRef.current;
@@ -433,6 +431,12 @@ const SyncEngine: React.FC = () => {
       const currentTrackMutes = trackMutesRef.current;
       const currentBassEnabled = isBassEnabledRef.current && !currentTrackMutes.bass;
       const beatDurationSec = baseBeatDurationSec || (60 / Math.max(30, bpmRef.current || 120));
+
+      const voicedMidiNotes = currentVoicing ? currentVoicing.allNotes : baseIntervals.map(i => i + 60);
+      // Upper harmony notes for chord / rhythm track (removes duplicate low bass note if bass track is playing)
+      const rhythmChordNotes = (currentVoicing && currentBassEnabled)
+        ? currentVoicing.upperNotes
+        : voicedMidiNotes;
 
       if (isRhythmOn && activeGroove) {
         const subsPerBeat = activeGroove.subdivisionsPerBeat || 2;
@@ -459,29 +463,31 @@ const SyncEngine: React.FC = () => {
               if (nextInfo) {
                 const nextChord = nextInfo.chord;
                 const nextVoicing = progVoicings?.[targetBeatIndex] || null;
-                const nextNotes = nextVoicing ? nextVoicing.allNotes : (getIntervalsForChord(nextChord) || [0, 4, 7]).map(i => i + 60);
+                const nextNotes = (nextVoicing && currentBassEnabled)
+                  ? nextVoicing.upperNotes
+                  : (nextVoicing ? nextVoicing.allNotes : (getIntervalsForChord(nextChord) || [0, 4, 7]).map(i => i + 60));
                 const isAccent = chordTrigger === 'PUSH_NEXT_ACCENT';
                 const vol = rhythmVol * (isAccent ? 1.15 : 0.95);
 
                 if (chordTrigger === 'PUSH_NEXT_ROOT') {
                   const rootMidi = nextVoicing?.bassNote ?? (nextNotes[0]);
-                  playRhythmChordSound(ctx, currentRhythmInst, [rootMidi], 0.8, vol, isAccent, eventTime, masterOut);
+                  playRhythmChordSound(ctx, currentRhythmInst, [rootMidi], 0.75, vol, isAccent, eventTime, masterOut);
                 } else {
-                  playRhythmChordSound(ctx, currentRhythmInst, nextNotes, 1.4, vol, isAccent, eventTime, masterOut);
+                  playRhythmChordSound(ctx, currentRhythmInst, nextNotes, 1.1, vol, isAccent, eventTime, masterOut);
                 }
               }
             } else if (chordTrigger === 'CHORD' || chordTrigger === 'CHORD_ACCENT') {
               const isAccent = chordTrigger === 'CHORD_ACCENT';
               const vol = rhythmVol * (isAccent ? 1.15 : 0.95);
-              playRhythmChordSound(ctx, currentRhythmInst, voicedMidiNotes, 1.4, vol, isAccent, eventTime, masterOut);
+              playRhythmChordSound(ctx, currentRhythmInst, rhythmChordNotes, 1.1, vol, isAccent, eventTime, masterOut);
             } else if (chordTrigger === 'ROOT' || chordTrigger === 'ROOT_ACCENT') {
               const isAccent = chordTrigger === 'ROOT_ACCENT';
               const vol = rhythmVol * (isAccent ? 1.15 : 0.95);
-              const rootMidi = currentVoicing?.bassNote ?? voicedMidiNotes[0];
-              playRhythmChordSound(ctx, currentRhythmInst, [rootMidi], 0.8, vol, isAccent, eventTime, masterOut);
+              const rootMidi = currentVoicing?.bassNote ?? rhythmChordNotes[0];
+              playRhythmChordSound(ctx, currentRhythmInst, [rootMidi], 0.75, vol, isAccent, eventTime, masterOut);
             } else if (chordTrigger === 'ARPEGGIO') {
-              const arpMidi = voicedMidiNotes[s % voicedMidiNotes.length];
-              playRhythmChordSound(ctx, currentRhythmInst, [arpMidi], 0.65, rhythmVol * 0.9, false, eventTime, masterOut);
+              const arpMidi = rhythmChordNotes[s % rhythmChordNotes.length];
+              playRhythmChordSound(ctx, currentRhythmInst, [arpMidi], 0.6, rhythmVol * 0.9, false, eventTime, masterOut);
             }
           }
 
@@ -498,19 +504,19 @@ const SyncEngine: React.FC = () => {
                 const nextVoicing = progVoicings?.[targetBeatIndex] || null;
                 const nextBassMidi = nextVoicing?.bassNote ?? ((getIntervalsForChord(nextInfo.chord)?.[0] ?? 0) + 36);
                 const noteMidi = bassTrigger === 'PUSH_NEXT_ROOT' ? nextBassMidi : (nextBassMidi + 7);
-                playBassSound(ctx, currentBassInst, noteMidi, 1.2, bassVol * 1.05, true, eventTime, masterOut);
+                playBassSound(ctx, currentBassInst, noteMidi, 1.0, bassVol * 1.05, true, eventTime, masterOut);
               }
             } else if (bassTrigger === 'ROOT' || bassTrigger === 'ROOT_ACCENT') {
               const isAccent = bassTrigger === 'ROOT_ACCENT';
-              playBassSound(ctx, currentBassInst, bassMidi, 1.2, bassVol * (isAccent ? 1.15 : 0.95), isAccent, eventTime, masterOut);
+              playBassSound(ctx, currentBassInst, bassMidi, 1.0, bassVol * (isAccent ? 1.15 : 0.95), isAccent, eventTime, masterOut);
             } else if (bassTrigger === 'FIFTH') {
-              playBassSound(ctx, currentBassInst, bassMidi + 7, 1.2, bassVol * 0.95, false, eventTime, masterOut);
+              playBassSound(ctx, currentBassInst, bassMidi + 7, 1.0, bassVol * 0.95, false, eventTime, masterOut);
             } else if (bassTrigger === 'WALKING') {
               const targetBeatIndex = (beatIndex + 1) % prog.length;
               const nextInfo = getEffectiveChord(prog, targetBeatIndex);
               const nextVoicing = progVoicings?.[targetBeatIndex] || null;
               const nextBassMidi = nextVoicing?.bassNote ?? bassMidi;
-              playBassSound(ctx, currentBassInst, nextBassMidi - 1, 0.85, bassVol * 0.9, false, eventTime, masterOut);
+              playBassSound(ctx, currentBassInst, nextBassMidi - 1, 0.75, bassVol * 0.9, false, eventTime, masterOut);
             }
           }
 
@@ -527,21 +533,24 @@ const SyncEngine: React.FC = () => {
               if (nextInfo) {
                 const nextVoicing = progVoicings?.[targetBeatIndex] || null;
                 const nextRootMidi = (nextVoicing?.bassNote ? (nextVoicing.bassNote + 24) : (getIntervalsForChord(nextInfo.chord)?.[0] ?? 0) + 60) + leadOctaveOffset;
-                playSynthSound(ctx, currentSynthInst, [nextRootMidi], 1.2, synthVol * 1.1, true, eventTime, masterOut);
+                playSynthSound(ctx, currentSynthInst, [nextRootMidi], 0.8, synthVol * 1.1, true, eventTime, masterOut);
               }
             } else if (synthTrigger === 'PAD') {
-              playSynthSound(ctx, currentSynthInst, voicedMidiNotes, Math.max(1.5, beatDurationSec * 1.8), synthVol * 0.85, false, eventTime, masterOut);
+              // Ensure pad notes are in airy middle/high register (>= 60) and duration fits beat step without muddy overlap
+              const padNotes = rhythmChordNotes.map(n => n < 60 ? n + 12 : n);
+              const padDuration = Math.min(1.1, beatDurationSec * (subsPerBeat > 2 ? 0.9 : 1.15));
+              playSynthSound(ctx, currentSynthInst, padNotes, padDuration, synthVol * 0.65, false, eventTime, masterOut);
             } else if (synthTrigger === 'LEAD_ROOT' || synthTrigger === 'LEAD_ACCENT') {
               const isAccent = synthTrigger === 'LEAD_ACCENT';
-              playSynthSound(ctx, currentSynthInst, [rootMidi], 0.9, synthVol * (isAccent ? 1.2 : 0.95), isAccent, eventTime, masterOut);
+              playSynthSound(ctx, currentSynthInst, [rootMidi], 0.75, synthVol * (isAccent ? 1.2 : 0.95), isAccent, eventTime, masterOut);
             } else if (synthTrigger === 'LEAD_FIFTH') {
-              playSynthSound(ctx, currentSynthInst, [rootMidi + 7], 0.9, synthVol * 0.95, false, eventTime, masterOut);
+              playSynthSound(ctx, currentSynthInst, [rootMidi + 7], 0.75, synthVol * 0.95, false, eventTime, masterOut);
             } else if (synthTrigger === 'LEAD_OCTAVE') {
-              playSynthSound(ctx, currentSynthInst, [rootMidi + 12], 0.9, synthVol * 1.0, true, eventTime, masterOut);
+              playSynthSound(ctx, currentSynthInst, [rootMidi + 12], 0.75, synthVol * 1.0, true, eventTime, masterOut);
             } else if (synthTrigger === 'ARP_FLOURISH') {
               const arpFlourish = [rootMidi, rootMidi + 4, rootMidi + 7, rootMidi + 12];
               const note = arpFlourish[s % arpFlourish.length];
-              playSynthSound(ctx, currentSynthInst, [note], 0.45, synthVol * 0.9, false, eventTime, masterOut);
+              playSynthSound(ctx, currentSynthInst, [note], 0.4, synthVol * 0.85, false, eventTime, masterOut);
             }
           }
 
@@ -608,9 +617,9 @@ const SyncEngine: React.FC = () => {
         }
 
         const subStepDurationSec = beatDurationSec / notesPerBeat;
-        let midiNotesList = [...voicedMidiNotes];
+        let midiNotesList = [...rhythmChordNotes];
         if (arpPreset.includes('2 Octaves')) {
-          midiNotesList = [...voicedMidiNotes, ...voicedMidiNotes.map(m => m + 12)];
+          midiNotesList = [...rhythmChordNotes, ...rhythmChordNotes.map(m => m + 12)];
         }
 
         const rhythmVol = currentAccompVol * (currentTrackVols.rhythm ?? 1.0);
@@ -622,10 +631,10 @@ const SyncEngine: React.FC = () => {
           if (!currentTrackMutes.rhythm) {
             if (arpPreset === 'Block') {
               if (s === 0 && (isExplicit || beatInMeasure === 0)) {
-                playRhythmChordSound(ctx, currentRhythmInst, voicedMidiNotes, 1.6, rhythmVol, false, eventTime, masterOut);
+                playRhythmChordSound(ctx, currentRhythmInst, rhythmChordNotes, 1.2, rhythmVol, false, eventTime, masterOut);
               }
             } else if (arpPreset === 'Double-Time Strum') {
-              playRhythmChordSound(ctx, currentRhythmInst, voicedMidiNotes, 0.8, rhythmVol * (s === 0 ? 1.0 : 0.8), false, eventTime, masterOut);
+              playRhythmChordSound(ctx, currentRhythmInst, rhythmChordNotes, 0.75, rhythmVol * (s === 0 ? 1.0 : 0.8), false, eventTime, masterOut);
             } else {
               const len = midiNotesList.length;
               let noteIndex = 0;

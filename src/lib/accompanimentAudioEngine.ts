@@ -965,25 +965,186 @@ export function playRhythmChordSound(
       filter.connect(noteGain);
       osc.start(noteTime); osc.stop(noteTime + duration);
       cleanNodes.push(osc, filter);
-    } else if (r.includes('guitar')) {
-      // Acoustic & Nylon Guitar: Plucked string
-      const osc = ctx.createOscillator();
-      osc.type = r.includes('nylon') ? 'sine' : 'triangle';
-      osc.frequency.setValueAtTime(freq, noteTime);
+    } else if (r.includes('nylon')) {
+      // --- Nylon Classical Guitar: Soft finger plucks, warm cedar body resonance, no low-end boom ---
+      const fingerNoise = ctx.createBufferSource();
+      fingerNoise.buffer = getNoiseBuffer(ctx, 'pink', 0.02);
+      const fingerFilt = ctx.createBiquadFilter();
+      fingerFilt.type = 'bandpass';
+      fingerFilt.frequency.setValueAtTime(1600, noteTime);
+      fingerFilt.Q.setValueAtTime(1.8, noteTime);
+      const fingerGain = ctx.createGain();
+      fingerGain.gain.setValueAtTime(masterVol * 0.12, noteTime);
+      fingerGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + 0.012);
+      fingerNoise.connect(fingerFilt);
+      fingerFilt.connect(fingerGain);
+      fingerGain.connect(outputTarget);
+      fingerNoise.start(noteTime);
+      fingerNoise.stop(noteTime + 0.02);
 
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(r.includes('nylon') ? 2200 : 3600, noteTime);
-      filter.frequency.exponentialRampToValueAtTime(800, noteTime + 0.15);
+      // Cedar body warm resonance (peaking at 240Hz, highpass at 115Hz to eliminate mud)
+      const woodRes = ctx.createBiquadFilter();
+      woodRes.type = 'peaking';
+      woodRes.frequency.setValueAtTime(240, noteTime);
+      woodRes.Q.setValueAtTime(1.6, noteTime);
+      woodRes.gain.setValueAtTime(3.5, noteTime);
+
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(115, noteTime);
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(isAccent ? 3200 : 2500, noteTime);
+      lp.frequency.exponentialRampToValueAtTime(1100, noteTime + 0.12);
+
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(freq, noteTime);
+
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(freq, noteTime);
 
       noteGain.gain.setValueAtTime(0.0001, noteTime);
-      noteGain.gain.linearRampToValueAtTime(masterVol * 0.4, noteTime + 0.004);
-      noteGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + duration * 0.85);
+      noteGain.gain.linearRampToValueAtTime(masterVol * 0.36, noteTime + 0.003);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + Math.min(duration * 0.8, 0.65));
 
-      osc.connect(filter);
-      filter.connect(noteGain);
+      osc1.connect(woodRes);
+      osc2.connect(woodRes);
+      woodRes.connect(lp);
+      lp.connect(hp);
+      hp.connect(noteGain);
+
+      osc1.start(noteTime); osc1.stop(noteTime + duration);
+      osc2.start(noteTime); osc2.stop(noteTime + duration);
+      cleanNodes.push(fingerNoise, fingerFilt, fingerGain, woodRes, hp, lp, osc1, osc2);
+    } else if (r.includes('electric') && r.includes('guitar')) {
+      // --- Clean Electric Guitar (Strat / Jazz Hollowbody): Crisp magnetic comping, tight funk chops ---
+      const pickNoise = ctx.createBufferSource();
+      pickNoise.buffer = getNoiseBuffer(ctx, 'white', 0.015);
+      const pickFilt = ctx.createBiquadFilter();
+      pickFilt.type = 'bandpass';
+      pickFilt.frequency.setValueAtTime(3400, noteTime);
+      pickFilt.Q.setValueAtTime(2.0, noteTime);
+      const pickGain = ctx.createGain();
+      pickGain.gain.setValueAtTime(masterVol * 0.14, noteTime);
+      pickGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + 0.012);
+      pickNoise.connect(pickFilt);
+      pickFilt.connect(pickGain);
+      pickGain.connect(outputTarget);
+      pickNoise.start(noteTime);
+      pickNoise.stop(noteTime + 0.015);
+
+      // Magnetic pickup tone: warm mid punch at 750Hz, amp cab roll-off at 4200Hz, highpass at 110Hz
+      const midPunch = ctx.createBiquadFilter();
+      midPunch.type = 'peaking';
+      midPunch.frequency.setValueAtTime(750, noteTime);
+      midPunch.Q.setValueAtTime(1.5, noteTime);
+      midPunch.gain.setValueAtTime(3.2, noteTime);
+
+      const cabRollOff = ctx.createBiquadFilter();
+      cabRollOff.type = 'lowpass';
+      cabRollOff.frequency.setValueAtTime(4200, noteTime);
+
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(110, noteTime);
+
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, noteTime);
+
+      const oscHarm = ctx.createOscillator();
+      oscHarm.type = 'sawtooth';
+      oscHarm.frequency.setValueAtTime(freq, noteTime);
+      const harmGain = ctx.createGain();
+      harmGain.gain.setValueAtTime(0.12, noteTime);
+
+      // Fast, snappy attack and tight decay for articulate funk comping
+      noteGain.gain.setValueAtTime(0.0001, noteTime);
+      noteGain.gain.linearRampToValueAtTime(masterVol * 0.38, noteTime + 0.002);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + Math.min(duration * 0.65, 0.45));
+
+      osc.connect(midPunch);
+      oscHarm.connect(harmGain);
+      harmGain.connect(midPunch);
+      midPunch.connect(cabRollOff);
+      cabRollOff.connect(hp);
+      hp.connect(noteGain);
+
       osc.start(noteTime); osc.stop(noteTime + duration);
-      cleanNodes.push(osc, filter);
+      oscHarm.start(noteTime); oscHarm.stop(noteTime + duration);
+      cleanNodes.push(pickNoise, pickFilt, pickGain, midPunch, cabRollOff, hp, osc, oscHarm, harmGain);
+    } else if (r.includes('guitar')) {
+      // --- Acoustic Steel Guitar: Plectrum strike transient, dreadnought wood air & sparkle, no mud ---
+      const pickNoise = ctx.createBufferSource();
+      pickNoise.buffer = getNoiseBuffer(ctx, 'white', 0.02);
+      const pickFilt = ctx.createBiquadFilter();
+      pickFilt.type = 'bandpass';
+      pickFilt.frequency.setValueAtTime(3900, noteTime);
+      pickFilt.Q.setValueAtTime(2.2, noteTime);
+      const pickGain = ctx.createGain();
+      pickGain.gain.setValueAtTime(masterVol * 0.16, noteTime);
+      pickGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + 0.015);
+      pickNoise.connect(pickFilt);
+      pickFilt.connect(pickGain);
+      pickGain.connect(outputTarget);
+      pickNoise.start(noteTime);
+      pickNoise.stop(noteTime + 0.02);
+
+      // Soundboard cavity shaping:
+      // Highpass at 130Hz cuts boomy sub frequencies that clash with the bass track
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(130, noteTime);
+
+      // Peaking warmth at 220Hz for spruce top body
+      const woodPeak = ctx.createBiquadFilter();
+      woodPeak.type = 'peaking';
+      woodPeak.frequency.setValueAtTime(220, noteTime);
+      woodPeak.Q.setValueAtTime(1.8, noteTime);
+      woodPeak.gain.setValueAtTime(2.5, noteTime);
+
+      // Steel string sparkle presence
+      const presence = ctx.createBiquadFilter();
+      presence.type = 'highshelf';
+      presence.frequency.setValueAtTime(3200, noteTime);
+      presence.gain.setValueAtTime(1.8, noteTime);
+
+      // Dynamic lowpass damping
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(isAccent ? 5400 : 4400, noteTime);
+      lp.frequency.exponentialRampToValueAtTime(1800, noteTime + 0.14);
+
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(freq, noteTime);
+
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(freq, noteTime);
+      osc2.detune.setValueAtTime(3, noteTime);
+      const osc2Gain = ctx.createGain();
+      osc2Gain.gain.setValueAtTime(0.14, noteTime);
+
+      // Clean, crisp acoustic strum envelope (fast decay to avoid muddy ringing)
+      noteGain.gain.setValueAtTime(0.0001, noteTime);
+      noteGain.gain.linearRampToValueAtTime(masterVol * 0.36, noteTime + 0.003);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, noteTime + Math.min(duration * 0.75, 0.6));
+
+      osc1.connect(woodPeak);
+      osc2.connect(osc2Gain);
+      osc2Gain.connect(woodPeak);
+      woodPeak.connect(presence);
+      presence.connect(lp);
+      lp.connect(hp);
+      hp.connect(noteGain);
+
+      osc1.start(noteTime); osc1.stop(noteTime + duration);
+      osc2.start(noteTime); osc2.stop(noteTime + duration);
+      cleanNodes.push(pickNoise, pickFilt, pickGain, hp, woodPeak, presence, lp, osc1, osc2, osc2Gain);
     } else if (r.includes('organ')) {
       // Hammond B3 Drawbars
       const osc = ctx.createOscillator();
@@ -1127,32 +1288,45 @@ export function playSynthSound(
     voiceGain.connect(outputTarget);
     cleanNodes.push(voiceGain);
 
-    // 1. Lush Silk Ambient Pad
+    // 1. Lush Silk Ambient Pad (Transparent, silky background shimmer, NO muddy sub-octaves, clean musical release)
     if (s.includes('pad') || s.includes('silk')) {
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      osc1.type = 'sawtooth'; osc2.type = 'triangle';
-      osc1.frequency.setValueAtTime(freq, now);
-      osc2.frequency.setValueAtTime(freq * 0.5, now);
-      osc1.detune.setValueAtTime(6, now);
+      const padDuration = Math.min(duration, 1.15);
+
+      // Low-cut filter at 180Hz prevents all low-end mud & bass clashing
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(180, now);
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(450, now);
-      filter.frequency.linearRampToValueAtTime(1800, now + 0.28);
-      filter.frequency.exponentialRampToValueAtTime(750, now + duration * 0.9);
+      filter.frequency.setValueAtTime(1600, now);
+      filter.Q.setValueAtTime(1.1, now);
 
-      // Lush slow bloom attack (220ms)
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      osc1.type = 'triangle';
+      osc2.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(freq, now);
+      osc2.frequency.setValueAtTime(freq, now);
+      osc2.detune.setValueAtTime(5, now); // Gentle chorused shimmer
+
+      const osc2Gain = ctx.createGain();
+      osc2Gain.gain.setValueAtTime(0.18, now);
+
+      // Smooth 70ms attack bloom and musical fade before next chord arrives
       voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.35, now + 0.22);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.2);
+      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.22, now + 0.07);
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + padDuration);
 
       osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(voiceGain);
-      osc1.start(now); osc1.stop(now + duration * 1.2);
-      osc2.start(now); osc2.stop(now + duration * 1.2);
-      cleanNodes.push(osc1, osc2, filter);
+      osc2.connect(osc2Gain);
+      osc2Gain.connect(filter);
+      filter.connect(hp);
+      hp.connect(voiceGain);
+
+      osc1.start(now); osc1.stop(now + padDuration);
+      osc2.start(now); osc2.stop(now + padDuration);
+      cleanNodes.push(osc1, osc2, osc2Gain, filter, hp);
     }
 
     // 2. 80s Analog Saw Lead
@@ -1171,43 +1345,68 @@ export function playSynthSound(
       filter.frequency.setValueAtTime(3200, now);
       filter.frequency.exponentialRampToValueAtTime(950, now + 0.18);
 
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(140, now);
+
       voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.38, now + 0.008);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.35, now + 0.008);
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + Math.min(duration, 0.8));
 
       osc1.connect(filter);
       osc2.connect(filter);
-      filter.connect(voiceGain);
+      filter.connect(hp);
+      hp.connect(voiceGain);
       osc1.start(now); osc1.stop(now + duration);
       osc2.start(now); osc2.stop(now + duration);
-      cleanNodes.push(osc1, osc2, filter);
+      cleanNodes.push(osc1, osc2, filter, hp);
     }
 
-    // 3. 1984 PolySynth Brass
+    // 3. 1984 PolySynth Brass: Snappy 80s brass stabs, clean highpass, no mud
     else if (s.includes('poly') || s.includes('brass')) {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, now);
+      const brassDuration = Math.min(duration * 0.75, 0.55);
+
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(150, now);
+
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      osc1.type = 'sawtooth';
+      osc2.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(freq, now);
+      osc2.frequency.setValueAtTime(freq, now);
+      osc1.detune.setValueAtTime(-5, now);
+      osc2.detune.setValueAtTime(5, now);
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.Q.setValueAtTime(2.8, now);
-      filter.frequency.setValueAtTime(600, now);
-      filter.frequency.linearRampToValueAtTime(2800, now + 0.045);
-      filter.frequency.exponentialRampToValueAtTime(800, now + duration * 0.7);
+      filter.Q.setValueAtTime(2.6, now);
+      filter.frequency.setValueAtTime(550, now);
+      filter.frequency.linearRampToValueAtTime(2700, now + 0.025);
+      filter.frequency.exponentialRampToValueAtTime(850, now + 0.16);
 
       voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.36, now + 0.015);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.05);
+      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.32, now + 0.015);
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + brassDuration);
 
-      osc.connect(filter);
-      filter.connect(voiceGain);
-      osc.start(now); osc.stop(now + duration);
-      cleanNodes.push(osc, filter);
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(hp);
+      hp.connect(voiceGain);
+      osc1.start(now); osc1.stop(now + brassDuration);
+      osc2.start(now); osc2.stop(now + brassDuration);
+      cleanNodes.push(osc1, osc2, filter, hp);
     }
 
     // 4. Crystal FM Glass Bell
     else if (s.includes('bell') || s.includes('glass')) {
+      const bellDuration = Math.min(duration * 0.9, 0.9);
+
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(250, now);
+
       const carrier = ctx.createOscillator();
       const mod = ctx.createOscillator();
       const modGain = ctx.createGain();
@@ -1215,23 +1414,23 @@ export function playSynthSound(
       carrier.type = 'sine';
       carrier.frequency.setValueAtTime(freq, now);
 
-      // Bell overtone ratio 3.5x
       mod.type = 'sine';
       mod.frequency.setValueAtTime(freq * 3.5, now);
-      modGain.gain.setValueAtTime(freq * 3.0, now);
-      modGain.gain.exponentialRampToValueAtTime(0.1, now + 0.15);
+      modGain.gain.setValueAtTime(freq * 2.5, now);
+      modGain.gain.exponentialRampToValueAtTime(0.1, now + 0.14);
 
       mod.connect(modGain);
       modGain.connect(carrier.frequency);
 
       voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.4, now + 0.003);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.25);
+      voiceGain.gain.linearRampToValueAtTime(masterVol * 0.32, now + 0.003);
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + bellDuration);
 
-      carrier.connect(voiceGain);
-      carrier.start(now); carrier.stop(now + duration * 1.3);
+      carrier.connect(hp);
+      hp.connect(voiceGain);
+      carrier.start(now); carrier.stop(now + bellDuration);
       mod.start(now); mod.stop(now + 0.25);
-      cleanNodes.push(carrier, mod, modGain);
+      cleanNodes.push(carrier, mod, modGain, hp);
     }
 
     // 5. 8-Bit Chiptune Square Lead

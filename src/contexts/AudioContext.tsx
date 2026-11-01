@@ -1381,10 +1381,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         const guitarLP = ctx.createBiquadFilter();
         guitarLP.type = 'lowpass';
-        guitarLP.frequency.setValueAtTime(3400, now);
+        guitarLP.frequency.setValueAtTime(3600, now);
+
+        const guitarHP = ctx.createBiquadFilter();
+        guitarHP.type = 'highpass';
+        guitarHP.frequency.setValueAtTime(130, now);
 
         bodyWoodFilter.connect(guitarLP);
-        guitarLP.connect(gain);
+        guitarLP.connect(guitarHP);
+        guitarHP.connect(gain);
 
         // Primary Plucked String Waveform
         osc.type = 'triangle';
@@ -1392,7 +1397,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         gain.gain.setValueAtTime(0.0001, now);
         gain.gain.linearRampToValueAtTime(0.12, now + 0.004);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.85);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.75);
 
         // String Overtones
         const overtone = ctx.createOscillator();
@@ -1409,7 +1414,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         overtone.start(now);
         overtone.stop(now + duration);
-        cleanupNodes.push(pluckSource, pluckFilter, pluckGain, bodyWoodFilter, guitarLP, overtone, oGain);
+        cleanupNodes.push(pluckSource, pluckFilter, pluckGain, bodyWoodFilter, guitarLP, guitarHP, overtone, oGain);
         break;
       }
 

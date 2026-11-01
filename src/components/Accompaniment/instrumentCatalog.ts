@@ -281,22 +281,22 @@ export const RHYTHM_INSTRUMENTS: AccompanimentInstrument[] = [
     id: 'rhythm_guitar_acoustic',
     name: 'Acoustic Steel Guitar',
     category: 'Guitars',
-    description: 'Dreadnought steel-string acoustic with natural strummed pick attack and body air.',
+    description: 'Dreadnought steel-string acoustic with crisp plectrum pick attack, spruce soundboard air, highpass mud filtering, and natural decay.',
     badge: 'Acoustic'
   },
   {
     id: 'rhythm_guitar_nylon',
     name: 'Nylon Classical Guitar',
     category: 'Guitars',
-    description: 'Warm round cedar top nylon plucks, ideal for Bossa Nova and Flamenco rasgueado.',
+    description: 'Warm cedar-top nylon plucks with soft finger transient, woody body resonance, and clean articulation for Bossa Nova and Flamenco.',
     badge: 'Latin'
   },
   {
     id: 'rhythm_guitar_electric',
-    name: 'Clean Jazz Hollowbody',
+    name: 'Clean Electric / Strat Guitar',
     category: 'Guitars',
-    description: 'Warm neck humbucker pickup through clean tube amp for velvety jazz comping.',
-    badge: 'Jazz'
+    description: 'Clean Stratocaster / Jazz Hollowbody electric guitar with warm magnetic pickup punch, amp cabinet roll-off, and tight funk comping response.',
+    badge: 'Electric'
   },
   {
     id: 'rhythm_organ_b3',
@@ -336,7 +336,7 @@ export const SYNTH_INSTRUMENTS: AccompanimentInstrument[] = [
     id: 'synth_silk_pad',
     name: 'Lush Silk Ambient Pad',
     category: 'Pads & Textures',
-    description: 'Slow 250ms blooming attack swell, multi-octave chorusing, and silky warm filter envelope.',
+    description: 'Airy background ambient pad with gentle 70ms bloom, highpass low-cut (no sub rumble), and disciplined musical release to prevent chord bleeding.',
     badge: 'Lush Pad'
   },
   {
@@ -350,7 +350,7 @@ export const SYNTH_INSTRUMENTS: AccompanimentInstrument[] = [
     id: 'synth_poly_brass',
     name: '1984 PolySynth Brass',
     category: 'Pads & Textures',
-    description: 'Iconic vintage polysynth filter bite with lush chorused brass chords and retro warmth.',
+    description: 'Snappy vintage polysynth brass stabs with punchy 18ms lip swell, tight filter cutoff, and highpass mud filtering.',
     badge: 'PolySynth'
   },
   {
