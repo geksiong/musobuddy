@@ -69,7 +69,9 @@ export default function GrooveEnginePanel() {
     selectedSynthInstrument, setSelectedSynthInstrument,
     selectedDrumSet, setSelectedDrumSet,
     trackVolumes, setTrackVolume,
-    trackMutes, setTrackMute
+    trackMutes, setTrackMute,
+    trackSolos, toggleTrackSolo, clearAllSolos, isAnyTrackSoloed,
+    togglePercussionLayerSolo
   } = useAccompaniment();
   const { resolvedTheme } = useTheme();
 
@@ -250,6 +252,17 @@ export default function GrooveEnginePanel() {
               </div>
             )}
 
+            {isAnyTrackSoloed && (
+              <button
+                onClick={clearAllSolos}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 flex items-center gap-1.5 hover:bg-amber-400 transition-all shadow-xs animate-pulse cursor-pointer shrink-0"
+                title="Click to clear all track solos"
+              >
+                <span>Solo Active</span>
+                <span className="text-[9px] bg-slate-950 text-amber-400 px-1 py-0.2 rounded font-mono">Reset</span>
+              </button>
+            )}
+
             <button
               onClick={() => setShowMixer(!showMixer)}
               className={cn(
@@ -342,27 +355,64 @@ export default function GrooveEnginePanel() {
                 <Sliders className="w-3.5 h-3.5 text-emerald-500" />
                 Track Instruments & Mixer
               </span>
-              <span className="text-[9px] text-slate-600 dark:text-slate-400 font-bold">Independent volume, mutes, and physical models</span>
+              <div className="flex items-center gap-2">
+                {isAnyTrackSoloed && (
+                  <button
+                    onClick={clearAllSolos}
+                    className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                    title="Clear all active solos"
+                  >
+                    Clear All Solos
+                  </button>
+                )}
+                <span className="text-[9px] text-slate-600 dark:text-slate-400 font-bold hidden sm:inline">
+                  Solo (S), Mute (M), volumes, and physical models
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* 1. RHYTHM / HARMONY TRACK */}
-              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+              <div className={cn(
+                "flex flex-col gap-2 p-2.5 rounded-xl border shadow-2xs min-w-0 overflow-hidden transition-all",
+                trackSolos.rhythm 
+                  ? "bg-amber-500/10 border-amber-500/50 ring-1 ring-amber-500/30" 
+                  : isAnyTrackSoloed && !trackSolos.rhythm
+                    ? "opacity-50 bg-slate-100/60 dark:bg-white/[0.02] border-slate-200 dark:border-white/5"
+                    : "bg-slate-50 dark:bg-white/[0.04] border-slate-200 dark:border-white/10"
+              )}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                    <span className="text-[11px] font-black uppercase text-emerald-800 dark:text-emerald-400">Rhythm / Chords</span>
-                  </div>
-                  <button
-                    onClick={() => setTrackMute('rhythm', !trackMutes.rhythm)}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
-                      trackMutes.rhythm ? "text-rose-600 bg-rose-500/15" : "text-emerald-600 hover:bg-emerald-500/15"
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                    <span className="text-[11px] font-black uppercase text-emerald-800 dark:text-emerald-400 truncate">Rhythm / Chords</span>
+                    {isAnyTrackSoloed && !trackSolos.rhythm && (
+                      <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-slate-200 dark:bg-white/10 text-slate-500 shrink-0">Solo Muted</span>
                     )}
-                    title={trackMutes.rhythm ? "Unmute Rhythm Track" : "Mute Rhythm Track"}
-                  >
-                    {trackMutes.rhythm ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleTrackSolo('rhythm')}
+                      className={cn(
+                        "px-2 py-1 rounded-lg text-[9px] font-black font-mono transition-all uppercase cursor-pointer border",
+                        trackSolos.rhythm
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                          : "text-slate-500 dark:text-slate-400 border-slate-300 dark:border-white/15 hover:border-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10"
+                      )}
+                      title={trackSolos.rhythm ? "Deactivate Solo (Rhythm Track)" : "Solo Rhythm Track (Isolate instrument)"}
+                    >
+                      SOLO
+                    </button>
+                    <button
+                      onClick={() => setTrackMute('rhythm', !trackMutes.rhythm)}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer border",
+                        trackMutes.rhythm ? "text-rose-600 bg-rose-500/15 border-rose-500/30" : "text-emerald-600 border-slate-300 dark:border-white/15 hover:bg-emerald-500/15"
+                      )}
+                      title={trackMutes.rhythm ? "Unmute Rhythm Track" : "Mute Rhythm Track"}
+                    >
+                      {trackMutes.rhythm ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -398,22 +448,46 @@ export default function GrooveEnginePanel() {
               </div>
 
               {/* 2. BASS TRACK */}
-              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+              <div className={cn(
+                "flex flex-col gap-2 p-2.5 rounded-xl border shadow-2xs min-w-0 overflow-hidden transition-all",
+                trackSolos.bass 
+                  ? "bg-amber-500/10 border-amber-500/50 ring-1 ring-amber-500/30" 
+                  : isAnyTrackSoloed && !trackSolos.bass
+                    ? "opacity-50 bg-slate-100/60 dark:bg-white/[0.02] border-slate-200 dark:border-white/5"
+                    : "bg-slate-50 dark:bg-white/[0.04] border-slate-200 dark:border-white/10"
+              )}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                    <span className="text-[11px] font-black uppercase text-blue-800 dark:text-blue-400">Bass Track</span>
-                  </div>
-                  <button
-                    onClick={() => setTrackMute('bass', !trackMutes.bass)}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
-                      trackMutes.bass ? "text-rose-600 bg-rose-500/15" : "text-blue-600 hover:bg-blue-500/15"
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shrink-0" />
+                    <span className="text-[11px] font-black uppercase text-blue-800 dark:text-blue-400 truncate">Bass Track</span>
+                    {isAnyTrackSoloed && !trackSolos.bass && (
+                      <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-slate-200 dark:bg-white/10 text-slate-500 shrink-0">Solo Muted</span>
                     )}
-                    title={trackMutes.bass ? "Unmute Bass Track" : "Mute Bass Track"}
-                  >
-                    {trackMutes.bass ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleTrackSolo('bass')}
+                      className={cn(
+                        "px-2 py-1 rounded-lg text-[9px] font-black font-mono transition-all uppercase cursor-pointer border",
+                        trackSolos.bass
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                          : "text-slate-500 dark:text-slate-400 border-slate-300 dark:border-white/15 hover:border-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10"
+                      )}
+                      title={trackSolos.bass ? "Deactivate Solo (Bass Track)" : "Solo Bass Track (Isolate instrument)"}
+                    >
+                      SOLO
+                    </button>
+                    <button
+                      onClick={() => setTrackMute('bass', !trackMutes.bass)}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer border",
+                        trackMutes.bass ? "text-rose-600 bg-rose-500/15 border-rose-500/30" : "text-blue-600 border-slate-300 dark:border-white/15 hover:bg-blue-500/15"
+                      )}
+                      title={trackMutes.bass ? "Unmute Bass Track" : "Mute Bass Track"}
+                    >
+                      {trackMutes.bass ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -449,22 +523,46 @@ export default function GrooveEnginePanel() {
               </div>
 
               {/* 3. SYNTH TRACK */}
-              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+              <div className={cn(
+                "flex flex-col gap-2 p-2.5 rounded-xl border shadow-2xs min-w-0 overflow-hidden transition-all",
+                trackSolos.synth 
+                  ? "bg-amber-500/10 border-amber-500/50 ring-1 ring-amber-500/30" 
+                  : isAnyTrackSoloed && !trackSolos.synth
+                    ? "opacity-50 bg-slate-100/60 dark:bg-white/[0.02] border-slate-200 dark:border-white/5"
+                    : "bg-slate-50 dark:bg-white/[0.04] border-slate-200 dark:border-white/10"
+              )}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
-                    <span className="text-[11px] font-black uppercase text-purple-800 dark:text-purple-400">Synth / Lead Track</span>
-                  </div>
-                  <button
-                    onClick={() => setTrackMute('synth', !trackMutes.synth)}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
-                      trackMutes.synth ? "text-rose-600 bg-rose-500/15" : "text-purple-600 hover:bg-purple-500/15"
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block shrink-0" />
+                    <span className="text-[11px] font-black uppercase text-purple-800 dark:text-purple-400 truncate">Synth / Lead Track</span>
+                    {isAnyTrackSoloed && !trackSolos.synth && (
+                      <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-slate-200 dark:bg-white/10 text-slate-500 shrink-0">Solo Muted</span>
                     )}
-                    title={trackMutes.synth ? "Unmute Synth Track" : "Mute Synth Track"}
-                  >
-                    {trackMutes.synth ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleTrackSolo('synth')}
+                      className={cn(
+                        "px-2 py-1 rounded-lg text-[9px] font-black font-mono transition-all uppercase cursor-pointer border",
+                        trackSolos.synth
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                          : "text-slate-500 dark:text-slate-400 border-slate-300 dark:border-white/15 hover:border-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10"
+                      )}
+                      title={trackSolos.synth ? "Deactivate Solo (Synth Track)" : "Solo Synth Track (Isolate instrument)"}
+                    >
+                      SOLO
+                    </button>
+                    <button
+                      onClick={() => setTrackMute('synth', !trackMutes.synth)}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer border",
+                        trackMutes.synth ? "text-rose-600 bg-rose-500/15 border-rose-500/30" : "text-purple-600 border-slate-300 dark:border-white/15 hover:bg-purple-500/15"
+                      )}
+                      title={trackMutes.synth ? "Unmute Synth Track" : "Mute Synth Track"}
+                    >
+                      {trackMutes.synth ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -500,22 +598,46 @@ export default function GrooveEnginePanel() {
               </div>
 
               {/* 4. PERCUSSION TRACK & DRUM SET */}
-              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 shadow-2xs min-w-0 overflow-hidden">
+              <div className={cn(
+                "flex flex-col gap-2 p-2.5 rounded-xl border shadow-2xs min-w-0 overflow-hidden transition-all",
+                trackSolos.percussion 
+                  ? "bg-amber-500/10 border-amber-500/50 ring-1 ring-amber-500/30" 
+                  : isAnyTrackSoloed && !trackSolos.percussion
+                    ? "opacity-50 bg-slate-100/60 dark:bg-white/[0.02] border-slate-200 dark:border-white/5"
+                    : "bg-slate-50 dark:bg-white/[0.04] border-slate-200 dark:border-white/10"
+              )}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-                    <span className="text-[11px] font-black uppercase text-amber-800 dark:text-amber-400">Percussion Drumset</span>
-                  </div>
-                  <button
-                    onClick={() => setTrackMute('percussion', !trackMutes.percussion)}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer",
-                      trackMutes.percussion ? "text-rose-600 bg-rose-500/15" : "text-amber-600 hover:bg-amber-500/15"
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shrink-0" />
+                    <span className="text-[11px] font-black uppercase text-amber-800 dark:text-amber-400 truncate">Percussion Drumset</span>
+                    {isAnyTrackSoloed && !trackSolos.percussion && (
+                      <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-slate-200 dark:bg-white/10 text-slate-500 shrink-0">Solo Muted</span>
                     )}
-                    title={trackMutes.percussion ? "Unmute Percussion Track" : "Mute Percussion Track"}
-                  >
-                    {trackMutes.percussion ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleTrackSolo('percussion')}
+                      className={cn(
+                        "px-2 py-1 rounded-lg text-[9px] font-black font-mono transition-all uppercase cursor-pointer border",
+                        trackSolos.percussion
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                          : "text-slate-500 dark:text-slate-400 border-slate-300 dark:border-white/15 hover:border-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10"
+                      )}
+                      title={trackSolos.percussion ? "Deactivate Solo (Percussion Track)" : "Solo Percussion Track (Isolate drumset)"}
+                    >
+                      SOLO
+                    </button>
+                    <button
+                      onClick={() => setTrackMute('percussion', !trackMutes.percussion)}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-colors text-xs font-bold cursor-pointer border",
+                        trackMutes.percussion ? "text-rose-600 bg-rose-500/15 border-rose-500/30" : "text-amber-600 border-slate-300 dark:border-white/15 hover:bg-amber-500/15"
+                      )}
+                      title={trackMutes.percussion ? "Unmute Percussion Track" : "Mute Percussion Track"}
+                    >
+                      {trackMutes.percussion ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -563,22 +685,40 @@ export default function GrooveEnginePanel() {
       {/* SEQUENCER GRID (4-TRACK MULTI-LAYER SEQUENCER) */}
       {isGrooveEngineEnabled && (
         <div className="flex flex-col gap-2 pt-1">
-          <div className="flex items-center justify-between pb-1">
-            <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider flex items-center gap-1.5">
-              <Zap className="w-3 h-3 text-emerald-500" />
-              Interactive Step Sequencer (Click steps to cycle triggers & accents)
-            </span>
-            <span className="text-[9px] font-mono font-bold text-emerald-500">
-              {totalSteps} Steps • {subsPerBeat} per beat • {activeGroovePattern?.swingRatio ? 'Swing' : 'Straight'}
-            </span>
+          <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider flex items-center gap-1.5">
+                <Zap className="w-3 h-3 text-emerald-500" />
+                Interactive Step Sequencer (Click steps to cycle triggers & accents)
+              </span>
+              {isAnyTrackSoloed && (
+                <span className="px-2 py-0.5 rounded text-[8px] font-black bg-amber-500 text-slate-950 uppercase tracking-wider animate-pulse">
+                  Solo Mode Active
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {isAnyTrackSoloed && (
+                <button
+                  onClick={clearAllSolos}
+                  className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                  title="Clear all track solos"
+                >
+                  Unsolo All
+                </button>
+              )}
+              <span className="text-[9px] font-mono font-bold text-emerald-500">
+                {totalSteps} Steps • {subsPerBeat} per beat • {activeGroovePattern?.swingRatio ? 'Swing' : 'Straight'}
+              </span>
+            </div>
           </div>
 
           <div className="w-full overflow-x-auto pb-2 scrollbar-none">
-            <div className="min-w-[620px] flex flex-col gap-1.5">
+            <div className="min-w-[660px] flex flex-col gap-1.5">
               {/* Step Numbers Header */}
               <div 
                 className="grid gap-1 items-center py-1 text-[9px] font-extrabold text-slate-400 uppercase tracking-widest pl-1"
-                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                style={{ gridTemplateColumns: `150px repeat(${totalSteps}, minmax(0, 1fr))` }}
               >
                 <div>Track / Beat</div>
                 {Array.from({ length: totalSteps }).map((_, stepIdx) => {
@@ -602,15 +742,53 @@ export default function GrooveEnginePanel() {
 
               {/* 1. CHORD / RHYTHM TRIGGER LAYER */}
               <div 
-                className="grid gap-1 items-center py-1.5 rounded-xl bg-slate-200/50 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
-                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                className={cn(
+                  "grid gap-1 items-center py-1.5 rounded-xl p-1.5 border transition-all",
+                  trackSolos.rhythm
+                    ? "bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/30 shadow-xs"
+                    : isAnyTrackSoloed && !trackSolos.rhythm
+                      ? "opacity-45 bg-slate-100/50 dark:bg-white/[0.01] border-slate-200 dark:border-white/5"
+                      : "bg-slate-200/50 dark:bg-white/[0.03] border-slate-200 dark:border-white/5"
+                )}
+                style={{ gridTemplateColumns: `150px repeat(${totalSteps}, minmax(0, 1fr))` }}
               >
-                <div className="flex flex-col pl-1">
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                    <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider">Rhythm / Chord</span>
+                <div className="flex items-center justify-between pr-1 pl-1">
+                  <div className="flex flex-col min-w-0 pr-1">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+                      <span className="text-[10px] font-black uppercase text-emerald-500 tracking-wider truncate">Rhythm</span>
+                    </div>
+                    <span className="text-[8px] text-slate-400 truncate">
+                      {isAnyTrackSoloed && !trackSolos.rhythm ? "Solo Muted" : "Comping / Pushes"}
+                    </span>
                   </div>
-                  <span className="text-[8px] text-slate-400 truncate">Comping / Pushes</span>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleTrackSolo('rhythm')}
+                      className={cn(
+                        "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                        trackSolos.rhythm
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                          : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:border-amber-500 hover:text-amber-500 hover:bg-amber-500/10"
+                      )}
+                      title={trackSolos.rhythm ? "Deactivate Solo (Rhythm Track)" : "Solo Rhythm Track (S)"}
+                    >
+                      S
+                    </button>
+                    <button
+                      onClick={() => setTrackMute('rhythm', !trackMutes.rhythm)}
+                      className={cn(
+                        "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                        trackMutes.rhythm
+                          ? "bg-rose-500/20 text-rose-500 border-rose-500/30"
+                          : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/5"
+                      )}
+                      title={trackMutes.rhythm ? "Unmute Rhythm Track" : "Mute Rhythm Track (M)"}
+                    >
+                      {trackMutes.rhythm ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                    </button>
+                  </div>
                 </div>
 
                 {activeGroovePattern?.chordPattern?.map((triggerType, stepIdx) => {
@@ -636,15 +814,53 @@ export default function GrooveEnginePanel() {
 
               {/* 2. BASS TRIGGER LAYER */}
               <div 
-                className="grid gap-1 items-center py-1.5 rounded-xl bg-slate-200/50 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
-                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                className={cn(
+                  "grid gap-1 items-center py-1.5 rounded-xl p-1.5 border transition-all",
+                  trackSolos.bass
+                    ? "bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/30 shadow-xs"
+                    : isAnyTrackSoloed && !trackSolos.bass
+                      ? "opacity-45 bg-slate-100/50 dark:bg-white/[0.01] border-slate-200 dark:border-white/5"
+                      : "bg-slate-200/50 dark:bg-white/[0.03] border-slate-200 dark:border-white/5"
+                )}
+                style={{ gridTemplateColumns: `150px repeat(${totalSteps}, minmax(0, 1fr))` }}
               >
-                <div className="flex flex-col pl-1">
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                    <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider">Bass Line</span>
+                <div className="flex items-center justify-between pr-1 pl-1">
+                  <div className="flex flex-col min-w-0 pr-1">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 inline-block shrink-0" />
+                      <span className="text-[10px] font-black uppercase text-blue-500 tracking-wider truncate">Bass Line</span>
+                    </div>
+                    <span className="text-[8px] text-slate-400 truncate">
+                      {isAnyTrackSoloed && !trackSolos.bass ? "Solo Muted" : "Root / 5th / Walk"}
+                    </span>
                   </div>
-                  <span className="text-[8px] text-slate-400 truncate">Root / 5th / Walk</span>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleTrackSolo('bass')}
+                      className={cn(
+                        "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                        trackSolos.bass
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                          : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:border-amber-500 hover:text-amber-500 hover:bg-amber-500/10"
+                      )}
+                      title={trackSolos.bass ? "Deactivate Solo (Bass Track)" : "Solo Bass Track (S)"}
+                    >
+                      S
+                    </button>
+                    <button
+                      onClick={() => setTrackMute('bass', !trackMutes.bass)}
+                      className={cn(
+                        "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                        trackMutes.bass
+                          ? "bg-rose-500/20 text-rose-500 border-rose-500/30"
+                          : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/5"
+                      )}
+                      title={trackMutes.bass ? "Unmute Bass Track" : "Mute Bass Track (M)"}
+                    >
+                      {trackMutes.bass ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                    </button>
+                  </div>
                 </div>
 
                 {activeGroovePattern?.bassPattern?.map((triggerType, stepIdx) => {
@@ -670,15 +886,53 @@ export default function GrooveEnginePanel() {
 
               {/* 3. SYNTH / LEAD TRIGGER LAYER */}
               <div 
-                className="grid gap-1 items-center py-1.5 rounded-xl bg-slate-200/50 dark:bg-white/[0.03] p-1.5 border border-slate-200 dark:border-white/5"
-                style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                className={cn(
+                  "grid gap-1 items-center py-1.5 rounded-xl p-1.5 border transition-all",
+                  trackSolos.synth
+                    ? "bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/30 shadow-xs"
+                    : isAnyTrackSoloed && !trackSolos.synth
+                      ? "opacity-45 bg-slate-100/50 dark:bg-white/[0.01] border-slate-200 dark:border-white/5"
+                      : "bg-slate-200/50 dark:bg-white/[0.03] border-slate-200 dark:border-white/5"
+                )}
+                style={{ gridTemplateColumns: `150px repeat(${totalSteps}, minmax(0, 1fr))` }}
               >
-                <div className="flex flex-col pl-1">
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
-                    <span className="text-[10px] font-black uppercase text-purple-500 tracking-wider">Synth / Lead</span>
+                <div className="flex items-center justify-between pr-1 pl-1">
+                  <div className="flex flex-col min-w-0 pr-1">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-purple-500 inline-block shrink-0" />
+                      <span className="text-[10px] font-black uppercase text-purple-500 tracking-wider truncate">Synth / Lead</span>
+                    </div>
+                    <span className="text-[8px] text-slate-400 truncate">
+                      {isAnyTrackSoloed && !trackSolos.synth ? "Solo Muted" : "Pad / Lead / Arp"}
+                    </span>
                   </div>
-                  <span className="text-[8px] text-slate-400 truncate">Pad / Lead / Arp</span>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleTrackSolo('synth')}
+                      className={cn(
+                        "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                        trackSolos.synth
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                          : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:border-amber-500 hover:text-amber-500 hover:bg-amber-500/10"
+                      )}
+                      title={trackSolos.synth ? "Deactivate Solo (Synth Track)" : "Solo Synth Track (S)"}
+                    >
+                      S
+                    </button>
+                    <button
+                      onClick={() => setTrackMute('synth', !trackMutes.synth)}
+                      className={cn(
+                        "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                        trackMutes.synth
+                          ? "bg-rose-500/20 text-rose-500 border-rose-500/30"
+                          : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/5"
+                      )}
+                      title={trackMutes.synth ? "Unmute Synth Track" : "Mute Synth Track (M)"}
+                    >
+                      {trackMutes.synth ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                    </button>
+                  </div>
                 </div>
 
                 {Array.from({ length: totalSteps }).map((_, stepIdx) => {
@@ -704,84 +958,109 @@ export default function GrooveEnginePanel() {
               </div>
 
               {/* 4. PERCUSSION TRACK LAYERS */}
-              {activeGroovePattern?.percussionLayers?.map((pLayer) => (
-                <div 
-                  key={pLayer.id}
-                  className={cn(
-                    "grid gap-1 items-center py-1.5 rounded-xl p-1.5 border transition-all",
-                    pLayer.muted
-                      ? "opacity-40 bg-slate-100 dark:bg-white/[0.01] border-slate-200 dark:border-white/5"
-                      : "bg-slate-200/50 dark:bg-white/[0.03] border-slate-200 dark:border-white/5"
-                  )}
-                  style={{ gridTemplateColumns: `130px repeat(${totalSteps}, minmax(0, 1fr))` }}
-                >
-                  <div className="flex items-center justify-between pr-2 pl-1">
-                    <div className="flex flex-col flex-1 mr-1 overflow-hidden">
-                      <select
-                        value={pLayer.sound}
-                        onChange={(e) => updatePercussionLayerProps(pLayer.id, { sound: e.target.value })}
-                        className="text-[9px] text-slate-700 dark:text-slate-200 font-extrabold uppercase bg-transparent hover:text-emerald-500 cursor-pointer outline-none truncate"
-                        title="Change drum / percussion instrument"
-                      >
-                        {PERCUSSION_SOUNDS.map(s => (
-                          <option key={s.id} value={s.id} className="bg-slate-900 text-white font-normal">
-                            {s.name} ({s.category})
-                          </option>
-                        ))}
-                      </select>
-                      <span className="text-[7px] text-slate-400 font-mono">Percussion Voice</span>
-                    </div>
+              {activeGroovePattern?.percussionLayers?.map((pLayer) => {
+                const hasAnyPercLayerSolo = activeGroovePattern.percussionLayers.some(l => l.solo);
+                const isTrackSoloMuted = isAnyTrackSoloed && !trackSolos.percussion;
+                const isLayerDimmed = pLayer.muted || isTrackSoloMuted || (hasAnyPercLayerSolo && !pLayer.solo);
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => updatePercussionLayerProps(pLayer.id, { muted: !pLayer.muted })}
-                        className={cn(
-                          "p-1 rounded transition-colors",
-                          pLayer.muted ? "text-slate-400 hover:text-slate-600" : "text-amber-500 hover:text-amber-600"
-                        )}
-                        title={pLayer.muted ? "Unmute layer" : "Mute layer"}
-                      >
-                        {pLayer.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                      </button>
-
-                      {activeGroovePattern.percussionLayers.length > 1 && (
-                        <button
-                          onClick={() => removePercussionLayer(pLayer.id)}
-                          className="p-1 rounded text-slate-400 hover:text-rose-500 transition-colors"
-                          title="Remove percussion track"
+                return (
+                  <div 
+                    key={pLayer.id}
+                    className={cn(
+                      "grid gap-1 items-center py-1.5 rounded-xl p-1.5 border transition-all",
+                      pLayer.solo || trackSolos.percussion
+                        ? "bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/30 shadow-xs"
+                        : isLayerDimmed
+                          ? "opacity-45 bg-slate-100 dark:bg-white/[0.01] border-slate-200 dark:border-white/5"
+                          : "bg-slate-200/50 dark:bg-white/[0.03] border-slate-200 dark:border-white/5"
+                    )}
+                    style={{ gridTemplateColumns: `150px repeat(${totalSteps}, minmax(0, 1fr))` }}
+                  >
+                    <div className="flex items-center justify-between pr-1 pl-1">
+                      <div className="flex flex-col flex-1 mr-1 min-w-0 overflow-hidden">
+                        <select
+                          value={pLayer.sound}
+                          onChange={(e) => updatePercussionLayerProps(pLayer.id, { sound: e.target.value })}
+                          className="text-[9px] text-slate-700 dark:text-slate-200 font-extrabold uppercase bg-transparent hover:text-emerald-500 cursor-pointer outline-none truncate"
+                          title="Change drum / percussion instrument voice"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          {PERCUSSION_SOUNDS.map(s => (
+                            <option key={s.id} value={s.id} className="bg-slate-900 text-white font-normal">
+                              {s.name} ({s.category})
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-[7px] text-slate-400 font-mono">
+                          {pLayer.solo ? "Solo Voice" : isLayerDimmed ? "Solo Muted" : "Perc Voice"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => togglePercussionLayerSolo(pLayer.id)}
+                          className={cn(
+                            "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                            pLayer.solo
+                              ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-1 ring-amber-300"
+                              : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:border-amber-500 hover:text-amber-500 hover:bg-amber-500/10"
+                          )}
+                          title={pLayer.solo ? "Deactivate Solo (Voice)" : "Solo Percussion Voice (S)"}
+                        >
+                          S
                         </button>
-                      )}
-                    </div>
-                  </div>
 
-                  {pLayer.pattern.map((val, stepIdx) => {
-                    const isCurrentSubStep = isPlaying && currentSubStepIndex === stepIdx;
-                    const isAccent = val === 2;
-                    const isHit = val === 1;
+                        <button
+                          onClick={() => updatePercussionLayerProps(pLayer.id, { muted: !pLayer.muted })}
+                          className={cn(
+                            "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black font-mono transition-all cursor-pointer border",
+                            pLayer.muted
+                              ? "bg-rose-500/20 text-rose-500 border-rose-500/30"
+                              : "text-slate-400 dark:text-slate-500 border-slate-300 dark:border-white/10 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/5"
+                          )}
+                          title={pLayer.muted ? "Unmute Voice" : "Mute Voice (M)"}
+                        >
+                          {pLayer.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                        </button>
 
-                    return (
-                      <button
-                        key={stepIdx}
-                        onClick={() => handleCyclePercussionStep(pLayer.id, stepIdx)}
-                        className={cn(
-                          "h-9 rounded-lg transition-colors flex items-center justify-center border font-mono text-[9px] font-extrabold",
-                          isAccent
-                            ? "bg-rose-500 border-rose-400 text-white shadow-xs"
-                            : isHit
-                              ? "bg-amber-500 border-amber-400 text-white shadow-xs"
-                              : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-transparent hover:border-slate-300",
-                          isCurrentSubStep ? "ring-2 ring-rose-400 z-10 scale-105" : ""
+                        {activeGroovePattern.percussionLayers.length > 1 && (
+                          <button
+                            onClick={() => removePercussionLayer(pLayer.id)}
+                            className="p-0.5 rounded text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                            title="Remove percussion voice"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         )}
-                        title={isAccent ? 'Accented Hit' : isHit ? 'Normal Hit' : 'Click to activate hit'}
-                      >
-                        {isAccent ? '★' : isHit ? '•' : ''}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+                      </div>
+                    </div>
+
+                    {pLayer.pattern.map((val, stepIdx) => {
+                      const isCurrentSubStep = isPlaying && currentSubStepIndex === stepIdx;
+                      const isAccent = val === 2;
+                      const isHit = val === 1;
+
+                      return (
+                        <button
+                          key={stepIdx}
+                          onClick={() => handleCyclePercussionStep(pLayer.id, stepIdx)}
+                          className={cn(
+                            "h-9 rounded-lg transition-colors flex items-center justify-center border font-mono text-[9px] font-extrabold",
+                            isAccent
+                              ? "bg-rose-500 border-rose-400 text-white shadow-xs"
+                              : isHit
+                                ? "bg-amber-500 border-amber-400 text-white shadow-xs"
+                                : "bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-transparent hover:border-slate-300",
+                            isCurrentSubStep ? "ring-2 ring-rose-400 z-10 scale-105" : ""
+                          )}
+                          title={isAccent ? 'Accented Hit' : isHit ? 'Normal Hit' : 'Click to activate hit'}
+                        >
+                          {isAccent ? '★' : isHit ? '•' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -789,6 +1068,7 @@ export default function GrooveEnginePanel() {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-[9px] font-bold text-slate-400 border-t border-slate-200 dark:border-white/10">
             <div className="flex flex-wrap items-center gap-3">
               <span className="uppercase text-[8px] tracking-wider font-mono">Legend:</span>
+              <div className="flex items-center gap-1"><span className="w-3.5 h-3.5 rounded bg-amber-500 text-slate-950 font-black text-[8px] flex items-center justify-center">S</span> Solo Track</div>
               <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" /> Chord Hit</div>
               <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500 inline-block" /> Early Push ➜</div>
               <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block" /> Bass Note</div>

@@ -36,6 +36,7 @@ export interface PercussionLayer {
   sound: string | MetronomeSound;
   volume: number;
   muted?: boolean;
+  solo?: boolean;
   pattern: number[]; // 0: off, 1: normal, 2: accent for each step
 }
 

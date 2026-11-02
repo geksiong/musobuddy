@@ -87,6 +87,13 @@ export interface TrackMutes {
   percussion: boolean;
 }
 
+export interface TrackSolos {
+  rhythm: boolean;
+  bass: boolean;
+  synth: boolean;
+  percussion: boolean;
+}
+
 interface AccompanimentContextType {
   progression: ProgressionChord[];
   setProgression: React.Dispatch<React.SetStateAction<ProgressionChord[]>>;
@@ -113,11 +120,17 @@ interface AccompanimentContextType {
   selectedDrumSet: string;
   setSelectedDrumSet: (drumSetId: string) => void;
 
-  // Track Mixer (Volumes & Mutes)
+  // Track Mixer (Volumes, Mutes & Solos)
   trackVolumes: TrackVolumes;
   setTrackVolume: (track: keyof TrackVolumes, volume: number) => void;
   trackMutes: TrackMutes;
   setTrackMute: (track: keyof TrackMutes, muted: boolean) => void;
+  trackSolos: TrackSolos;
+  setTrackSolo: (track: keyof TrackSolos, soloed: boolean) => void;
+  toggleTrackSolo: (track: keyof TrackSolos) => void;
+  clearAllSolos: () => void;
+  isAnyTrackSoloed: boolean;
+  togglePercussionLayerSolo: (layerId: string) => void;
 
   // Legacy mappings
   selectedInstrument: InstrumentType;
@@ -222,13 +235,14 @@ const AccompanimentContext = createContext<AccompanimentContextType | null>(null
 const COUNT_IN_STORAGE_KEY = 'musobuddy_accompaniment_count_in_v1';
 const TRACK_VOLUMES_STORAGE_KEY = 'musobuddy_track_volumes_v2';
 const TRACK_MUTES_STORAGE_KEY = 'musobuddy_track_mutes_v2';
+const TRACK_SOLOS_STORAGE_KEY = 'musobuddy_track_solos_v1';
 const TRACK_MEASURES_STORAGE_KEY = 'musobuddy_track_measures_v1';
 
 const SyncEngine: React.FC = () => {
   const { 
     isPlaying, progression, arpeggioPreset, arpeggioRate,
     selectedRhythmInstrument, selectedBassInstrument, selectedSynthInstrument,
-    trackVolumes, trackMutes, isBassEnabled,
+    trackVolumes, trackMutes, trackSolos, isBassEnabled,
     setCurrentIndex, setIsPendingStart, accompanimentVolume,
     isRhythmEngineEnabled, activeRhythmPattern, setCurrentSubStepIndex, setEarlyPushEvent,
     progressionVoicings,
@@ -276,6 +290,9 @@ const SyncEngine: React.FC = () => {
 
   const trackMutesRef = useRef(trackMutes);
   trackMutesRef.current = trackMutes;
+
+  const trackSolosRef = useRef(trackSolos);
+  trackSolosRef.current = trackSolos;
 
   const isBassEnabledRef = useRef(isBassEnabled);
   isBassEnabledRef.current = isBassEnabled;
@@ -429,7 +446,29 @@ const SyncEngine: React.FC = () => {
       const currentAccompVol = accompanimentVolumeRef.current;
       const currentTrackVols = trackVolumesRef.current;
       const currentTrackMutes = trackMutesRef.current;
-      const currentBassEnabled = isBassEnabledRef.current && !currentTrackMutes.bass;
+      const currentTrackSolos = trackSolosRef.current;
+
+      const hasAnyTrackSolo = currentTrackSolos.rhythm || currentTrackSolos.bass || currentTrackSolos.synth || currentTrackSolos.percussion;
+
+      const isRhythmActive = hasAnyTrackSolo 
+        ? (currentTrackSolos.rhythm && !currentTrackMutes.rhythm) 
+        : !currentTrackMutes.rhythm;
+
+      const isBassActive = isBassEnabledRef.current && (
+        hasAnyTrackSolo 
+          ? (currentTrackSolos.bass && !currentTrackMutes.bass) 
+          : !currentTrackMutes.bass
+      );
+
+      const isSynthActive = hasAnyTrackSolo 
+        ? (currentTrackSolos.synth && !currentTrackMutes.synth) 
+        : !currentTrackMutes.synth;
+
+      const isPercussionActive = hasAnyTrackSolo 
+        ? (currentTrackSolos.percussion && !currentTrackMutes.percussion) 
+        : !currentTrackMutes.percussion;
+
+      const currentBassEnabled = isBassActive;
       const beatDurationSec = baseBeatDurationSec || (60 / Math.max(30, bpmRef.current || 120));
 
       const voicedMidiNotes = currentVoicing ? currentVoicing.allNotes : baseIntervals.map(i => i + 60);
@@ -455,7 +494,7 @@ const SyncEngine: React.FC = () => {
 
           // 1. RHYTHM / CHORD TRACK LAYER
           const chordTrigger = activeGroove.chordPattern?.[stepIdx] || 'OFF';
-          if (chordTrigger !== 'OFF' && !currentTrackMutes.rhythm) {
+          if (chordTrigger !== 'OFF' && isRhythmActive) {
             const rhythmVol = currentAccompVol * (currentTrackVols.rhythm ?? 1.0);
             if (chordTrigger === 'PUSH_NEXT_CHORD' || chordTrigger === 'PUSH_NEXT_ACCENT' || chordTrigger === 'PUSH_NEXT_ROOT') {
               const targetBeatIndex = (beatIndex + 1) % prog.length;
@@ -493,7 +532,7 @@ const SyncEngine: React.FC = () => {
 
           // 2. BASS TRACK LAYER
           const bassTrigger = activeGroove.bassPattern?.[stepIdx] || 'OFF';
-          if (bassTrigger !== 'OFF' && currentBassEnabled) {
+          if (bassTrigger !== 'OFF' && isBassActive) {
             const bassVol = currentAccompVol * (currentTrackVols.bass ?? 1.0);
             const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
 
@@ -522,7 +561,7 @@ const SyncEngine: React.FC = () => {
 
           // 3. SYNTH TRACK LAYER
           const synthTrigger: SynthTriggerType = activeGroove.synthPattern?.[stepIdx] || 'OFF';
-          if (synthTrigger !== 'OFF' && !currentTrackMutes.synth) {
+          if (synthTrigger !== 'OFF' && isSynthActive) {
             const synthVol = currentAccompVol * (currentTrackVols.synth ?? 1.0);
             const leadOctaveOffset = 12;
             const rootMidi = (currentVoicing?.bassNote ? (currentVoicing.bassNote + 24) : (baseIntervals[0] + 60)) + leadOctaveOffset;
@@ -555,10 +594,12 @@ const SyncEngine: React.FC = () => {
           }
 
           // 4. PERCUSSION TRACK LAYERS
-          if (activeGroove.percussionLayers && !currentTrackMutes.percussion) {
+          if (activeGroove.percussionLayers && isPercussionActive) {
             const percVol = currentAccompVol * (currentTrackVols.percussion ?? 1.0);
+            const hasAnyPercLayerSolo = activeGroove.percussionLayers.some(l => l.solo);
             activeGroove.percussionLayers.forEach(layer => {
-              if (layer.muted) return;
+              const isLayerAudible = hasAnyPercLayerSolo ? (layer.solo && !layer.muted) : !layer.muted;
+              if (!isLayerAudible) return;
               const patValue = layer.pattern?.[stepIdx] || 0;
               if (patValue > 0) {
                 const isAccent = patValue === 2;
@@ -596,7 +637,7 @@ const SyncEngine: React.FC = () => {
         }
       } else {
         // Standard Arpeggiator / Block Chords
-        if (currentBassEnabled && beatInMeasure === 0) {
+        if (isBassActive && beatInMeasure === 0) {
           const bassMidi = currentVoicing?.bassNote ?? (baseIntervals[0] + 36);
           const bassVol = currentAccompVol * (currentTrackVols.bass ?? 1.0);
           playBassSound(ctx, currentBassInst, bassMidi, 2.0, bassVol, true, audioTime, masterOut);
@@ -628,7 +669,7 @@ const SyncEngine: React.FC = () => {
           const offsetSec = s * subStepDurationSec;
           const eventTime = audioTime + offsetSec;
 
-          if (!currentTrackMutes.rhythm) {
+          if (isRhythmActive) {
             if (arpPreset === 'Block') {
               if (s === 0 && (isExplicit || beatInMeasure === 0)) {
                 playRhythmChordSound(ctx, currentRhythmInst, rhythmChordNotes, 1.2, rhythmVol, false, eventTime, masterOut);
@@ -725,6 +766,14 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     return { rhythm: false, bass: false, synth: false, percussion: false };
   });
 
+  const [trackSolos, setTrackSolos] = useState<TrackSolos>(() => {
+    try {
+      const saved = localStorage.getItem(TRACK_SOLOS_STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { rhythm: false, bass: false, synth: false, percussion: false };
+  });
+
   const setTrackVolume = (track: keyof TrackVolumes, vol: number) => {
     setTrackVolumes(prev => {
       const updated = { ...prev, [track]: Math.max(0, Math.min(1.5, vol)) };
@@ -738,6 +787,66 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
       const updated = { ...prev, [track]: muted };
       try { localStorage.setItem(TRACK_MUTES_STORAGE_KEY, JSON.stringify(updated)); } catch {}
       return updated;
+    });
+  };
+
+  const setTrackSolo = (track: keyof TrackSolos, soloed: boolean) => {
+    setTrackSolos(prev => {
+      const updated = { ...prev, [track]: soloed };
+      try { localStorage.setItem(TRACK_SOLOS_STORAGE_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const toggleTrackSolo = (track: keyof TrackSolos) => {
+    setTrackSolos(prev => {
+      const nextVal = !prev[track];
+      const updated = { ...prev, [track]: nextVal };
+      try { localStorage.setItem(TRACK_SOLOS_STORAGE_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    // When activating solo on a track that is currently muted, unmute it immediately
+    if (!trackSolos[track] && trackMutes[track]) {
+      setTrackMute(track, false);
+    }
+  };
+
+  const isAnyTrackSoloed = useMemo(() => {
+    return trackSolos.rhythm || trackSolos.bass || trackSolos.synth || trackSolos.percussion;
+  }, [trackSolos]);
+
+  const clearAllSolos = () => {
+    const cleared: TrackSolos = { rhythm: false, bass: false, synth: false, percussion: false };
+    setTrackSolos(cleared);
+    try { localStorage.setItem(TRACK_SOLOS_STORAGE_KEY, JSON.stringify(cleared)); } catch {}
+    setActiveGroovePattern(prev => {
+      if (!prev || !prev.percussionLayers) return prev;
+      if (!prev.percussionLayers.some(l => l.solo)) return prev;
+      return {
+        ...prev,
+        percussionLayers: prev.percussionLayers.map(l => ({ ...l, solo: false }))
+      };
+    });
+  };
+
+  const togglePercussionLayerSolo = (layerId: string) => {
+    setActiveGroovePattern(prev => {
+      if (!prev || !prev.percussionLayers) return prev;
+      const targetLayer = prev.percussionLayers.find(l => l.id === layerId);
+      const nextSolo = !targetLayer?.solo;
+      return {
+        ...prev,
+        percussionLayers: prev.percussionLayers.map(l => {
+          if (l.id === layerId) {
+            return {
+              ...l,
+              solo: nextSolo,
+              muted: nextSolo ? false : l.muted
+            };
+          }
+          return l;
+        })
+      };
     });
   };
 
@@ -1112,6 +1221,9 @@ export const AccompanimentProvider: React.FC<{ children: React.ReactNode }> = ({
     // Track Mixer
     trackVolumes, setTrackVolume,
     trackMutes, setTrackMute,
+    trackSolos, setTrackSolo,
+    toggleTrackSolo, clearAllSolos,
+    isAnyTrackSoloed, togglePercussionLayerSolo,
 
     // Legacy
     selectedInstrument, setSelectedInstrument,
