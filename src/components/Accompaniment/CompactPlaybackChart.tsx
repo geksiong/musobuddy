@@ -10,6 +10,7 @@ import { useAccompaniment, getEffectiveChord } from '../../contexts/Accompanimen
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { useAudio } from '../../contexts/AudioContext.tsx';
 import { formatChordName } from './constants.ts';
+import { FormattedChord } from './FormattedChord.tsx';
 
 interface CompactPlaybackChartProps {
   masterLength: number;
@@ -202,32 +203,87 @@ export default function CompactPlaybackChart({
                 {/* Chords Notation Area */}
                 <div className="flex-1 flex items-center justify-center my-1.5 min-h-[46px]">
                   {measure.hasSingleChord ? (
-                    // Single chord spanning the entire measure
-                    <button
-                      onClick={() => handleChordClick(measure.beats[0].index, measure.primaryChord)}
-                      className={cn(
-                        "w-full h-full flex items-center justify-center gap-2 px-2 py-1 rounded-lg transition-all group/btn cursor-pointer",
-                        selectedBeatIndex === measure.beats[0].index
-                          ? "bg-emerald-500/15 ring-2 ring-emerald-500"
-                          : (resolvedTheme === 'dark' ? "hover:bg-white/5" : "hover:bg-slate-100/70")
-                      )}
+                    // Single chord spanning the entire measure: spread across all beat columns
+                    <div
+                      className="grid gap-1 w-full h-full items-center"
+                      style={{ gridTemplateColumns: `repeat(${masterLength}, minmax(0, 1fr))` }}
                     >
-                      <span className={cn(
-                        "text-lg sm:text-xl font-black font-mono tracking-tight transition-all",
-                        isCurrentMeasure && measure.primaryChord
-                          ? "text-emerald-700 dark:text-emerald-400 scale-105"
-                          : (resolvedTheme === 'dark' ? "text-white" : "text-slate-900")
-                      )}>
-                        {formatChordName(measure.primaryChord || '—')}
-                      </span>
+                      {measure.beats.map((beat, bIdx) => {
+                        const explicitBeatIndex = measure.beats.findIndex((b) => b.isExplicit);
+                        const chordBeatIndex = explicitBeatIndex >= 0 ? explicitBeatIndex : 0;
+                        const isChordBeat = bIdx === chordBeatIndex;
+                        const isCellPlaying = isPlaying && currentIndex === beat.index;
+                        const isSelected = selectedBeatIndex === beat.index;
+                        const beatNum = (beat.index % masterLength) + 1;
+                        const chordName = measure.primaryChord;
+                        const isLong = chordName.length > 4;
 
-                      {/* Rhythm Slash Notation for remaining beats */}
-                      {measure.primaryChord && masterLength > 1 && (
-                        <span className="text-xs font-mono font-bold text-slate-300 dark:text-white/20 select-none tracking-widest">
-                          {Array.from({ length: masterLength - 1 }).map(() => ' / ').join('')}
-                        </span>
-                      )}
-                    </button>
+                        if (isChordBeat) {
+                          return (
+                            <button
+                              key={beat.index}
+                              onClick={() => handleChordClick(beat.index, chordName)}
+                              className={cn(
+                                "flex flex-col items-center justify-center h-11 rounded-lg text-center transition-all cursor-pointer p-0.5 relative group/chord",
+                                isCellPlaying
+                                  ? "bg-emerald-600 text-white shadow-xs font-bold scale-105 z-10"
+                                  : isSelected
+                                    ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 ring-2 ring-emerald-500 font-black"
+                                    : chordName
+                                      ? (resolvedTheme === 'dark'
+                                          ? "bg-white/10 hover:bg-white/15 text-white font-black"
+                                          : "bg-slate-100 hover:bg-slate-200 text-slate-900 font-black")
+                                      : (resolvedTheme === 'dark'
+                                          ? "bg-transparent text-slate-500 hover:text-white"
+                                          : "bg-transparent text-slate-400 hover:text-slate-800")
+                              )}
+                              title={`Beat ${beatNum}: ${chordName || 'Empty'}`}
+                            >
+                              <span
+                                className={cn(
+                                  "font-black font-mono leading-none truncate w-full px-0.5 transition-transform flex items-center justify-center",
+                                  isLong ? "text-xs sm:text-sm" : "text-sm sm:text-base",
+                                  isCurrentMeasure && chordName && !isCellPlaying && "text-emerald-700 dark:text-emerald-400"
+                                )}
+                              >
+                                <FormattedChord chord={chordName} fallback="—" />
+                              </span>
+                            </button>
+                          );
+                        }
+
+                        // Rhythm dash for subsequent/other beats in the measure (spread out to align with columns)
+                        return (
+                          <button
+                            key={beat.index}
+                            onClick={() => handleChordClick(beat.index, chordName)}
+                            className={cn(
+                              "flex flex-col items-center justify-center h-11 rounded-lg text-center transition-all cursor-pointer p-0.5 relative group/slash",
+                              isCellPlaying
+                                ? "bg-emerald-600 text-white shadow-xs font-bold scale-105 z-10"
+                                : isSelected
+                                  ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 ring-2 ring-emerald-500 font-black"
+                                  : (resolvedTheme === 'dark'
+                                      ? "bg-transparent hover:bg-white/5 text-slate-400 hover:text-white"
+                                      : "bg-transparent hover:bg-slate-100 text-slate-400 hover:text-slate-800")
+                            )}
+                            title={`Beat ${beatNum}: ${chordName ? `${chordName} (beat ${beatNum})` : 'Empty'}`}
+                          >
+                            <span
+                              className={cn(
+                                "font-black font-mono leading-none select-none transition-transform",
+                                chordName
+                                  ? "text-base sm:text-lg text-slate-400/80 dark:text-white/30"
+                                  : "text-xs text-slate-300 dark:text-white/20",
+                                isCellPlaying && "!text-white scale-110"
+                              )}
+                            >
+                              {chordName ? '–' : '•'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   ) : (
                     // Multi-chord measure with split beat cells
                     <div
@@ -245,12 +301,12 @@ export default function CompactPlaybackChart({
                             className={cn(
                               "flex flex-col items-center justify-center h-11 rounded-lg text-center transition-all cursor-pointer p-0.5 relative",
                               isCellPlaying
-                                ? "bg-emerald-600 text-white shadow-xs font-bold scale-105"
+                                ? "bg-emerald-600 text-white shadow-xs font-bold scale-105 z-10"
                                 : isSelected
                                   ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 ring-2 ring-emerald-500 font-black"
                                   : beat.isExplicit
                                     ? (resolvedTheme === 'dark'
-                                        ? "bg-white/5 hover:bg-white/10 text-white font-bold"
+                                        ? "bg-white/10 hover:bg-white/15 text-white font-bold"
                                         : "bg-slate-100 hover:bg-slate-200 text-slate-900 font-black")
                                     : (resolvedTheme === 'dark'
                                         ? "bg-transparent text-slate-500 hover:text-white"
@@ -258,15 +314,13 @@ export default function CompactPlaybackChart({
                             )}
                             title={`Beat ${(beat.index % masterLength) + 1}: ${beat.effectiveChord || 'Empty'}`}
                           >
-                            <span className="text-xs font-black font-mono leading-none truncate w-full px-0.5">
-                              {formatChordName(
-                                isCellPlaying && (beat.rawName === '-' || beat.rawName === '—')
-                                  ? (activeChordToDisplay || beat.effectiveChord || '—')
-                                  : (beat.rawName || (beat.effectiveChord ? '—' : '•'))
-                              )}
-                            </span>
-                            <span className="text-[7px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
-                              b.{(beat.index % masterLength) + 1}
+                            <span className="text-xs font-black font-mono leading-none truncate w-full px-0.5 flex items-center justify-center">
+                              {beat.isExplicit
+                                ? <FormattedChord chord={beat.rawName} />
+                                : isCellPlaying && (beat.rawName === '-' || beat.rawName === '—' || !beat.rawName)
+                                  ? (activeChordToDisplay || beat.effectiveChord ? '–' : '•')
+                                  : (beat.effectiveChord ? '–' : '•')
+                              }
                             </span>
                           </button>
                         );

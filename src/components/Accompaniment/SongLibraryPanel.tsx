@@ -21,6 +21,7 @@ import {
   POPULAR_STANDARDS, Song, getUserSongs, saveUserSong, deleteUserSong 
 } from './songLibrary.ts';
 import { formatChordName, transposeChord } from './constants.ts';
+import { FormattedChord } from './FormattedChord.tsx';
 
 interface SongLibraryPanelProps {
   onClose?: () => void;
@@ -459,7 +460,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
                           className="font-mono font-black px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-[8px] hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors cursor-pointer"
                           title={`Click to play ${chord}`}
                         >
-                          {formatChordName(chord)}
+                          <FormattedChord chord={chord} />
                         </button>
                       ))}
                       {uniqueExplicitChords.length > 7 && (
@@ -595,7 +596,7 @@ export default function SongLibraryPanel({ onClose, compact = false }: SongLibra
                         key={idx}
                         className="font-mono font-black px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 text-[9px]"
                       >
-                        {formatChordName(chord)}
+                        <FormattedChord chord={chord} />
                       </span>
                     ))}
                     {uniqueExplicitChords.length > 8 && (

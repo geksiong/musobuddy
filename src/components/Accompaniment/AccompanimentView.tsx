@@ -26,6 +26,7 @@ import {
   CHORD_ROOTS_SHARP, CHORD_ROOTS_FLAT, CHORD_TYPES,
   formatChordName, toggleEnharmonicSpelling
 } from './constants.ts';
+import { FormattedChord } from './FormattedChord.tsx';
 import { 
   ProgressionPreset, getUserPresets, saveUserPreset
 } from './progressionPresets.ts';
@@ -294,7 +295,7 @@ export default function AccompanimentView() {
   const activeExplorerChord = trackedChord || (isPlaying && activePlayChordInfo?.chord) || selectedBeatChordInfo?.chord || 'C';
 
   return (
-    <div className="p-4 md:p-6 w-full max-w-7xl mx-auto min-h-full flex flex-col gap-4 pb-20">
+    <div className="p-3 sm:p-5 md:p-6 w-full flex-1 min-h-full flex flex-col gap-4 pb-24">
       {/* 1. CLEAN LEAD-SHEET HEADER */}
       <header className={cn(
         "flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-all",
@@ -582,7 +583,7 @@ export default function AccompanimentView() {
                       : "opacity-40 border-slate-200 dark:border-white/10"
                   )}>
                     {selectedBeatIndex !== null 
-                      ? `Selected: Beat ${selectedBeatIndex + 1} (m.${Math.floor(selectedBeatIndex / masterLength) + 1}, b.${(selectedBeatIndex % masterLength) + 1})`
+                      ? `Selected: Beat ${selectedBeatIndex + 1} (${Math.floor(selectedBeatIndex / masterLength) + 1}.${(selectedBeatIndex % masterLength) + 1})`
                       : 'Click any beat cell to edit'}
                   </span>
 
@@ -655,7 +656,7 @@ export default function AccompanimentView() {
                     <div
                       key={mIdx}
                       className={cn(
-                        "flex flex-col p-3 rounded-xl border transition-all",
+                        "flex flex-col justify-between p-3 rounded-xl border transition-all min-h-[96px]",
                         isCurrentMeasure
                           ? "bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/30"
                           : "border-slate-200/80 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
@@ -663,7 +664,7 @@ export default function AccompanimentView() {
                     >
                       <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200/60 dark:border-white/10 text-[9px] font-mono">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-400">m.{mIdx + 1}</span>
+                          <span className="font-bold text-slate-400">{mIdx + 1}</span>
                           {currentLabel ? (
                             <button
                               onClick={() => {
@@ -691,7 +692,7 @@ export default function AccompanimentView() {
                       </div>
 
                       <div 
-                        className="grid gap-1.5 items-center w-full"
+                        className="grid gap-1.5 items-center w-full flex-1 my-auto"
                         style={{ gridTemplateColumns: `repeat(${masterLength}, minmax(0, 1fr))` }}
                       >
                         {Array.from({ length: masterLength }).map((_, bIdx) => {
@@ -714,7 +715,7 @@ export default function AccompanimentView() {
                                 if (!isToolsDrawerOpen) setIsToolsDrawerOpen(true);
                               }}
                               className={cn(
-                                "flex flex-col justify-between h-14 p-1.5 rounded-lg border text-center transition-all cursor-pointer",
+                                "flex items-center justify-center h-12 sm:h-14 p-1.5 rounded-lg border text-center transition-all cursor-pointer relative",
                                 isCellPlaying
                                   ? "bg-emerald-600 text-white border-emerald-500 font-bold scale-[1.03]"
                                   : isSelected
@@ -723,17 +724,21 @@ export default function AccompanimentView() {
                                       ? "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-emerald-500/40 text-slate-900 dark:text-white"
                                       : "border-dashed border-slate-200 dark:border-white/10 text-slate-400 hover:border-slate-300"
                               )}
+                              title={`Beat ${bIdx + 1}: ${chordSlot?.name || (effective?.chord ? `(${effective.chord})` : 'Empty')}`}
                             >
-                              <div className="flex items-center justify-between w-full text-[8px] font-mono opacity-60">
-                                <span>b.{bIdx + 1}</span>
-                                {progressionVoicings[globalBeatIndex]?.inversionName && (
-                                  <span className="truncate max-w-[40px] text-[7px] text-emerald-600 dark:text-emerald-400">
-                                    {progressionVoicings[globalBeatIndex]?.inversionName}
-                                  </span>
+                              {progressionVoicings[globalBeatIndex]?.inversionName && (
+                                <span className="absolute top-1 right-1.5 truncate max-w-[40px] text-[7px] text-emerald-600 dark:text-emerald-400 font-mono">
+                                  {progressionVoicings[globalBeatIndex]?.inversionName}
+                                </span>
+                              )}
+                              <div className="font-mono font-black text-xs md:text-sm truncate w-full flex items-center justify-center leading-none">
+                                {chordSlot?.name ? (
+                                  <FormattedChord chord={chordSlot.name} />
+                                ) : effective?.chord ? (
+                                  <FormattedChord chord={`(${effective.chord})`} />
+                                ) : (
+                                  '—'
                                 )}
-                              </div>
-                              <div className="font-mono font-black text-xs md:text-sm truncate w-full">
-                                {chordSlot?.name ? formatChordName(chordSlot.name) : (effective?.chord ? `(${formatChordName(effective.chord)})` : '—')}
                               </div>
                             </button>
                           );
@@ -844,7 +849,7 @@ export default function AccompanimentView() {
                         >
                           <div className="flex items-center justify-between w-full">
                             <span className="font-mono font-black text-xs text-slate-900 dark:text-white">
-                              {formatChordName(s.chord)}
+                              <FormattedChord chord={s.chord} />
                             </span>
                             <span className="text-[7px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
                               {s.label}
@@ -921,7 +926,7 @@ export default function AccompanimentView() {
                             onClick={() => handleLibraryChordClick(chordName)}
                             className="flex flex-col items-center justify-center p-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:border-emerald-500 hover:bg-emerald-500/10 text-slate-900 dark:text-white transition-all cursor-pointer"
                           >
-                            <span className="text-xs font-mono font-black">{formatChordName(chordName)}</span>
+                            <FormattedChord chord={chordName} className="text-xs font-mono font-black" />
                             <span className="text-[7.5px] text-slate-400 truncate max-w-full">{type.label}</span>
                           </button>
                         );

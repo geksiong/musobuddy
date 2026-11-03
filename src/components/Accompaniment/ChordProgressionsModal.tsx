@@ -14,6 +14,7 @@ import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { useAudio } from '../../contexts/AudioContext.tsx';
 import { useAccompaniment } from '../../contexts/AccompanimentContext.tsx';
 import { formatChordName, transposeChord } from './constants.ts';
+import { FormattedChord } from './FormattedChord.tsx';
 import { 
   CHORD_PROGRESSIONS_LIBRARY, DetailedProgression, ProgressionVariation 
 } from './chordProgressionsData.ts';
@@ -460,7 +461,7 @@ export default function ChordProgressionsModal({
                                   className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 font-mono font-bold text-[9px] hover:bg-emerald-500/30 transition-all cursor-pointer"
                                   title={`Click to play ${chord}`}
                                 >
-                                  {formatChordName(chord)}
+                                  <FormattedChord chord={chord} />
                                 </button>
                               ) : (
                                 <span className="px-1 text-[8px] text-slate-400 font-mono opacity-30">—</span>
@@ -680,7 +681,7 @@ export default function ChordProgressionsModal({
                                 )}
                                 title={`Click to play ${chord}`}
                               >
-                                {formatChordName(chord)}
+                                <FormattedChord chord={chord} />
                               </button>
                             ) : (
                               <div className="px-2 py-1 rounded-lg border border-transparent font-mono font-bold text-xs flex items-center justify-center min-w-[36px] opacity-30 text-slate-400">

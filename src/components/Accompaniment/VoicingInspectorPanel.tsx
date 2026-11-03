@@ -17,6 +17,7 @@ import {
   calculateVoiceLeadingDistance
 } from '../../lib/pianoVoicingEngine.ts';
 import { formatChordName } from './constants.ts';
+import { FormattedChord } from './FormattedChord.tsx';
 
 export const VOICING_STYLES: {
   id: PianoVoicingStyle;
@@ -186,9 +187,7 @@ export default function VoicingInspectorPanel() {
                 <span className="text-[9px] font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 font-bold">
                   {isPlaying ? `Playing Beat ${targetBeatIndex + 1}` : `Selected Beat ${targetBeatIndex + 1}`}
                 </span>
-                <span className="text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
-                  {formatChordName(currentChord)}
-                </span>
+                <FormattedChord chord={currentChord} className="text-base font-black font-mono text-emerald-600 dark:text-emerald-400" />
               </div>
 
               <div className="h-7 w-px bg-slate-200 dark:bg-white/10" />
@@ -243,22 +242,23 @@ export default function VoicingInspectorPanel() {
             {prevInfo?.chord && prevInfo.chord !== currentChord && (
               <>
                 <span className="px-1.5 py-0.5 rounded bg-white dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-slate-200 font-bold">
-                  {formatChordName(prevInfo.chord)}
+                  <FormattedChord chord={prevInfo.chord} />
                   {prevVoicing ? ` (${prevVoicing.inversionName})` : ''}
                 </span>
                 <ArrowRight className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
               </>
             )}
 
-            <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-black shadow-xs">
-              {formatChordName(currentChord)} ({currentVoicing.inversionName || currentVoicing.label})
+            <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-black shadow-xs inline-flex items-center gap-1">
+              <FormattedChord chord={currentChord} />
+              <span className="text-[9px] font-semibold opacity-90">({currentVoicing.inversionName || currentVoicing.label})</span>
             </span>
 
             {nextInfo?.chord && nextInfo.chord !== currentChord && (
               <>
                 <ArrowRight className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span className="px-1.5 py-0.5 rounded bg-white dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-slate-200 font-bold">
-                  {formatChordName(nextInfo.chord)}
+                  <FormattedChord chord={nextInfo.chord} />
                 </span>
               </>
             )}
@@ -361,8 +361,10 @@ export default function VoicingInspectorPanel() {
           {/* Alternative Voicing Options Comparison */}
           {candidateVoicings.length > 1 && (
             <div className="pt-1">
-              <div className="text-[9px] font-mono text-slate-700 dark:text-slate-300 font-bold mb-1">
-                Candidate Voicing Inversions for {formatChordName(currentChord)}:
+              <div className="text-[9px] font-mono text-slate-700 dark:text-slate-300 font-bold mb-1 flex items-center gap-1">
+                <span>Candidate Voicing Inversions for</span>
+                <FormattedChord chord={currentChord} />
+                <span>:</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {candidateVoicings.map((cVoicing, idx) => {

@@ -18,6 +18,7 @@ import { parseChordsFromAbc, ParsedAbcTune } from '../../lib/abcChordParser.ts';
 import { parseChordsFromChordSheet, ParsedChordSheet, ChordDistributionMode } from '../../lib/chordSheetParser.ts';
 import { DEFAULT_PRESETS } from '../Metronome/constants.ts';
 import { formatChordName } from './constants.ts';
+import { FormattedChord } from './FormattedChord.tsx';
 
 interface ImportAbcChordsModalProps {
   isOpen: boolean;
@@ -547,7 +548,7 @@ export default function ImportAbcChordsModal({ isOpen, onClose }: ImportAbcChord
                             )}
                             title={chord ? `Beat ${bIdx + 1}: ${chord}` : `Beat ${bIdx + 1}: (empty)`}
                           >
-                            {chord ? formatChordName(chord) : '—'}
+                            <FormattedChord chord={chord} fallback="—" />
                           </button>
                         ))}
                       </div>

@@ -22,6 +22,7 @@ import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { useAudio } from '../../contexts/AudioContext.tsx';
 import { InstrumentType } from '../../types.ts';
 import { formatChordName } from '../Accompaniment/constants.ts';
+import { FormattedChord } from '../Accompaniment/FormattedChord.tsx';
 import { 
   InstrumentName, 
   INSTRUMENT_CONFIGS, 
@@ -905,8 +906,8 @@ export default function ChordExplorer({ initialChord = 'C' }: { initialChord?: s
             <Music2 className="w-4 h-4" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[11px] font-black tracking-wide">
-              {formatChordName(`${parsedChord.normalizedRoot}${parsedChord.formula.label !== 'Major' ? parsedChord.suffix : ''}`)}
+            <span className="text-[11px] font-black tracking-wide inline-flex items-baseline">
+              <FormattedChord chord={`${parsedChord.normalizedRoot}${parsedChord.formula.label !== 'Major' ? parsedChord.suffix : ''}`} />
               <span className={cn("ml-2 text-[9px] font-bold uppercase tracking-widest", resolvedTheme === 'dark' ? "text-white/40" : "text-slate-400")}>
                 ({parsedChord.formula.label})
               </span>

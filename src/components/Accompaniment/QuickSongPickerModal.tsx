@@ -11,6 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext.tsx';
 import { POPULAR_STANDARDS, Song, getUserSongs } from './songLibrary.ts';
 import { PROGRESSION_PRESETS, ProgressionPreset, getUserPresets } from './progressionPresets.ts';
 import { formatChordName } from './constants.ts';
+import { FormattedChord } from './FormattedChord.tsx';
 
 interface QuickSongPickerModalProps {
   isOpen: boolean;
@@ -269,7 +270,7 @@ export default function QuickSongPickerModal({
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {previewChords.map((c, i) => (
                           <span key={i} className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white border border-slate-200 dark:border-white/15 font-mono text-[9px] font-black">
-                            {formatChordName(c)}
+                            <FormattedChord chord={c} />
                           </span>
                         ))}
                         {prog.chordsPerBeat.filter(c => c && c.trim() !== '').length > 4 && (
