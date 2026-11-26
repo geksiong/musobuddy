@@ -240,6 +240,30 @@ interface SlurArc {
 }
 
 /**
+ * Computes visual rhythmic weight for proportional Jianpu spacing (quarter note / dash = 1).
+ */
+function getNoteBeatWeight(note: SimpErhuNote): number {
+  let base = 1;
+  if (note.underlines === 1) base = 0.5;
+  else if (note.underlines === 2) base = 0.25;
+  else if (note.underlines >= 3) base = 0.125;
+
+  if (note.dots === 1) base *= 1.5;
+  else if (note.dots >= 2) base *= 1.75;
+  return base;
+}
+
+function getGroupBeatWeight(group: BeatGroup): number {
+  const total = group.notes.reduce((sum, n) => sum + getNoteBeatWeight(n), 0);
+  return Math.max(0.45, total);
+}
+
+function getMeasureBeatWeight(measure: SimpErhuMeasure): number {
+  const total = measure.groups.reduce((sum, g) => sum + getGroupBeatWeight(g), 0);
+  return Math.max(1, total);
+}
+
+/**
  * Renders one Music Line (system of measures) with accurate SVG slur arcs measured across DOM note boxes.
  */
 function MusicLineView({
@@ -377,6 +401,13 @@ function MusicLineView({
     const prevUnderlines = noteIdxInGroup > 0 ? group.notes[noteIdxInGroup - 1].underlines : 0;
     const nextUnderlines = noteIdxInGroup < group.notes.length - 1 ? group.notes[noteIdxInGroup + 1].underlines : 0;
 
+    const noteMinWidthClass =
+      note.underlines === 0
+        ? (note.dots > 0 ? 'min-w-[36px]' : 'min-w-[26px]')
+        : note.underlines === 1
+          ? (note.dots > 0 ? 'min-w-[28px]' : 'min-w-[22px]')
+          : 'min-w-[19px]';
+
     return (
       <button
         key={note.id}
@@ -384,7 +415,8 @@ function MusicLineView({
         onClick={() => onNoteClick?.(note)}
         title={`Line ${note.lineNumber} · Click to edit in source`}
         className={cn(
-          'relative flex flex-col items-center justify-end group/note px-[4px] pt-1 pb-0.5 rounded-md transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E05A2B]',
+          'relative shrink-0 flex flex-col items-center justify-end group/note px-[5px] pt-1 pb-0.5 rounded-md transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E05A2B]',
+          noteMinWidthClass,
           isPlaying && (isDarkSurface ? 'bg-[#E05A2B]/30 ring-1 ring-[#E05A2B]' : 'bg-[#E05A2B]/15 ring-1 ring-[#E05A2B]'),
           !isPlaying && isSelected && (isDarkSurface ? 'bg-white/10' : 'bg-amber-100/80'),
           !isPlaying && !isSelected && (isDarkSurface ? 'hover:bg-white/[0.06]' : 'hover:bg-neutral-100')
@@ -394,7 +426,7 @@ function MusicLineView({
         {showMarkings && (
           <div className="flex flex-col items-center justify-end min-h-[34px] mb-0.5 select-none">
             {/* Lane 1: Dynamics + Bowing */}
-            <div className="flex items-center justify-center gap-1 min-h-[14px]">
+            <div className="flex items-center justify-center gap-0.5 min-h-[14px] whitespace-nowrap">
               {note.markings.dynamic && (
                 <span className={cn('text-[10px] font-serif italic font-bold leading-none', isDarkSurface ? 'text-amber-300' : 'text-neutral-800')}>
                   {note.markings.dynamic}
@@ -502,9 +534,15 @@ function MusicLineView({
 
           {/* Augmentation Dot(s) */}
           {note.dots > 0 && (
-            <span className={cn('inline-flex items-center gap-[2px] ml-[2px]', inkClass)}>
+            <span
+              className={cn(
+                'inline-flex items-center',
+                note.underlines === 0 ? 'ml-[8px] mr-[1px] gap-[4px]' : 'ml-[5px] gap-[3px]',
+                inkClass
+              )}
+            >
               {Array.from({ length: note.dots }).map((_, dIdx) => (
-                <span key={dIdx} className="w-[3.5px] h-[3.5px] rounded-full bg-current inline-block" />
+                <span key={dIdx} className="w-[4px] h-[4px] rounded-full bg-current inline-block" />
               ))}
             </span>
           )}
@@ -540,8 +578,8 @@ function MusicLineView({
                   isPlaying ? 'text-[#E05A2B]' : inkClass
                 )}
                 style={{
-                  marginLeft: connectLeft ? '-4px' : '1px',
-                  marginRight: connectRight ? '-4px' : '1px'
+                  marginLeft: connectLeft ? '-5px' : '1px',
+                  marginRight: connectRight ? '-5px' : '1px'
                 }}
               />
             );
@@ -586,13 +624,15 @@ function MusicLineView({
       )}
 
       {/* Measures Flex Row */}
-      <div className="flex flex-wrap items-end gap-y-6 w-full">
+      <div className="flex flex-wrap items-end gap-y-7 w-full">
         {line.measures.map((measure: SimpErhuMeasure, mIdx: number) => {
           const isLastInLine = mIdx === line.measures.length - 1;
+          const measureWeight = getMeasureBeatWeight(measure);
           return (
             <div
               key={measure.id}
-              className="relative flex items-end grow basis-[180px] min-w-0"
+              style={{ flex: `${measureWeight} 0 auto` }}
+              className="relative flex items-end"
             >
               {/* Measure Number subtle cue on first measure of each line */}
               {mIdx === 0 && (
@@ -619,18 +659,23 @@ function MusicLineView({
 
               {/* Start Barline */}
               {measure.startBarline && (
-                <div className={cn('mr-2 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
+                <div className={cn('mr-2 shrink-0 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
                   <BarlineGlyph type={measure.startBarline} inkClass={inkClass} />
                 </div>
               )}
 
-              {/* Beat Groups inside Measure */}
-              <div className="flex items-end justify-around flex-1 gap-2 px-1.5">
+              {/* Beat Groups inside Measure (duration-proportional spacing, never overlapping) */}
+              <div className="flex items-end flex-1 gap-x-2 pl-2.5 pr-1.5">
                 {measure.groups.map(group => {
+                  const groupWeight = getGroupBeatWeight(group);
                   const hasTuplet = group.notes.some(n => n.tupletStart);
                   const tupletNum = group.notes.find(n => n.tupletStart)?.tupletStart;
                   return (
-                    <div key={group.id} className="relative flex items-end">
+                    <div
+                      key={group.id}
+                      style={{ flex: `${groupWeight} 0 auto` }}
+                      className="relative flex items-end justify-start"
+                    >
                       {hasTuplet && tupletNum && (
                         <div className={cn(
                           'absolute -top-2 inset-x-1 flex items-center justify-center text-[10px] font-bold pointer-events-none',
@@ -649,7 +694,7 @@ function MusicLineView({
 
               {/* End Barline */}
               {(measure.endBarline || !isLastInLine) && (
-                <div className={cn('ml-2 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
+                <div className={cn('ml-2 shrink-0 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
                   <BarlineGlyph type={measure.endBarline || '|'} inkClass={inkClass} />
                 </div>
               )}
@@ -675,7 +720,7 @@ export function SimpErhuRenderer({
   customFontFamily,
   onNoteClick
 }: SimpErhuRendererProps) {
-  const isDarkSurface = paperTheme === 'adaptive' && resolvedTheme === 'dark';
+  const isDarkSurface = paperTheme === 'adaptive';
   const keyInfo = getErhuKeyInfo(document.header.key);
   const stringsLabel = document.header.strings || keyInfo.strings;
 

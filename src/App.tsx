@@ -79,7 +79,7 @@ export default function App() {
 
   return (
     <div className={cn(
-      "flex h-screen overflow-hidden font-sans flex-col transition-colors duration-200 select-none",
+      "print-unclip flex h-screen overflow-hidden font-sans flex-col transition-colors duration-200 select-none",
       resolvedTheme === 'dark' ? "bg-[#121316] text-neutral-200" : "bg-[#F8F9FA] text-neutral-800"
     )}>
       {/* Hidden File Input for Global Score Uploads */}
@@ -113,7 +113,7 @@ export default function App() {
 
       {/* Offline Status Bar (Discreet) */}
       {isOffline && !isDistractionFree && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-500 px-4 py-1 text-xs font-medium flex items-center justify-center gap-2 shrink-0">
+        <div className="no-print bg-amber-500/10 border-b border-amber-500/20 text-amber-500 px-4 py-1 text-xs font-medium flex items-center justify-center gap-2 shrink-0">
           <WifiOff className="w-3.5 h-3.5" />
           <span>Offline Mode • Scores, Practice Tools & Tuner remain operational</span>
         </div>
@@ -121,10 +121,10 @@ export default function App() {
 
       {/* Main Content Workspace */}
       <main className={cn(
-        "flex-1 relative flex flex-col min-h-0 overflow-hidden",
+        "print-unclip flex-1 relative flex flex-col min-h-0 overflow-hidden",
         isDistractionFree && "fixed inset-0 z-50 bg-inherit"
       )}>
-        <div className={cn("flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar", currentView !== 'score' && "hidden")}>
+        <div className={cn("print-unclip flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar", currentView !== 'score' && "hidden")}>
           <ScoreView />
         </div>
         <div className={cn("flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar", currentView !== 'accompaniment' && "hidden")}>
@@ -143,11 +143,13 @@ export default function App() {
 
       {/* Practice Tools Compact Bottom Dock */}
       {!isDistractionFree && (
-        <PracticeToolsDock 
-          currentView={currentView}
-          onNavigate={(view) => setCurrentView(view)}
-          fileInputRef={fileInputRef}
-        />
+        <div className="no-print shrink-0">
+          <PracticeToolsDock 
+            currentView={currentView}
+            onNavigate={(view) => setCurrentView(view)}
+            fileInputRef={fileInputRef}
+          />
+        </div>
       )}
 
       {/* Controller & Hardware Mapping Modal */}

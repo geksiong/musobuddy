@@ -9,7 +9,7 @@ import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
 import { parseMxlFile } from '../lib/mxlUtils.ts';
 import { detectChordEngine } from '../lib/chordSheetUtils.ts';
 import { loadScoreFromUrl, LoadScoreUrlResult } from '../lib/urlScoreLoader.ts';
-import { SIMPERHU_BLANK_TEMPLATE, SIMPERHU_ERQUAN_SAMPLE } from '../lib/simperhu/samples.ts';
+import { SIMPERHU_BLANK_TEMPLATE, SIMPERHU_JASMINE_SAMPLE } from '../lib/simperhu/samples.ts';
 import { detectSimpErhuFormat, parseSimpErhuScore } from '../lib/simperhu/parser.ts';
 import { generateMidiForSimpErhu } from '../lib/simperhu/audioEngine.ts';
 
@@ -64,10 +64,10 @@ interface ScoreContextType {
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
 
 const DEFAULT_SIMPERHU_SCORE: ScoreData = {
-  id: 'simperhu-erquan',
-  title: '二泉映月 (SimpErhu Jianpu)',
+  id: 'simperhu-jasmine',
+  title: '茉莉花 (SimpErhu Jianpu)',
   format: ScoreFormat.SimpErhu,
-  content: SIMPERHU_ERQUAN_SAMPLE,
+  content: SIMPERHU_JASMINE_SAMPLE,
   zoom: 1,
   pan: { x: 0, y: 0 },
   viewMode: 'scroll',

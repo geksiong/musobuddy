@@ -261,60 +261,61 @@ export default function ScoreView() {
   };
 
   const updateActiveScore = (updates: Partial<ScoreData>) => {
-    // Clear manual audio override when updating core ABC properties or explicit audio
-    const s = scores.find(score => score.id === activeScoreId);
-    if (s && s.format === ScoreFormat.ABC) {
-      const contentChanged = updates.content !== undefined && updates.content !== s.content;
-      const tuneChanged = updates.selectedTuneIndex !== undefined && updates.selectedTuneIndex !== s.selectedTuneIndex;
+    const current = scores.find(score => score.id === activeScoreId);
+    if (current && current.format === ScoreFormat.ABC) {
+      const contentChanged = updates.content !== undefined && updates.content !== current.content;
+      const tuneChanged = updates.selectedTuneIndex !== undefined && updates.selectedTuneIndex !== current.selectedTuneIndex;
       const audioUpdated = updates.audioUrl !== undefined;
-      
+
       if (contentChanged || tuneChanged || audioUpdated) {
         setGlobalAudio(null);
       }
     }
 
-    setScores(scores.map(s => {
-      if (s.id === activeScoreId) {
-        const updated = { ...s, ...updates };
-        
-        // Regenerate MIDI if ABC content or selectedTuneIndex or transpose changed
-        const contentChanged = s.format === ScoreFormat.ABC && updates.content !== undefined && updates.content !== s.content;
-        const tuneChanged = s.format === ScoreFormat.ABC && updates.selectedTuneIndex !== undefined && updates.selectedTuneIndex !== s.selectedTuneIndex;
-        const transposeChanged = s.format === ScoreFormat.ABC && updates.transpose !== undefined && updates.transpose !== s.transpose;
+    setScores(prevScores => {
+      return prevScores.map(s => {
+        if (s.id === activeScoreId) {
+          const updated = { ...s, ...updates };
 
-        if (contentChanged || tuneChanged || transposeChanged) {
-          const targetTuneIndex = updates.selectedTuneIndex !== undefined ? updates.selectedTuneIndex : (s.selectedTuneIndex || 0);
-          const targetTranspose = updates.transpose !== undefined ? updates.transpose : (s.transpose || 0);
-          const midiUrl = generateMidiForAbc(updated.content as string, targetTuneIndex, targetTranspose);
-          if (midiUrl) {
-            updated.audioUrl = midiUrl;
-            updated.audioName = `${updated.title || 'score'}.mid`;
+          // Regenerate MIDI if ABC content or selectedTuneIndex or transpose changed
+          const contentChanged = s.format === ScoreFormat.ABC && updates.content !== undefined && updates.content !== s.content;
+          const tuneChanged = s.format === ScoreFormat.ABC && updates.selectedTuneIndex !== undefined && updates.selectedTuneIndex !== s.selectedTuneIndex;
+          const transposeChanged = s.format === ScoreFormat.ABC && updates.transpose !== undefined && updates.transpose !== s.transpose;
+
+          if (contentChanged || tuneChanged || transposeChanged) {
+            const targetTuneIndex = updates.selectedTuneIndex !== undefined ? updates.selectedTuneIndex : (s.selectedTuneIndex || 0);
+            const targetTranspose = updates.transpose !== undefined ? updates.transpose : (s.transpose || 0);
+            const midiUrl = generateMidiForAbc(updated.content as string, targetTuneIndex, targetTranspose);
+            if (midiUrl) {
+              updated.audioUrl = midiUrl;
+              updated.audioName = `${updated.title || 'score'}.mid`;
+            }
+          } else if (s.format === ScoreFormat.SimpErhu && updates.content !== undefined && updates.content !== s.content) {
+            const parsed = parseSimpErhuScore(updated.content as string);
+            const midiUrl = generateMidiForSimpErhu(parsed, updated.transpose || 0);
+            if (midiUrl) {
+              updated.audioUrl = midiUrl;
+              updated.audioName = `${updated.title || 'erhu-score'}.mid`;
+            }
           }
-        } else if (s.format === ScoreFormat.SimpErhu && updates.content !== undefined && updates.content !== s.content) {
-          const parsed = parseSimpErhuScore(updated.content as string);
-          const midiUrl = generateMidiForSimpErhu(parsed, updated.transpose || 0);
-          if (midiUrl) {
-            updated.audioUrl = midiUrl;
-            updated.audioName = `${updated.title || 'erhu-score'}.mid`;
-          }
+          return updated;
         }
-        return updated;
-      }
-      return s;
-    }));
+        return s;
+      });
+    });
   };
 
   const activeScore = scores.find(s => s.id === activeScoreId) || scores[0];
 
   return (
-    <div className="h-full flex-1 flex flex-col px-2 sm:px-4 md:px-6 pt-2 sm:pt-4 md:pt-6 pb-0 relative overflow-hidden min-h-0">
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
+    <div className="print-unclip h-full flex-1 flex flex-col px-2 sm:px-4 md:px-6 pt-2 sm:pt-4 md:pt-6 pb-0 relative overflow-hidden min-h-0">
+      <div className="print-unclip flex-1 flex flex-col min-w-0 min-h-0 relative overflow-hidden">
         <div 
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={onDrop}
           className={cn(
-            "flex-1 rounded-t-2xl rounded-b-none border border-b-0 flex flex-col overflow-hidden backdrop-blur-sm relative transition-all min-h-0",
+            "print-unclip flex-1 rounded-t-2xl rounded-b-none border border-b-0 flex flex-col overflow-hidden backdrop-blur-sm relative transition-all min-h-0",
             resolvedTheme === 'dark' ? "bg-white/5 border-white/10" : "bg-white border-black/5 shadow-xl",
             isDragging && "ring-4 ring-orange-500 ring-inset bg-orange-500/5"
           )}
@@ -528,10 +529,10 @@ function ScoreDisplay({
   }, []);
 
   return (
-    <div ref={scoreViewRef} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar relative min-h-0 h-full">
+    <div ref={scoreViewRef} className="print-unclip flex-1 flex flex-col overflow-y-auto custom-scrollbar relative min-h-0 h-full">
       {/* Floating HUD for No Distraction mode */}
       {isDistractionFree && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 bg-black/90 backdrop-blur-2xl border border-white/20 text-white rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all hover:opacity-100 opacity-90 max-w-[95vw]">
+        <div className="no-print fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 bg-black/90 backdrop-blur-2xl border border-white/20 text-white rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all hover:opacity-100 opacity-90 max-w-[95vw]">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse shrink-0" />
             <span className="text-xs font-black uppercase tracking-wider truncate max-w-[100px] sm:max-w-[200px]">
@@ -610,7 +611,7 @@ function ScoreDisplay({
         <div 
           ref={headerRef}
           className={cn(
-            "sticky top-0 z-30 px-3 sm:px-5 py-2 flex flex-col border-b transition-colors gap-1.5 backdrop-blur-xl shrink-0",
+            "no-print sticky top-0 z-30 px-3 sm:px-5 py-2 flex flex-col border-b transition-colors gap-1.5 backdrop-blur-xl shrink-0",
             resolvedTheme === 'dark' 
               ? "border-white/[0.08] bg-[#141518]/95 text-neutral-200" 
               : "border-neutral-200 bg-white/95 text-neutral-800 shadow-sm"
@@ -1463,6 +1464,7 @@ function ScoreDisplay({
                     paperTheme={score.simperhuPaperTheme || 'paper'}
                     onChangeContent={(val) => onUpdate({ content: val })}
                     onChangeTitle={(nextTitle) => onUpdate({ title: nextTitle })}
+                    onLoadTemplate={(tplContent, tplTitle) => onUpdate({ content: tplContent, title: tplTitle })}
                     onLayoutChange={(nextLayout) => onUpdate({
                       simperhuLayout: nextLayout,
                       showEditor: nextLayout !== 'sheet'

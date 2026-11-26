@@ -24,7 +24,9 @@ import {
   ArrowUp,
   ArrowDown,
   Gauge,
-  Music
+  Music,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { parseSimpErhuScore } from '../../lib/simperhu/parser.ts';
 import { simperhu } from '../../lib/simperhu/language.ts';
@@ -62,6 +64,7 @@ export interface SimpErhuWorkbenchProps {
   paperTheme: 'paper' | 'adaptive';
   onChangeContent: (nextContent: string) => void;
   onChangeTitle?: (nextTitle: string) => void;
+  onLoadTemplate?: (nextContent: string, nextTitle: string) => void;
   onLayoutChange: (layout: 'split' | 'stacked' | 'sheet') => void;
   onFingeringStyleChange: (style: 'chinese' | 'arabic') => void;
   onPaperThemeChange: (theme: 'paper' | 'adaptive') => void;
@@ -76,6 +79,7 @@ export function SimpErhuWorkbench({
   paperTheme,
   onChangeContent,
   onChangeTitle,
+  onLoadTemplate,
   onLayoutChange,
   onFingeringStyleChange,
   onPaperThemeChange
@@ -86,6 +90,7 @@ export function SimpErhuWorkbench({
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const playerRef = useRef<SimpErhuPlayer | null>(null);
   const fontInputRef = useRef<HTMLInputElement>(null);
+  const sheetPaneRef = useRef<HTMLDivElement>(null);
 
   const [activeMacroTab, setActiveMacroTab] = useState<MacroTab>('bowing');
   const [showMarkings, setShowMarkings] = useState(true);
@@ -114,6 +119,7 @@ export function SimpErhuWorkbench({
 
   // Template selector menu
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
+  const [templateMenuAlign, setTemplateMenuAlign] = useState<'left' | 'right'>('left');
   const templateMenuRef = useRef<HTMLDivElement>(null);
 
   // Parse the SimpErhu text score into AST
@@ -321,6 +327,143 @@ export function SimpErhuWorkbench({
     }
   };
 
+  // Export a self-contained print-ready HTML sheet (used as fallback when sandboxed iframe blocks window.print())
+  const downloadPrintableHtml = useCallback(() => {
+    const sheetEl = sheetPaneRef.current?.querySelector('.simperhu-print-sheet');
+    if (!sheetEl) return;
+
+    const clone = sheetEl.cloneNode(true) as HTMLElement;
+    clone.style.transform = '';
+    clone.style.width = '100%';
+
+    // Collect all same-origin CSS rules so the downloaded sheet renders identically offline
+    let collectedCss = '';
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        if (sheet.cssRules) {
+          for (const rule of Array.from(sheet.cssRules)) {
+            collectedCss += rule.cssText + '\n';
+          }
+        }
+      } catch {
+        // Ignore cross-origin stylesheets
+      }
+    }
+
+    const safeTitle = (parsedDoc.header.title || 'erhu-jianpu-score')
+      .replace(/[<>:"/\\|?*]+/g, '')
+      .trim() || 'erhu-jianpu-score';
+    const escapedTitle = safeTitle
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapedTitle} - SimpErhu Sheet Music</title>
+  <style>
+${collectedCss}
+    body {
+      background: #f5f5f4 !important;
+      color: #161616 !important;
+      margin: 0;
+      padding: 24px 16px 48px;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    .standalone-print-bar {
+      max-width: 920px;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      color: #444;
+    }
+    .standalone-print-btn {
+      background: #161616;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .standalone-print-btn:hover {
+      background: #E05A2B;
+    }
+    .simperhu-print-sheet > div {
+      background: #FFFEFA !important;
+      color: #161616 !important;
+      border-color: #e5e5e5 !important;
+    }
+    .simperhu-print-sheet [class*="text-neutral-100"],
+    .simperhu-print-sheet [class*="text-white"] {
+      color: #161616 !important;
+    }
+    .simperhu-print-sheet [class*="text-neutral-200"],
+    .simperhu-print-sheet [class*="text-neutral-300"] {
+      color: #262626 !important;
+    }
+    .simperhu-print-sheet svg path[stroke="#E5E7EB"] {
+      stroke: #1A1A1A !important;
+    }
+    @media print {
+      .standalone-print-bar { display: none !important; }
+      body { background: #ffffff !important; padding: 0 !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="standalone-print-bar">
+    <span><strong>${escapedTitle}</strong> — Print-ready SimpErhu Jianpu Sheet</span>
+    <button class="standalone-print-btn" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+  ${clone.outerHTML}
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeTitle}-print.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [parsedDoc.header.title]);
+
+  // Print sheet music with automatic fallback when running inside a sandboxed preview iframe
+  const handlePrintSheet = useCallback(() => {
+    let beforePrintFired = false;
+    const onBeforePrint = () => {
+      beforePrintFired = true;
+    };
+    window.addEventListener('beforeprint', onBeforePrint, { once: true });
+
+    try {
+      window.print();
+    } catch {
+      // Blocked by sandbox
+    }
+
+    setTimeout(() => {
+      window.removeEventListener('beforeprint', onBeforePrint);
+      if (!beforePrintFired) {
+        downloadPrintableHtml();
+        setFontStatusMsg('Preview iframe blocks the browser print dialog — downloaded a print-ready HTML sheet you can open & print directly.');
+        setTimeout(() => setFontStatusMsg(null), 7000);
+      }
+    }, 250);
+  }, [downloadPrintableHtml]);
+
   const effectiveLayout = showEditor ? (layout === 'sheet' ? 'split' : layout) : 'sheet';
   const showEditorPane = effectiveLayout !== 'sheet';
 
@@ -452,7 +595,19 @@ export function SimpErhuWorkbench({
           <div className="relative" ref={templateMenuRef}>
             <button
               type="button"
-              onClick={() => setIsTemplateMenuOpen(prev => !prev)}
+              onClick={() => {
+                setIsTemplateMenuOpen(prev => {
+                  const next = !prev;
+                  if (next && templateMenuRef.current) {
+                    const rect = templateMenuRef.current.getBoundingClientRect();
+                    const menuWidth = 264;
+                    const wouldOverflowRight = rect.left + menuWidth > window.innerWidth - 16;
+                    const fitsOnLeft = rect.right - menuWidth >= 16;
+                    setTemplateMenuAlign(wouldOverflowRight && fitsOnLeft ? 'right' : 'left');
+                  }
+                  return next;
+                });
+              }}
               className={macroBtnClass}
               title="Load an Erhu Jianpu template"
             >
@@ -462,7 +617,8 @@ export function SimpErhuWorkbench({
 
             {isTemplateMenuOpen && (
               <div className={cn(
-                'absolute right-0 top-full mt-1.5 w-64 rounded-xl border p-1.5 shadow-xl z-40',
+                'absolute top-full mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-xl border p-1.5 shadow-xl z-40',
+                templateMenuAlign === 'right' ? 'right-0' : 'left-0',
                 isDark ? 'bg-[#181A1F] border-white/[0.12] text-neutral-200' : 'bg-white border-neutral-200 text-neutral-800'
               )}>
                 <div className="px-2 py-1 text-[11px] font-semibold text-neutral-400">
@@ -473,8 +629,13 @@ export function SimpErhuWorkbench({
                     key={tpl.id}
                     type="button"
                     onClick={() => {
-                      onChangeContent(tpl.content);
-                      onChangeTitle?.(tpl.title);
+                      if (onLoadTemplate) {
+                        onLoadTemplate(tpl.content, tpl.title);
+                      } else {
+                        onChangeContent(tpl.content);
+                        onChangeTitle?.(tpl.title);
+                      }
+                      setCursorOffset(null);
                       setIsTemplateMenuOpen(false);
                     }}
                     className={cn(
@@ -528,13 +689,21 @@ export function SimpErhuWorkbench({
             <span>{fingeringStyle === 'chinese' ? '指法: 一二三' : 'Finger: 123'}</span>
           </button>
 
-          {/* Paper Mode Toggle */}
+          {/* Sheet Surface Mode Toggle (Warm Paper vs Dark Stage) */}
           <button
             type="button"
             onClick={() => onPaperThemeChange(paperTheme === 'paper' ? 'adaptive' : 'paper')}
-            className={macroBtnClass}
-            title="Toggle archival paper engraving vs dark stage mode"
+            className={cn(
+              macroBtnClass,
+              paperTheme === 'adaptive' && 'border-[#E05A2B]/50 text-[#E05A2B] bg-[#E05A2B]/10'
+            )}
+            title={
+              paperTheme === 'paper'
+                ? 'Sheet surface: Warm Paper (click to switch to low-glare Dark Stage mode)'
+                : 'Sheet surface: Dark Stage mode (click to switch to Warm Paper)'
+            }
           >
+            {paperTheme === 'paper' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
             <span>{paperTheme === 'paper' ? 'Paper' : 'Stage'}</span>
           </button>
 
@@ -598,9 +767,9 @@ export function SimpErhuWorkbench({
           {/* Print Sheet */}
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrintSheet}
             className={macroBtnClass}
-            title="Print clean Jianpu sheet music"
+            title="Print clean Jianpu sheet music (downloads print-ready HTML if blocked in embedded preview)"
           >
             <Printer className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Print</span>
@@ -907,7 +1076,7 @@ export function SimpErhuWorkbench({
         )}
 
         {/* Live Engraved Jianpu / SimpErhu Sheet Pane */}
-        <div className={cn(effectiveLayout === 'split' ? 'lg:col-span-7 min-w-0' : 'w-full min-w-0')}>
+        <div ref={sheetPaneRef} className={cn(effectiveLayout === 'split' ? 'lg:col-span-7 min-w-0' : 'w-full min-w-0')}>
           <SimpErhuRenderer
             document={parsedDoc}
             zoom={zoom}
