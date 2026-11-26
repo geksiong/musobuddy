@@ -482,6 +482,15 @@ function MusicLineView({
             </span>
           )}
 
+          {/* Slide Arrows (上滑音 / 下滑音 leading into the note from the left) */}
+          {showMarkings && slideOrnaments.length > 0 && (
+            <span className="inline-flex items-center mr-[1px]">
+              {slideOrnaments.map((sOrn, sIdx) => (
+                <OrnamentGlyph key={sIdx} type={sOrn} className={erhuAccentClass} />
+              ))}
+            </span>
+          )}
+
           {/* Accidental */}
           {note.accidental && (
             <span className={cn('text-[11px] font-bold -translate-y-1.5 mr-[0.5px] leading-none', inkClass)}>
@@ -543,15 +552,6 @@ function MusicLineView({
             >
               {Array.from({ length: note.dots }).map((_, dIdx) => (
                 <span key={dIdx} className="w-[4px] h-[4px] rounded-full bg-current inline-block" />
-              ))}
-            </span>
-          )}
-
-          {/* Slide Arrows (上滑音 / 下滑音 right beside note, authentic SimpErhu placement!) */}
-          {showMarkings && slideOrnaments.length > 0 && (
-            <span className="inline-flex items-center ml-[1px]">
-              {slideOrnaments.map((sOrn, sIdx) => (
-                <OrnamentGlyph key={sIdx} type={sOrn} className={erhuAccentClass} />
               ))}
             </span>
           )}
