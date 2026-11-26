@@ -173,7 +173,7 @@ function OrnamentGlyph({ type, className }: { type: OrnamentType; className?: st
 }
 
 function BarlineGlyph({ type, inkClass }: { type: BarlineType; inkClass: string }) {
-  const barH = 'h-7';
+  const barH = 'h-[26px]';
   switch (type) {
     case '|':
       return <div className={cn('w-[1.5px] bg-current opacity-75 shrink-0', barH, inkClass)} />;
@@ -266,7 +266,7 @@ function MusicLineView({
   onNoteClick?: (note: SimpErhuNote) => void;
 }) {
   const lineContainerRef = useRef<HTMLDivElement>(null);
-  const noteElMapRef = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const noteElMapRef = useRef<Map<string, HTMLSpanElement>>(new Map());
   const [slurArcs, setSlurArcs] = useState<SlurArc[]>([]);
 
   const hasAnyLyrics = useMemo(() => {
@@ -280,6 +280,7 @@ function MusicLineView({
     const container = lineContainerRef.current;
     if (!container) return;
     const containerRect = container.getBoundingClientRect();
+    const scale = container.offsetWidth > 0 ? containerRect.width / container.offsetWidth : 1;
 
     // Group notes by slurId across the line
     const slurGroups = new Map<number, SimpErhuNote[]>();
@@ -306,18 +307,21 @@ function MusicLineView({
       const r2 = lastEl.getBoundingClientRect();
 
       // Only draw continuous arc if both notes are on the same wrapped visual row
-      if (Math.abs(r1.top - r2.top) > 40) return;
+      if (Math.abs(r1.top - r2.top) / scale > 40) return;
 
-      const x1 = r1.left - containerRect.left + r1.width * 0.45;
-      const x2 = r2.left - containerRect.left + r2.width * 0.55;
-      const minTop = Math.min(r1.top, r2.top) - containerRect.top;
+      const x1 = (r1.left - containerRect.left + r1.width * 0.5) / scale;
+      const x2 = (r2.left - containerRect.left + r2.width * 0.5) / scale;
+      const minDigitTop = (Math.min(r1.top, r2.top) - containerRect.top) / scale;
+
+      const maxOctave = notes.reduce((max, n) => Math.max(max, n.octave), 0);
+      const octaveClearance = maxOctave >= 2 ? 12 : maxOctave === 1 ? 7 : 1;
 
       if (x2 > x1 + 4) {
         nextArcs.push({
           id: slurId,
           x1,
           x2,
-          y: Math.max(4, minTop + 14)
+          y: Math.max(4, minDigitTop - octaveClearance)
         });
       }
     });
@@ -343,7 +347,7 @@ function MusicLineView({
     : (isDarkSurface ? 'text-neutral-300' : 'text-[#2B2B2B]');
   const subtleInkClass = isDarkSurface ? 'text-neutral-400' : 'text-neutral-600';
 
-  const registerNoteRef = (noteId: string) => (el: HTMLButtonElement | null) => {
+  const registerNoteRef = (noteId: string) => (el: HTMLSpanElement | null) => {
     if (el) noteElMapRef.current.set(noteId, el);
     else noteElMapRef.current.delete(noteId);
   };
@@ -376,7 +380,6 @@ function MusicLineView({
     return (
       <button
         key={note.id}
-        ref={registerNoteRef(note.id)}
         type="button"
         onClick={() => onNoteClick?.(note)}
         title={`Line ${note.lineNumber} · Click to edit in source`}
@@ -426,14 +429,11 @@ function MusicLineView({
           </div>
         )}
 
-        {/* High Octave Dots (1 or 2 dots directly above numeral) */}
-        <div className="h-[11px] flex flex-col items-center justify-end gap-[2px] mb-[1px]">
-          {note.octave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
-          {note.octave >= 1 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
-        </div>
+        {/* Reserved vertical lane for High Octave Dots & Slur Arcs */}
+        <div className="h-[16px] mb-[2px]" aria-hidden="true" />
 
         {/* Main Pitch Numeral Row (with optional Grace Notes, Accidental, Dot, Slide) */}
-        <div className="relative flex items-baseline justify-center leading-none h-[24px]">
+        <div className="relative flex items-center justify-center leading-none h-[24px]">
           {/* Grace Notes (Superscript miniature Jianpu) */}
           {note.graceNotes.length > 0 && (
             <span className="inline-flex items-baseline mr-0.5 -translate-y-2 text-[10px] font-semibold opacity-85">
@@ -457,20 +457,52 @@ function MusicLineView({
             </span>
           )}
 
-          {/* Core Jianpu Digit or Prolongation Dash */}
+          {/* Core Jianpu Digit or Prolongation Dash (anchors octave dots & slurs to the digit itself) */}
           <span
+            ref={registerNoteRef(note.id)}
             className={cn(
-              'text-[21px] font-bold tabular-nums tracking-tight leading-none select-text',
+              'relative inline-flex items-center justify-center h-[22px] text-[21px] font-bold tabular-nums tracking-tight leading-none select-text',
               isPlaying ? 'text-[#E05A2B]' : inkClass
             )}
             style={customFontFamily ? { fontFamily: `"${customFontFamily}", serif` } : { fontFamily: '"Plus Jakarta Sans", "Noto Sans SC", system-ui, sans-serif' }}
           >
+            {/* High Octave Dots anchored directly above the digit */}
+            {note.octave >= 1 && (
+              <span
+                aria-hidden="true"
+                className="absolute bottom-full left-1/2 -translate-x-1/2 pb-[2px] flex flex-col items-center gap-[2px] pointer-events-none"
+              >
+                {note.octave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
+              </span>
+            )}
+
             {note.degree === -1 ? '–' : note.degree}
+
+            {/* Low Octave Dots anchored directly below the digit & duration underlines */}
+            {note.octave <= -1 && (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'absolute top-full left-1/2 -translate-x-1/2 flex flex-col items-center gap-[2px] pointer-events-none',
+                  note.underlines === 0
+                    ? 'pt-[3px]'
+                    : note.underlines === 1
+                      ? 'pt-[6px]'
+                      : note.underlines === 2
+                        ? 'pt-[10px]'
+                        : 'pt-[14px]'
+                )}
+              >
+                <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
+                {note.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+              </span>
+            )}
           </span>
 
           {/* Augmentation Dot(s) */}
           {note.dots > 0 && (
-            <span className={cn('inline-flex items-center gap-[2px] ml-[2px] -translate-y-0.5', inkClass)}>
+            <span className={cn('inline-flex items-center gap-[2px] ml-[2px]', inkClass)}>
               {Array.from({ length: note.dots }).map((_, dIdx) => (
                 <span key={dIdx} className="w-[3.5px] h-[3.5px] rounded-full bg-current inline-block" />
               ))}
@@ -479,7 +511,7 @@ function MusicLineView({
 
           {/* Slide Arrows (上滑音 / 下滑音 right beside note, authentic SimpErhu placement!) */}
           {showMarkings && slideOrnaments.length > 0 && (
-            <span className="inline-flex items-center ml-[1px] -translate-y-0.5">
+            <span className="inline-flex items-center ml-[1px]">
               {slideOrnaments.map((sOrn, sIdx) => (
                 <OrnamentGlyph key={sIdx} type={sOrn} className={erhuAccentClass} />
               ))}
@@ -516,11 +548,8 @@ function MusicLineView({
           })}
         </div>
 
-        {/* Low Octave Dots (Positioned cleanly below underlines per Jianpu standard) */}
-        <div className="h-[11px] flex flex-col items-center justify-start gap-[2px] mt-[1px]">
-          {note.octave <= -1 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
-          {note.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
-        </div>
+        {/* Reserved vertical lane for Low Octave Dots */}
+        <div className="h-[11px] mt-[1px]" aria-hidden="true" />
 
         {/* Aligned Lyric Syllable */}
         {hasAnyLyrics && (
@@ -540,7 +569,7 @@ function MusicLineView({
           {slurArcs.map(arc => {
             const midX = (arc.x1 + arc.x2) / 2;
             const span = arc.x2 - arc.x1;
-            const lift = Math.min(14, Math.max(7, span * 0.14));
+            const lift = Math.min(13, Math.max(7, span * 0.12));
             const yBase = arc.y;
             return (
               <path
@@ -567,7 +596,13 @@ function MusicLineView({
             >
               {/* Measure Number subtle cue on first measure of each line */}
               {mIdx === 0 && (
-                <span className={cn('absolute -left-5 bottom-[24px] text-[10px] font-mono tabular-nums opacity-40 select-none', inkClass)}>
+                <span
+                  className={cn(
+                    'absolute -left-5 text-[10px] font-mono tabular-nums opacity-40 select-none',
+                    hasAnyLyrics ? 'bottom-[55px]' : 'bottom-[31px]',
+                    inkClass
+                  )}
+                >
                   {measure.measureNumber}
                 </span>
               )}
@@ -584,7 +619,7 @@ function MusicLineView({
 
               {/* Start Barline */}
               {measure.startBarline && (
-                <div className={cn('mr-2 self-end', hasAnyLyrics ? 'mb-[34px]' : 'mb-[12px]')}>
+                <div className={cn('mr-2 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
                   <BarlineGlyph type={measure.startBarline} inkClass={inkClass} />
                 </div>
               )}
@@ -614,7 +649,7 @@ function MusicLineView({
 
               {/* End Barline */}
               {(measure.endBarline || !isLastInLine) && (
-                <div className={cn('ml-2 self-end', hasAnyLyrics ? 'mb-[34px]' : 'mb-[12px]')}>
+                <div className={cn('ml-2 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
                   <BarlineGlyph type={measure.endBarline || '|'} inkClass={inkClass} />
                 </div>
               )}
