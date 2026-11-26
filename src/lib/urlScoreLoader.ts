@@ -7,6 +7,8 @@ import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 import { generateMidiForAbc } from './abcUtils.ts';
 import { parseMxlFile } from './mxlUtils.ts';
 import { detectChordEngine } from './chordSheetUtils.ts';
+import { detectSimpErhuFormat, parseSimpErhuScore } from './simperhu/parser.ts';
+import { generateMidiForSimpErhu } from './simperhu/audioEngine.ts';
 
 export interface LoadScoreUrlResult {
   success: boolean;
@@ -429,7 +431,32 @@ export async function loadScoreFromUrl(rawUrl: string, customTitle?: string): Pr
       return { success: true, score };
     }
 
-    // 3. Is it ChordPro / Chord Sheet?
+    // 3. Is it SimpErhu Jianpu text notation?
+    const isSimpErhuExt = ['erhu', 'simperhu', 'jianpu'].includes(inferredExt);
+    if (isSimpErhuExt || detectSimpErhuFormat(text)) {
+      const parsed = parseSimpErhuScore(text);
+      const finalTitle = customTitle?.trim() || (parsed.header.title !== 'Untitled Erhu Score' ? parsed.header.title : inferredTitle);
+      const midiUrl = generateMidiForSimpErhu(parsed, 0);
+      const score: ScoreData = {
+        id,
+        title: finalTitle,
+        format: ScoreFormat.SimpErhu,
+        content: text,
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+        viewMode: 'scroll',
+        showEditor: true,
+        simperhuLayout: 'split',
+        simperhuFingeringStyle: 'chinese',
+        simperhuPaperTheme: 'paper',
+        audioUrl: midiUrl || undefined,
+        audioName: midiUrl ? `${finalTitle}.mid` : undefined,
+        sourceUrl: normalizedUrl
+      };
+      return { success: true, score };
+    }
+
+    // 4. Is it ChordPro / Chord Sheet?
     const isChordExt = ['pro', 'chordpro', 'chopro', 'crd', 'cho'].includes(inferredExt);
     const chordDetection = detectChordEngine(text);
     const hasChords = isChordExt || 

@@ -70,3 +70,32 @@ input[type="range"] {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+/* Clean print layout for SimpErhu & Jianpu engraved sheet music */
+@media print {
+  header,
+  .no-print {
+    display: none !important;
+  }
+  body,
+  html,
+  #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .simperhu-print-sheet {
+    transform: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+  .simperhu-print-sheet > div {
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}

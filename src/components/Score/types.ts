@@ -12,7 +12,8 @@ export enum ScoreFormat {
   Text = 'text',
   MusicXML = 'musicxml',
   GuitarPro = 'guitarpro',
-  ChordSheet = 'chordsheet'
+  ChordSheet = 'chordsheet',
+  SimpErhu = 'simperhu'
 }
 
 export interface ScoreData {
@@ -35,6 +36,9 @@ export interface ScoreData {
   chordEngine?: 'auto' | 'chordsOverWords' | 'ultimateGuitar' | 'chordpro'; // Renderer/Parser choice for ChordSheet
   chordFormat?: 'html' | 'text' | 'chordpro'; // Output display format for ChordSheet
   accidentalPreference?: '#' | 'b'; // Sharp (#) vs Flat (b) preference for ChordSheet
+  simperhuLayout?: 'split' | 'stacked' | 'sheet'; // Layout mode for SimpErhu workbench
+  simperhuFingeringStyle?: 'chinese' | 'arabic'; // Chinese numerals (一二三四) vs Arabic (1234)
+  simperhuPaperTheme?: 'paper' | 'adaptive'; // Archival white paper vs adaptive dark stage
   sourceUrl?: string; // Original URL if loaded from a URL
   waypoints?: Waypoint[]; // Rehearsal marks & page waypoints
   currentPage?: number;

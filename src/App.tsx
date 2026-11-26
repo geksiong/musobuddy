@@ -88,7 +88,7 @@ export default function App() {
         ref={fileInputRef} 
         className="hidden" 
         multiple 
-        accept=".abc,.txt,.pro,.chordpro,.chopro,.crd,.cho,.pdf,.xml,.musicxml,.mxl,.gp,.gp3,.gp4,.gp5,.gpx,.ptb,image/*,audio/*"
+        accept=".abc,.erhu,.simperhu,.jianpu,.txt,.pro,.chordpro,.chopro,.crd,.cho,.pdf,.xml,.musicxml,.mxl,.gp,.gp3,.gp4,.gp5,.gpx,.ptb,image/*,audio/*"
         onChange={handleHeaderFileChange}
       />
 

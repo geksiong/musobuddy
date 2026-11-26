@@ -9,6 +9,9 @@ import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
 import { parseMxlFile } from '../lib/mxlUtils.ts';
 import { detectChordEngine } from '../lib/chordSheetUtils.ts';
 import { loadScoreFromUrl, LoadScoreUrlResult } from '../lib/urlScoreLoader.ts';
+import { SIMPERHU_BLANK_TEMPLATE, SIMPERHU_ERQUAN_SAMPLE } from '../lib/simperhu/samples.ts';
+import { detectSimpErhuFormat, parseSimpErhuScore } from '../lib/simperhu/parser.ts';
+import { generateMidiForSimpErhu } from '../lib/simperhu/audioEngine.ts';
 
 import { Waypoint } from '../components/Score/annotationTypes.ts';
 
@@ -60,7 +63,23 @@ interface ScoreContextType {
 
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
 
+const DEFAULT_SIMPERHU_SCORE: ScoreData = {
+  id: 'simperhu-erquan',
+  title: '二泉映月 (SimpErhu Jianpu)',
+  format: ScoreFormat.SimpErhu,
+  content: SIMPERHU_ERQUAN_SAMPLE,
+  zoom: 1,
+  pan: { x: 0, y: 0 },
+  viewMode: 'scroll',
+  showEditor: true,
+  simperhuLayout: 'split',
+  simperhuFingeringStyle: 'chinese',
+  simperhuPaperTheme: 'paper',
+  transpose: 0
+};
+
 const DEFAULT_SCORES: ScoreData[] = [
+  DEFAULT_SIMPERHU_SCORE,
   {
     id: 'cooleys-reel',
     title: "Cooley's Reel",
@@ -192,7 +211,15 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasSimpErhu = parsed.some((s: ScoreData) => s.format === ScoreFormat.SimpErhu);
+          const alreadySeeded = localStorage.getItem('simperhu_sample_seeded_v1');
+          if (!hasSimpErhu && !alreadySeeded) {
+            localStorage.setItem('simperhu_sample_seeded_v1', '1');
+            return [DEFAULT_SIMPERHU_SCORE, ...parsed];
+          }
+          return parsed;
+        }
       } catch (e) {
         console.warn('Failed to parse saved scores:', e);
       }
@@ -202,15 +229,22 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
   
   const [activeScoreIdState, setActiveScoreIdState] = useState<string | null>(() => {
     const savedId = localStorage.getItem('studio_buddy_active_score_id');
-    if (savedId) return savedId;
+    const alreadySeeded = localStorage.getItem('simperhu_sample_seeded_v1');
     const savedScores = localStorage.getItem('studio_buddy_scores');
     if (savedScores) {
       try {
         const parsed = JSON.parse(savedScores);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasSimpErhu = parsed.some((s: ScoreData) => s.format === ScoreFormat.SimpErhu);
+          if (!hasSimpErhu && !alreadySeeded) {
+            return DEFAULT_SIMPERHU_SCORE.id;
+          }
+          if (savedId) return savedId;
+          return parsed[0].id;
+        }
       } catch (e) {}
     }
-    return DEFAULT_SCORES[0]?.id || null;
+    return savedId || DEFAULT_SCORES[0]?.id || null;
   });
 
   const [globalAudio, setGlobalAudio] = useState<GlobalAudio | null>(null);
@@ -447,6 +481,16 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
           audioName: `${s.title || 'score'}.mid`
         } : s));
       }
+    } else if (activeScore.format === ScoreFormat.SimpErhu && (!activeScore.audioUrl || activeScore.audioUrl === '')) {
+      const parsed = parseSimpErhuScore(activeScore.content as string);
+      const midiUrl = generateMidiForSimpErhu(parsed, activeScore.transpose || 0);
+      if (midiUrl) {
+        setScores(prev => prev.map(s => s.id === activeScore.id ? {
+          ...s,
+          audioUrl: midiUrl,
+          audioName: `${s.title || 'erhu-score'}.mid`
+        } : s));
+      }
     }
   }, [activeScore?.id, activeScore?.content, activeScore?.selectedTuneIndex, activeScore?.transpose, activeScore?.audioUrl]);
 
@@ -483,12 +527,19 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
 {chorus}
 [C]Singing chords over [G]lyrics
 [Am]Or use chords over [F]words format!`;
+    } else if (format === ScoreFormat.SimpErhu) {
+      title = '未命名二胡曲 (SimpErhu)';
+      initialContent = SIMPERHU_BLANK_TEMPLATE;
     } else if (format === ScoreFormat.Text) {
       title = 'New Text Sheet';
       initialContent = '';
     }
 
-    const midiUrl = format === ScoreFormat.ABC ? generateMidiForAbc(initialContent, 0) : null;
+    const midiUrl = format === ScoreFormat.ABC
+      ? generateMidiForAbc(initialContent, 0)
+      : format === ScoreFormat.SimpErhu
+        ? generateMidiForSimpErhu(parseSimpErhuScore(initialContent), 0)
+        : null;
     const newScore: ScoreData = {
       id,
       title,
@@ -497,12 +548,15 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       zoom: 1,
       pan: { x: 0, y: 0 },
       viewMode: 'scroll',
-      showEditor: format === ScoreFormat.ABC || format === ScoreFormat.ChordSheet,
+      showEditor: format === ScoreFormat.ABC || format === ScoreFormat.ChordSheet || format === ScoreFormat.SimpErhu,
       selectedTuneIndex: 0,
       audioUrl: midiUrl || undefined,
       audioName: midiUrl ? 'rendering.mid' : undefined,
       chordEngine: format === ScoreFormat.ChordSheet ? 'auto' : undefined,
       chordFormat: format === ScoreFormat.ChordSheet ? 'html' : undefined,
+      simperhuLayout: format === ScoreFormat.SimpErhu ? 'split' : undefined,
+      simperhuFingeringStyle: format === ScoreFormat.SimpErhu ? 'chinese' : undefined,
+      simperhuPaperTheme: format === ScoreFormat.SimpErhu ? 'paper' : undefined,
       transpose: 0
     };
 
@@ -584,13 +638,30 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       } else if (['pro', 'chordpro', 'chopro', 'crd', 'cho'].includes(ext || '')) {
         format = ScoreFormat.ChordSheet;
         content = await file.text();
+      } else if (['erhu', 'simperhu', 'jianpu'].includes(ext || '')) {
+        format = ScoreFormat.SimpErhu;
+        content = await file.text();
+        const midiUrl = generateMidiForSimpErhu(parseSimpErhuScore(content), 0);
+        if (midiUrl) {
+          audioUrl = midiUrl;
+          audioName = `${name}.mid`;
+        }
       } else if (ext === 'txt') {
         const text = await file.text();
-        const detected = detectChordEngine(text);
-        if (detected.engine === 'chordpro' || detected.engine === 'ultimateGuitar' || text.includes('[ch]')) {
-          format = ScoreFormat.ChordSheet;
+        if (detectSimpErhuFormat(text)) {
+          format = ScoreFormat.SimpErhu;
+          const midiUrl = generateMidiForSimpErhu(parseSimpErhuScore(text), 0);
+          if (midiUrl) {
+            audioUrl = midiUrl;
+            audioName = `${name}.mid`;
+          }
         } else {
-          format = ScoreFormat.Text;
+          const detected = detectChordEngine(text);
+          if (detected.engine === 'chordpro' || detected.engine === 'ultimateGuitar' || text.includes('[ch]')) {
+            format = ScoreFormat.ChordSheet;
+          } else {
+            format = ScoreFormat.Text;
+          }
         }
         content = text;
       } else {
@@ -608,7 +679,10 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
         viewMode: 'scroll',
         audioUrl,
         audioName,
-        showEditor: false,
+        showEditor: format === ScoreFormat.SimpErhu,
+        simperhuLayout: format === ScoreFormat.SimpErhu ? 'split' : undefined,
+        simperhuFingeringStyle: format === ScoreFormat.SimpErhu ? 'chinese' : undefined,
+        simperhuPaperTheme: format === ScoreFormat.SimpErhu ? 'paper' : undefined,
         selectedTuneIndex: 0
       });
     }

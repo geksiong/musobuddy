@@ -60,6 +60,9 @@ import { toAbcNoteName, generateMidiForAbc, parseAbcItems } from '../../lib/abcU
 import { detectAbcRenderer } from '../../lib/abcDetector.ts';
 import { detectChordEngine } from '../../lib/chordSheetUtils.ts';
 import { ChordSheetRenderer } from './ChordSheetRenderer.tsx';
+import { SimpErhuWorkbench } from './SimpErhuWorkbench.tsx';
+import { parseSimpErhuScore } from '../../lib/simperhu/parser.ts';
+import { generateMidiForSimpErhu } from '../../lib/simperhu/audioEngine.ts';
 import ScoreErrorBoundary from './ScoreErrorBoundary.tsx';
 import { useController } from '../../contexts/ControllerContext.tsx';
 
@@ -287,6 +290,13 @@ export default function ScoreView() {
             updated.audioUrl = midiUrl;
             updated.audioName = `${updated.title || 'score'}.mid`;
           }
+        } else if (s.format === ScoreFormat.SimpErhu && updates.content !== undefined && updates.content !== s.content) {
+          const parsed = parseSimpErhuScore(updated.content as string);
+          const midiUrl = generateMidiForSimpErhu(parsed, updated.transpose || 0);
+          if (midiUrl) {
+            updated.audioUrl = midiUrl;
+            updated.audioName = `${updated.title || 'erhu-score'}.mid`;
+          }
         }
         return updated;
       }
@@ -370,6 +380,7 @@ function ScoreIcon({ format }: { format: ScoreFormat }) {
     case ScoreFormat.Image: return <ImageIcon className="w-4 h-4" />;
     case ScoreFormat.GuitarPro: return <Music className="w-4 h-4 text-orange-500" />;
     case ScoreFormat.ChordSheet: return <FileText className="w-4 h-4 text-[#FF4E00]" />;
+    case ScoreFormat.SimpErhu: return <Music className="w-4 h-4 text-[#E05A2B]" />;
     default: return <FileText className="w-4 h-4" />;
   }
 }
@@ -653,7 +664,9 @@ function ScoreDisplay({
                       ? 'Guitar Pro' 
                       : score.format === ScoreFormat.ChordSheet
                         ? 'Chord Sheet'
-                        : score.format.toUpperCase()}
+                        : score.format === ScoreFormat.SimpErhu
+                          ? 'SimpErhu Jianpu'
+                          : score.format.toUpperCase()}
                 </span>
               </div>
             </div>
@@ -1198,6 +1211,34 @@ function ScoreDisplay({
                   </button>
                 </div>
               )}
+
+              {/* SimpErhu Specific Toolbar Action */}
+              {score.format === ScoreFormat.SimpErhu && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 min-w-0">
+                  <button
+                    onClick={() => {
+                      const nextShow = !(score.showEditor ?? true);
+                      onUpdate({
+                        showEditor: nextShow,
+                        simperhuLayout: nextShow ? (score.simperhuLayout === 'sheet' ? 'split' : (score.simperhuLayout || 'split')) : 'sheet'
+                      });
+                    }}
+                    className={cn(
+                      "h-7 px-2.5 rounded-lg border transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer shrink-0",
+                      (score.showEditor ?? true) && score.simperhuLayout !== 'sheet'
+                        ? "bg-[#E05A2B] border-[#E05A2B] text-white"
+                        : (resolvedTheme === 'dark' ? "bg-white/[0.04] border-white/[0.08] text-neutral-300 hover:bg-white/[0.08]" : "bg-neutral-100 border-neutral-200 text-neutral-700 hover:bg-neutral-200")
+                    )}
+                    title={(score.showEditor ?? true) ? "Hide SimpErhu Macro Editor" : "Show SimpErhu Macro Editor"}
+                  >
+                    <Layout className="w-3.5 h-3.5" />
+                    <span>{(score.showEditor ?? true) && score.simperhuLayout !== 'sheet' ? 'Hide Editor' : 'Macro Editor'}</span>
+                  </button>
+                  <span className="text-xs text-neutral-500 hidden sm:inline">
+                    SimpErhu Web Text Format · Jianpu & Erhu Notation
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1407,6 +1448,27 @@ function ScoreDisplay({
                         onUpdate({ audioUrl: midiUrl, audioName: midiName });
                       }
                     }}
+                  />
+                </ScoreErrorBoundary>
+              )}
+
+              {score.format === ScoreFormat.SimpErhu && (
+                <ScoreErrorBoundary fallbackTitle="SimpErhu Score Error" key={score.id}>
+                  <SimpErhuWorkbench
+                    content={score.content as string}
+                    zoom={score.zoom || 1}
+                    showEditor={score.showEditor ?? true}
+                    layout={score.simperhuLayout || 'split'}
+                    fingeringStyle={score.simperhuFingeringStyle || 'chinese'}
+                    paperTheme={score.simperhuPaperTheme || 'paper'}
+                    onChangeContent={(val) => onUpdate({ content: val })}
+                    onChangeTitle={(nextTitle) => onUpdate({ title: nextTitle })}
+                    onLayoutChange={(nextLayout) => onUpdate({
+                      simperhuLayout: nextLayout,
+                      showEditor: nextLayout !== 'sheet'
+                    })}
+                    onFingeringStyleChange={(style) => onUpdate({ simperhuFingeringStyle: style })}
+                    onPaperThemeChange={(theme) => onUpdate({ simperhuPaperTheme: theme })}
                   />
                 </ScoreErrorBoundary>
               )}

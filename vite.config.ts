@@ -125,10 +125,14 @@ export default defineConfig(({mode}) => {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
     resolve: {
+      dedupe: ['react', 'react-dom', '@codemirror/state', '@codemirror/view', '@codemirror/language'],
       alias: {
         '@': path.resolve(__dirname, '.'),
         'react': path.resolve(__dirname, 'node_modules/react'),
         'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+        '@codemirror/state': path.resolve(__dirname, 'node_modules/@codemirror/state'),
+        '@codemirror/view': path.resolve(__dirname, 'node_modules/@codemirror/view'),
+        '@codemirror/language': path.resolve(__dirname, 'node_modules/@codemirror/language'),
       },
     },
     server: {
