@@ -816,8 +816,8 @@ ${collectedCss}
               <div className="font-semibold text-neutral-900 dark:text-neutral-100">Notes, Octaves & Beams</div>
               <div><code className="font-mono text-[#E05A2B]">1–7</code> scale degrees · <code className="font-mono text-[#E05A2B]">0</code> rest · <code className="font-mono text-[#E05A2B]">-</code> prolong</div>
               <div><code className="font-mono text-[#E05A2B]">' / ''</code> high octave · <code className="font-mono text-[#E05A2B]">, / ,,</code> low octave (<kbd className="font-mono">Alt+↑/↓</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">5_6_</code> beamed 8ths · <code className="font-mono text-[#E05A2B]">5__6__</code> beamed 16ths (<kbd className="font-mono">Alt+-/=</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">(3_5_ 6_1'_)</code> slur/legato bow (<kbd className="font-mono">Alt+S</kbd>) · <code className="font-mono text-[#E05A2B]">^5_</code> grace note</div>
+              <div><code className="font-mono text-[#E05A2B]">5/6/</code> or <code className="font-mono text-[#E05A2B]">5_6_</code> 8ths · <code className="font-mono text-[#E05A2B]">//</code> 16ths · <code className="font-mono text-[#E05A2B]">///</code> 32nds (<kbd className="font-mono">Alt+-/=</kbd>)</div>
+              <div><code className="font-mono text-[#E05A2B]">(3/5/ 6/1'/)</code> slur/legato bow (<kbd className="font-mono">Alt+S</kbd>) · <code className="font-mono text-[#E05A2B]">^5/</code> grace note</div>
             </div>
             <div className="space-y-1">
               <div className="font-semibold text-neutral-900 dark:text-neutral-100">Erhu Bowing, Fingers & Strings</div>
@@ -963,8 +963,8 @@ ${collectedCss}
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroShiftOctave(t, f, e, -1))} className={macroBtnClass} title="Lower Octave Dot (Alt+↓)">
                     <ArrowDown className="w-3 h-3" /> Octave -
                   </button>
-                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroAdjustUnderlines(t, f, e, 1))} className={macroBtnClass} title="Add Duration Beam Underline (Alt+-)">
-                    + Beam (_)
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroAdjustUnderlines(t, f, e, 1))} className={macroBtnClass} title="Add Duration Beam Underline (/ or _, Alt+-)">
+                    + Beam (/)
                   </button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroAdjustUnderlines(t, f, e, -1))} className={macroBtnClass} title="Remove Duration Beam Underline (Alt+=)">
                     - Beam

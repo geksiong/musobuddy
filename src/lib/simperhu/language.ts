@@ -38,8 +38,8 @@ const simperhuParser: StreamParser<unknown> = {
       return 'attributeName';
     }
 
-    // Grace notes ^5_ or ^{5_6_}
-    if (stream.match(/^\^(\{[^}]*\}|[#b=]?[1-7][',]*_*)/)) {
+    // Grace notes ^5_, ^5/, or ^{5/6/}
+    if (stream.match(/^\^(\{[^}]*\}|[#b=]?[1-7][',]*[_/]*)/)) {
       return 'meta';
     }
 
@@ -58,8 +58,8 @@ const simperhuParser: StreamParser<unknown> = {
       return 'bracket';
     }
 
-    // Jianpu notes with accidentals, octaves, underlines, dots
-    if (stream.match(/^[#b=]?[0-7][',]*_*\.*~?/)) {
+    // Jianpu notes with accidentals, octaves, underlines (_ or /), dots
+    if (stream.match(/^[#b=]?[0-7][',]*[_/]*\.*~?/)) {
       return 'number';
     }
 

@@ -99,7 +99,7 @@ function parseMarkingsBlock(raw: string, target: ErhuMarkings) {
 
 function parseGraceString(raw: string): GraceNote[] {
   const notes: GraceNote[] = [];
-  const regex = /([#b=]?)([1-7])([',]*)(_*)/g;
+  const regex = /([#b=]?)([1-7])([',]*)([_/]*)/g;
   let m: RegExpExecArray | null;
   while ((m = regex.exec(raw)) !== null) {
     const acc = (m[1] || null) as AccidentalType;
@@ -433,7 +433,7 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
             continue;
           }
         } else {
-          const gm = rawLine.slice(i + 1).match(/^([#b=]?)([1-7])([',]*)(_*)/);
+          const gm = rawLine.slice(i + 1).match(/^([#b=]?)([1-7])([',]*)([_/]*)/);
           if (gm) {
             pendingGraceNotes.push(...parseGraceString(gm[0]));
             i += 1 + gm[0].length;
@@ -490,8 +490,8 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
         continue;
       }
 
-      // Note token: optional accidental (#, b, =) + digit (0-7) + octaves (', ,) + underlines (_) + dots (.) + tie (~) + {markings}
-      const noteMatch = rawLine.slice(i).match(/^([#b=]?)([0-7])([',]*)(_*)(\.*)(~?)/);
+      // Note token: optional accidental (#, b, =) + digit (0-7) + octaves (', ,) + underlines (_ or /) + dots (.) + tie (~) + {markings}
+      const noteMatch = rawLine.slice(i).match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)/);
       if (noteMatch) {
         ensureMeasure(lineStart + i);
         const startOffset = lineStart + i;
@@ -639,7 +639,7 @@ export function detectSimpErhuFormat(text: string): boolean {
   // Check for multiple Jianpu measure bars containing digits 0-7
   const jianpuBarLines = text.split('\n').filter(line => {
     const t = line.trim();
-    return t.includes('|') && /[1-7][',_.-]*\s+[0-7-]/.test(t) && !/^[A-Z]:/.test(t);
+    return t.includes('|') && /[1-7][',_/.-]*\s+[0-7-]/.test(t) && !/^[A-Z]:/.test(t);
   });
   return jianpuBarLines.length >= 2;
 }

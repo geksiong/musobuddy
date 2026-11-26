@@ -11,7 +11,7 @@ export interface TextEditResult {
   selectionEnd: number;
 }
 
-const NOTE_REGEX = /([#b=]?)([0-7])([',]*)(_*)(\.*)(~?)((?:\{[^}]*\})*)/g;
+const NOTE_REGEX = /([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)/g;
 
 /**
  * Locates the note token covering the cursor position (or just before the cursor).
@@ -49,7 +49,7 @@ function findNoteAtCursor(text: string, pos: number): { start: number; end: numb
 }
 
 function transformNoteOctave(noteStr: string, delta: 1 | -1): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)(_*)(\.*)(~?)((?:\{[^}]*\})*)$/);
+  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
   if (!m) return noteStr;
   const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
   if (digit === '0') return noteStr; // Rest has no octave
@@ -64,16 +64,17 @@ function transformNoteOctave(noteStr: string, delta: 1 | -1): string {
   return `${acc}${digit}${newOctStr}${underlines}${dots}${tie}${markings}`;
 }
 
-function transformNoteUnderlines(noteStr: string, delta: 1 | -1): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)(_*)(\.*)(~?)((?:\{[^}]*\})*)$/);
+function transformNoteUnderlines(noteStr: string, delta: 1 | -1, defaultBeamChar: '/' | '_' = '/'): string {
+  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
   if (!m) return noteStr;
   const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
   const nextCount = Math.max(0, Math.min(3, underlines.length + delta));
-  return `${acc}${digit}${octStr}${'_'.repeat(nextCount)}${dots}${tie}${markings}`;
+  const beamChar = underlines.includes('/') ? '/' : underlines.includes('_') ? '_' : defaultBeamChar;
+  return `${acc}${digit}${octStr}${beamChar.repeat(nextCount)}${dots}${tie}${markings}`;
 }
 
 function transformNoteDot(noteStr: string): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)(_*)(\.*)(~?)((?:\{[^}]*\})*)$/);
+  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
   if (!m) return noteStr;
   const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
   const nextDots = dots.length === 0 ? '.' : dots.length === 1 ? '' : '.';
@@ -81,7 +82,7 @@ function transformNoteDot(noteStr: string): string {
 }
 
 function transformNoteAccidental(noteStr: string, accTarget: '#' | 'b' | '='): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)(_*)(\.*)(~?)((?:\{[^}]*\})*)$/);
+  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
   if (!m) return noteStr;
   const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
   if (digit === '0') return noteStr;
@@ -97,7 +98,7 @@ const EXCLUSIVE_GROUPS: string[][] = [
 ];
 
 function transformNoteMarking(noteStr: string, tag: string): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)(_*)(\.*)(~?)((?:\{[^}]*\})*)$/);
+  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
   if (!m) return noteStr;
   const [, acc, digit, octStr, underlines, dots, tie, markingsStr] = m;
 
@@ -169,7 +170,10 @@ export function macroShiftOctave(text: string, selStart: number, selEnd: number,
  * Port of SimpErhu VBA Macro: Add / Remove Duration Underline (Beam)
  */
 export function macroAdjustUnderlines(text: string, selStart: number, selEnd: number, delta: 1 | -1): TextEditResult | null {
-  return applyNoteTransform(text, selStart, selEnd, n => transformNoteUnderlines(n, delta));
+  const hasSlashBeams = /[0-7][',]*\//.test(text);
+  const hasUnderscoreBeams = /[0-7][',]*_/.test(text);
+  const defaultBeamChar: '/' | '_' = hasUnderscoreBeams && !hasSlashBeams ? '_' : '/';
+  return applyNoteTransform(text, selStart, selEnd, n => transformNoteUnderlines(n, delta, defaultBeamChar));
 }
 
 /**
