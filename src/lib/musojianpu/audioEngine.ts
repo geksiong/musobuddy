@@ -4,7 +4,7 @@
  */
 
 import * as Tone from 'tone';
-import { SimpErhuDocument, SimpErhuNote } from './types.ts';
+import { MusoJianpuDocument, MusoJianpuNote } from './types.ts';
 import { jianpuToMidi } from './erhuKeys.ts';
 
 export interface ScheduledErhuEvent {
@@ -34,14 +34,14 @@ const DYNAMIC_VELOCITIES: Record<string, number> = {
 };
 
 /**
- * Flattens a parsed SimpErhuDocument into sequential timed musical events,
+ * Flattens a parsed MusoJianpuDocument into sequential timed musical events,
  * combining prolongation dashes ('-') and ties ('~') into accurate note durations.
  */
 export function buildErhuPlaybackTimeline(
-  doc: SimpErhuDocument,
+  doc: MusoJianpuDocument,
   transposeSemitones: number = 0
 ): { events: ScheduledErhuEvent[]; totalBeats: number } {
-  const flatNotes: { note: SimpErhuNote; measureIndex: number }[] = [];
+  const flatNotes: { note: MusoJianpuNote; measureIndex: number }[] = [];
   let measureIdx = 0;
 
   for (const line of doc.lines) {
@@ -82,9 +82,9 @@ export function buildErhuPlaybackTimeline(
       continue;
     }
 
-    // Grace notes take a crisp 1/6 beat just before the main note
+    // Grace notes take a crisp slice just before the main note
     if (note.graceNotes.length > 0) {
-      const graceDur = Math.min(0.14, beats * 0.22);
+      const graceDur = Math.min(0.14, (beats * 0.36) / note.graceNotes.length);
       for (const gn of note.graceNotes) {
         const gMidi = jianpuToMidi(gn.degree, gn.octave, gn.accidental, doc.header.key, transposeSemitones);
         if (gMidi !== null) {
@@ -117,7 +117,17 @@ export function buildErhuPlaybackTimeline(
       : undefined;
 
     const isFermata = note.markings.ornaments.includes('fermata');
-    const effectiveBeats = isFermata ? beats * 1.45 : beats;
+    let effectiveBeats = isFermata ? beats * 1.45 : beats;
+
+    // Reserve a short tail for optional trailing post-grace notes (后倚音)
+    const postGraces = note.postGraceNotes || [];
+    const postGraceDur = postGraces.length > 0
+      ? Math.min(0.12, (effectiveBeats * 0.25) / postGraces.length)
+      : 0;
+    const totalPostDur = postGraceDur * postGraces.length;
+    if (totalPostDur > 0) {
+      effectiveBeats = Math.max(0.15, effectiveBeats - totalPostDur);
+    }
 
     // Check if previous event was tied to this exact same pitch
     const prev = events[events.length - 1];
@@ -125,26 +135,45 @@ export function buildErhuPlaybackTimeline(
     if (prev && prevFlat?.tiedToNext && prev.midi !== null && prev.midi === midi) {
       prev.durationBeats += effectiveBeats;
       currentBeat += effectiveBeats;
-      continue;
+    } else {
+      events.push({
+        noteId: note.id,
+        measureIndex,
+        midi,
+        startBeat: currentBeat,
+        durationBeats: effectiveBeats,
+        slideTargetMidi,
+        hasVibrato: note.markings.ornaments.includes('vib') || note.markings.ornaments.includes('pvib'),
+        isStaccato: note.markings.bowing === 'stacc' || note.markings.bowing === 'spicc',
+        isTremolo: note.markings.bowing === 'trem',
+        isPizzicato: note.markings.bowing === 'pizz',
+        velocity: note.markings.ornaments.includes('accent')
+          ? Math.min(1.0, currentVelocity * 1.18)
+          : currentVelocity
+      });
+      currentBeat += effectiveBeats;
     }
 
-    events.push({
-      noteId: note.id,
-      measureIndex,
-      midi,
-      startBeat: currentBeat,
-      durationBeats: effectiveBeats,
-      slideTargetMidi,
-      hasVibrato: note.markings.ornaments.includes('vib') || note.markings.ornaments.includes('pvib'),
-      isStaccato: note.markings.bowing === 'stacc' || note.markings.bowing === 'spicc',
-      isTremolo: note.markings.bowing === 'trem',
-      isPizzicato: note.markings.bowing === 'pizz',
-      velocity: note.markings.ornaments.includes('accent')
-        ? Math.min(1.0, currentVelocity * 1.18)
-        : currentVelocity
-    });
-
-    currentBeat += effectiveBeats;
+    if (postGraces.length > 0) {
+      for (const pgn of postGraces) {
+        const pgMidi = jianpuToMidi(pgn.degree, pgn.octave, pgn.accidental, doc.header.key, transposeSemitones);
+        if (pgMidi !== null) {
+          events.push({
+            noteId: note.id,
+            measureIndex,
+            midi: pgMidi,
+            startBeat: currentBeat,
+            durationBeats: postGraceDur,
+            hasVibrato: false,
+            isStaccato: false,
+            isTremolo: false,
+            isPizzicato: note.markings.bowing === 'pizz',
+            velocity: currentVelocity * 0.8
+          });
+          currentBeat += postGraceDur;
+        }
+      }
+    }
   }
 
   return { events, totalBeats: currentBeat };
@@ -153,7 +182,7 @@ export function buildErhuPlaybackTimeline(
 /**
  * Expressive Tone.js Erhu Synthesizer Player (bowed resonator tone + vibrato + portamento slides)
  */
-export class SimpErhuPlayer {
+export class MusoJianpuPlayer {
   private isPlayingState = false;
   private timeouts: number[] = [];
   private bowedSynth: Tone.MonoSynth | null = null;
@@ -213,7 +242,7 @@ export class SimpErhuPlayer {
   }
 
   async play(
-    doc: SimpErhuDocument,
+    doc: MusoJianpuDocument,
     options: {
       tempoOverride?: number;
       transposeSemitones?: number;
@@ -337,10 +366,10 @@ function encodeVLQ(value: number): number[] {
 }
 
 /**
- * Generates a real binary Standard MIDI File (.mid) Blob URL from a parsed SimpErhuDocument,
+ * Generates a real binary Standard MIDI File (.mid) Blob URL from a parsed MusoJianpuDocument,
  * using General MIDI Program 110 (Fiddle / Erhu) so MusoBuddy's ScoreAudioPlayer plays it seamlessly!
  */
-export function generateMidiForSimpErhu(doc: SimpErhuDocument, transposeSemitones: number = 0): string | null {
+export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemitones: number = 0): string | null {
   try {
     const { events } = buildErhuPlaybackTimeline(doc, transposeSemitones);
     if (events.length === 0) return null;
@@ -421,7 +450,7 @@ export function generateMidiForSimpErhu(doc: SimpErhuDocument, transposeSemitone
     const blob = new Blob([midiBytes], { type: 'audio/midi' });
     return URL.createObjectURL(blob);
   } catch (err) {
-    console.warn('Failed to generate SimpErhu MIDI:', err);
+    console.warn('Failed to generate MusoJianpu MIDI:', err);
     return null;
   }
 }

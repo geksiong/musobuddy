@@ -12,12 +12,40 @@ export interface TextEditResult {
 }
 
 const NOTE_REGEX = /([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)/g;
+const GRACE_PREFIX_REGEX = /\^\/?(?:\{[^}]*\}|[#b=]?[1-7][',]*[_/]*)/;
+const LINE_TOKEN_REGEX = /(\^\/?(?:\{[^}]*\}|[#b=]?[1-7][',]*[_/]*))|(\{[^}]*\})|(([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*))/g;
+
+interface NoteSpan {
+  start: number;
+  end: number;
+  text: string;
+}
 
 /**
- * Locates the note token covering the cursor position (or just before the cursor).
+ * Finds all main note spans in a single music line, ignoring grace-note prefixes (^5/, ^{5/6/})
+ * and standalone marking blocks ({...}) so macros never corrupt grace notes.
  */
-function findNoteAtCursor(text: string, pos: number): { start: number; end: number; match: RegExpExecArray } | null {
-  // Search within the current line to keep it fast and safe
+function findMainNotesInLine(line: string, lineStart: number): NoteSpan[] {
+  const spans: NoteSpan[] = [];
+  LINE_TOKEN_REGEX.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = LINE_TOKEN_REGEX.exec(line)) !== null) {
+    if (m[3]) {
+      spans.push({
+        start: lineStart + m.index,
+        end: lineStart + m.index + m[3].length,
+        text: m[3]
+      });
+    }
+  }
+  return spans;
+}
+
+/**
+ * Locates the main note token covering the cursor position (or immediately before/after it),
+ * skipping grace note prefixes (^5/, ^{5/6/}) so Erhu markings & rhythm edits never corrupt them.
+ */
+function findNoteAtCursor(text: string, pos: number): NoteSpan | null {
   const lineStart = text.lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
   const rawLineEnd = text.indexOf('\n', pos);
   const lineEnd = rawLineEnd === -1 ? text.length : rawLineEnd;
@@ -26,24 +54,30 @@ function findNoteAtCursor(text: string, pos: number): { start: number; end: numb
   // Skip header / lyrics / section lines
   if (/^\s*(@|S:|L:|T:|#|\/\/)/i.test(line)) return null;
 
-  const relPos = pos - lineStart;
-  NOTE_REGEX.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  let candidate: { start: number; end: number; match: RegExpExecArray } | null = null;
+  const spans = findMainNotesInLine(line, lineStart);
+  let prevCandidate: NoteSpan | null = null;
 
-  while ((m = NOTE_REGEX.exec(line)) !== null) {
-    const start = m.index;
-    const end = start + m[0].length;
-    if (relPos >= start && relPos <= end) {
-      return { start: lineStart + start, end: lineStart + end, match: m };
+  for (const span of spans) {
+    if (pos >= span.start && pos <= span.end) {
+      return span;
     }
-    if (end <= relPos) {
-      candidate = { start: lineStart + start, end: lineStart + end, match: m };
+    if (span.end <= pos) {
+      prevCandidate = span;
     }
   }
+
+  // If cursor sits right after a grace note (e.g. ^5/|6), target the main note immediately following it
+  const nextAfterCursor = spans.find(s => s.start >= pos && s.start - pos <= 2);
+  if (nextAfterCursor) {
+    const beforeRel = line.slice(0, pos - lineStart);
+    if (new RegExp(`${GRACE_PREFIX_REGEX.source}\\s*$`).test(beforeRel)) {
+      return nextAfterCursor;
+    }
+  }
+
   // If cursor is immediately after a note (within 1 space), use previous note on same line
-  if (candidate && pos - candidate.end <= 1) {
-    return candidate;
+  if (prevCandidate && pos - prevCandidate.end <= 1) {
+    return prevCandidate;
   }
   return null;
 }
@@ -94,6 +128,7 @@ const EXCLUSIVE_GROUPS: string[][] = [
   ['pull', 'push', '拉', '推', 'pizz', '拨'],
   ['in', 'out', '内', '外'],
   ['0', '1', '2', '3', '4', '一', '二', '三', '四'],
+  ['pos1', 'pos2', 'pos3', 'pos4', 'pos5', 'p1', 'p2', 'p3', 'p4', 'p5', '一把', '二把', '三把', '四把', '五把', '上把', '中把', '下把', '次下把'],
   ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sfz']
 ];
 
@@ -136,7 +171,10 @@ function applyNoteTransform(
 ): TextEditResult | null {
   if (selStart !== selEnd) {
     const selected = text.slice(selStart, selEnd);
-    const replaced = selected.replace(NOTE_REGEX, match => transformer(match));
+    const replaced = selected.replace(LINE_TOKEN_REGEX, (full, graceTok, braceTok, noteTok) => {
+      if (graceTok || braceTok) return full;
+      return noteTok ? transformer(noteTok) : full;
+    });
     if (replaced === selected) return null;
     const nextText = text.slice(0, selStart) + replaced + text.slice(selEnd);
     return {
@@ -160,14 +198,14 @@ function applyNoteTransform(
 }
 
 /**
- * Port of SimpErhu VBA Macro: Raise / Lower Octave Dots on cursor note or selection
+ * Raise / Lower Octave Dots on cursor note or selection
  */
 export function macroShiftOctave(text: string, selStart: number, selEnd: number, delta: 1 | -1): TextEditResult | null {
   return applyNoteTransform(text, selStart, selEnd, n => transformNoteOctave(n, delta));
 }
 
 /**
- * Port of SimpErhu VBA Macro: Add / Remove Duration Underline (Beam)
+ * Add / Remove Duration Underline (Beam)
  */
 export function macroAdjustUnderlines(text: string, selStart: number, selEnd: number, delta: 1 | -1): TextEditResult | null {
   const hasSlashBeams = /[0-7][',]*\//.test(text);
@@ -177,21 +215,21 @@ export function macroAdjustUnderlines(text: string, selStart: number, selEnd: nu
 }
 
 /**
- * Port of SimpErhu VBA Macro: Toggle Augmentation Dot
+ * Toggle Augmentation Dot
  */
 export function macroToggleDot(text: string, selStart: number, selEnd: number): TextEditResult | null {
   return applyNoteTransform(text, selStart, selEnd, transformNoteDot);
 }
 
 /**
- * Port of SimpErhu VBA Macro: Toggle Sharp / Flat / Natural
+ * Toggle Sharp / Flat / Natural
  */
 export function macroToggleAccidental(text: string, selStart: number, selEnd: number, acc: '#' | 'b' | '='): TextEditResult | null {
   return applyNoteTransform(text, selStart, selEnd, n => transformNoteAccidental(n, acc));
 }
 
 /**
- * Port of SimpErhu VBA Macro: Attach / Toggle Erhu Marking (Bowing, Finger, String, Slide, Vibrato, Dynamic)
+ * Attach / Toggle Erhu Marking (Bowing, Finger, String, Slide, Vibrato, Dynamic)
  */
 export function macroToggleMarking(text: string, selStart: number, selEnd: number, tag: string): TextEditResult {
   const res = applyNoteTransform(text, selStart, selEnd, n => transformNoteMarking(n, tag));
@@ -206,7 +244,7 @@ export function macroToggleMarking(text: string, selStart: number, selEnd: numbe
 }
 
 /**
- * Port of SimpErhu VBA Macro: Wrap / Unwrap Slur (连弓线)
+ * Wrap / Unwrap Slur (连弓线)
  */
 export function macroToggleSlur(text: string, selStart: number, selEnd: number): TextEditResult {
   if (selStart !== selEnd) {
@@ -227,7 +265,7 @@ export function macroToggleSlur(text: string, selStart: number, selEnd: number):
 }
 
 /**
- * Port of SimpErhu VBA Macro: Wrap Triplet 3(...)
+ * Wrap Triplet 3(...)
  */
 export function macroWrapTriplet(text: string, selStart: number, selEnd: number): TextEditResult {
   if (selStart !== selEnd) {
@@ -248,7 +286,7 @@ export function macroWrapTriplet(text: string, selStart: number, selEnd: number)
 }
 
 /**
- * Insert raw snippet at cursor (barlines, grace notes, sections, lyrics templates)
+ * Insert raw snippet at cursor (barlines, sections, lyrics templates)
  */
 export function macroInsertSnippet(text: string, selStart: number, selEnd: number, snippet: string): TextEditResult {
   const next = text.slice(0, selStart) + snippet + text.slice(selEnd);
@@ -260,7 +298,108 @@ export function macroInsertSnippet(text: string, selStart: number, selEnd: numbe
 }
 
 /**
- * Port of SimpErhu VBA Macro (Ctrl+J): Update or insert @tempo and @expression directives
+ * Prepend a grace note (^5/) before the selected or cursor note without deleting the note.
+ * Selects the grace pitch digit so the user can immediately type any scale degree 1-7.
+ */
+export function macroInsertGraceNote(
+  text: string,
+  selStart: number,
+  selEnd: number,
+  defaultPitch: string = '5'
+): TextEditResult {
+  const hasSlashBeams = /[0-7][',]*\//.test(text);
+  const hasUnderscoreBeams = /[0-7][',]*_/.test(text);
+  const beamChar = hasUnderscoreBeams && !hasSlashBeams ? '_' : '/';
+  const snippet = `^${defaultPitch}${beamChar}`;
+
+  // Determine the target main note using the full line so selecting the pitch inside ^5/ never nests ^
+  let insertAt: number | null = null;
+  const lineStart = text.lastIndexOf('\n', Math.max(0, selStart - 1)) + 1;
+  const rawLineEnd = text.indexOf('\n', selStart);
+  const lineEnd = rawLineEnd === -1 ? text.length : rawLineEnd;
+  const line = text.slice(lineStart, lineEnd);
+
+  if (!/^\s*(@|S:|L:|T:|#|\/\/)/i.test(line)) {
+    const lineSpans = findMainNotesInLine(line, lineStart);
+    if (selStart !== selEnd) {
+      // Find first main note overlapping the selection, or immediately following a selected grace pitch
+      const overlapping = lineSpans.find(s => s.end > selStart && s.start < selEnd);
+      if (overlapping) {
+        insertAt = overlapping.start;
+      } else {
+        const following = lineSpans.find(s => s.start >= selEnd);
+        if (following) {
+          const between = text.slice(lineStart, following.start);
+          if (new RegExp(`${GRACE_PREFIX_REGEX.source}\\s*$`).test(between)) {
+            insertAt = following.start;
+          }
+        }
+      }
+    } else {
+      const target = findNoteAtCursor(text, selStart);
+      if (target) {
+        insertAt = target.start;
+      }
+    }
+  }
+
+  if (insertAt !== null) {
+    // Check if there is already an existing single grace note right before insertAt (e.g. ^5/6 -> ^{5/5/}6)
+    const before = text.slice(0, insertAt);
+    const existingSingle = before.match(/(\^\/?)([#b=]?[1-7][',]*[_/]*)(\s*)$/);
+    if (existingSingle) {
+      const prefix = existingSingle[1];
+      const existingGrace = existingSingle[2];
+      const trailingSpace = existingSingle[3];
+      const replaceStart = insertAt - existingSingle[0].length;
+      const newGrace = `${defaultPitch}${beamChar}`;
+      const combined = `${prefix}{${existingGrace}${newGrace}}${trailingSpace}`;
+      const next = text.slice(0, replaceStart) + combined + text.slice(insertAt);
+      const pitchStart = replaceStart + prefix.length + 1 + existingGrace.length;
+      return {
+        text: next,
+        selectionStart: pitchStart,
+        selectionEnd: pitchStart + defaultPitch.length
+      };
+    }
+
+    const existingMulti = before.match(/(\^\/?\{)([^}]*)(\})(\s*)$/);
+    if (existingMulti) {
+      const open = existingMulti[1];
+      const inner = existingMulti[2];
+      const close = existingMulti[3];
+      const trailingSpace = existingMulti[4];
+      const replaceStart = insertAt - existingMulti[0].length;
+      const newGrace = `${defaultPitch}${beamChar}`;
+      const combined = `${open}${inner}${newGrace}${close}${trailingSpace}`;
+      const next = text.slice(0, replaceStart) + combined + text.slice(insertAt);
+      const pitchStart = replaceStart + open.length + inner.length;
+      return {
+        text: next,
+        selectionStart: pitchStart,
+        selectionEnd: pitchStart + defaultPitch.length
+      };
+    }
+
+    const next = text.slice(0, insertAt) + snippet + text.slice(insertAt);
+    return {
+      text: next,
+      selectionStart: insertAt + 1,
+      selectionEnd: insertAt + 1 + defaultPitch.length
+    };
+  }
+
+  // Fallback when cursor is not near any note: insert at cursor and highlight pitch digit
+  const next = text.slice(0, selStart) + snippet + text.slice(selEnd);
+  return {
+    text: next,
+    selectionStart: selStart + 1,
+    selectionEnd: selStart + 1 + defaultPitch.length
+  };
+}
+
+/**
+ * Tempo Macro (Ctrl+J): Update or insert @tempo and @expression directives
  */
 export function macroSetTempo(text: string, bpm: number, expression?: string): string {
   let result = text;
@@ -286,7 +425,7 @@ export function macroSetTempo(text: string, bpm: number, expression?: string): s
 }
 
 /**
- * Port of SimpErhu VBA Macro: Set or transpose score Key (@key and auto-update Erhu @strings)
+ * Set or transpose score Key (@key and auto-update Erhu @strings)
  */
 export function macroSetKey(text: string, targetKey: string): string {
   const keyInfo = getErhuKeyInfo(targetKey);
@@ -315,7 +454,7 @@ export function macroTransposeKey(text: string, semitones: number): string {
 }
 
 /**
- * Port of SimpErhu VBA Macro: Diatonic Scale-Degree Shift (shifts all 1-7 notes + octave dots!)
+ * Diatonic Scale-Degree Shift (shifts all 1-7 notes + octave dots)
  */
 export function macroShiftScaleDegrees(text: string, steps: number): string {
   if (steps === 0) return text;
@@ -343,7 +482,7 @@ export function macroShiftScaleDegrees(text: string, steps: number): string {
 }
 
 /**
- * Port of SimpErhu VBA Macro: Auto-format & tidy barline spacing across all music lines
+ * Auto-format & tidy barline spacing across all music lines
  */
 export function macroTidyFormatting(text: string): string {
   const lines = text.split('\n');

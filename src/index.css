@@ -71,7 +71,7 @@ input[type="range"] {
   box-sizing: border-box;
 }
 
-/* Clean print layout for SimpErhu & Jianpu engraved sheet music */
+/* Clean print layout for MusoJianpu engraved sheet music */
 @media print {
   @page {
     margin: 12mm;
@@ -97,12 +97,12 @@ input[type="range"] {
     box-shadow: none !important;
     padding: 0 !important;
   }
-  .simperhu-print-sheet {
+  .musojianpu-print-sheet {
     transform: none !important;
     width: 100% !important;
     overflow: visible !important;
   }
-  .simperhu-print-sheet > div {
+  .musojianpu-print-sheet > div {
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;

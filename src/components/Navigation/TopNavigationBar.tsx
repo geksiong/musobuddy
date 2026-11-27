@@ -234,7 +234,7 @@ export default function TopNavigationBar({
                   </div>
                   <div>
                     <div className="font-semibold text-neutral-900 dark:text-neutral-100">Upload Files</div>
-                    <div className="text-[11px] text-neutral-500">ABC, SimpErhu, PDF, MusicXML, GP, TXT</div>
+                    <div className="text-[11px] text-neutral-500">ABC, MusoJianpu, PDF, MusicXML, GP, TXT</div>
                   </div>
                 </button>
 
@@ -281,7 +281,7 @@ export default function TopNavigationBar({
                 <button
                   onClick={() => {
                     setIsAddMenuOpen(false);
-                    onCreateScore(ScoreFormat.SimpErhu);
+                    onCreateScore(ScoreFormat.MusoJianpu);
                   }}
                   className={cn(
                     "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer",
@@ -289,7 +289,7 @@ export default function TopNavigationBar({
                   )}
                 >
                   <Music className="w-4 h-4 text-[#E05A2B] shrink-0" />
-                  <span className="font-medium">SimpErhu Jianpu Score</span>
+                  <span className="font-medium">MusoJianpu Score</span>
                 </button>
 
                 <button

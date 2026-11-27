@@ -7,8 +7,8 @@ import { ScoreData, ScoreFormat } from '../components/Score/types.ts';
 import { generateMidiForAbc } from './abcUtils.ts';
 import { parseMxlFile } from './mxlUtils.ts';
 import { detectChordEngine } from './chordSheetUtils.ts';
-import { detectSimpErhuFormat, parseSimpErhuScore } from './simperhu/parser.ts';
-import { generateMidiForSimpErhu } from './simperhu/audioEngine.ts';
+import { detectMusoJianpuFormat, parseMusoJianpuScore } from './musojianpu/parser.ts';
+import { generateMidiForMusoJianpu } from './musojianpu/audioEngine.ts';
 
 export interface LoadScoreUrlResult {
   success: boolean;
@@ -431,24 +431,24 @@ export async function loadScoreFromUrl(rawUrl: string, customTitle?: string): Pr
       return { success: true, score };
     }
 
-    // 3. Is it SimpErhu Jianpu text notation?
-    const isSimpErhuExt = ['erhu', 'simperhu', 'jianpu'].includes(inferredExt);
-    if (isSimpErhuExt || detectSimpErhuFormat(text)) {
-      const parsed = parseSimpErhuScore(text);
-      const finalTitle = customTitle?.trim() || (parsed.header.title !== 'Untitled Erhu Score' ? parsed.header.title : inferredTitle);
-      const midiUrl = generateMidiForSimpErhu(parsed, 0);
+    // 3. Is it MusoJianpu text notation?
+    const isMusoJianpuExt = ['erhu', 'musojianpu', 'jianpu'].includes(inferredExt);
+    if (isMusoJianpuExt || detectMusoJianpuFormat(text)) {
+      const parsed = parseMusoJianpuScore(text);
+      const finalTitle = customTitle?.trim() || (parsed.header.title !== 'Untitled Jianpu Score' ? parsed.header.title : inferredTitle);
+      const midiUrl = generateMidiForMusoJianpu(parsed, 0);
       const score: ScoreData = {
         id,
         title: finalTitle,
-        format: ScoreFormat.SimpErhu,
+        format: ScoreFormat.MusoJianpu,
         content: text,
         zoom: 1,
         pan: { x: 0, y: 0 },
         viewMode: 'scroll',
         showEditor: true,
-        simperhuLayout: 'split',
-        simperhuFingeringStyle: 'chinese',
-        simperhuPaperTheme: 'paper',
+        musoJianpuLayout: 'split',
+        musoJianpuFingeringStyle: 'chinese',
+        musoJianpuPaperTheme: 'paper',
         audioUrl: midiUrl || undefined,
         audioName: midiUrl ? `${finalTitle}.mid` : undefined,
         sourceUrl: normalizedUrl

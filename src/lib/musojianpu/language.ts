@@ -5,7 +5,7 @@
 
 import { StreamLanguage, StreamParser, LanguageSupport } from '@codemirror/language';
 
-const simperhuParser: StreamParser<unknown> = {
+const musoJianpuParser: StreamParser<unknown> = {
   token(stream) {
     if (stream.sol()) {
       // Header directives: @title:, @key:, @time:, @tempo:, etc.
@@ -38,8 +38,8 @@ const simperhuParser: StreamParser<unknown> = {
       return 'attributeName';
     }
 
-    // Grace notes ^5_, ^5/, or ^{5/6/}
-    if (stream.match(/^\^(\{[^}]*\}|[#b=]?[1-7][',]*[_/]*)/)) {
+    // Grace notes ^5_, ^5/, ^5//, ^/5, ^{5/6/}, or ^/{5/6/}
+    if (stream.match(/^\^\/?(\{[^}]*\}|[#b=]?[1-7][',]*[_/]*)/)) {
       return 'meta';
     }
 
@@ -73,8 +73,8 @@ const simperhuParser: StreamParser<unknown> = {
   }
 };
 
-export const simperhuLanguage = StreamLanguage.define(simperhuParser);
+export const musoJianpuLanguage = StreamLanguage.define(musoJianpuParser);
 
-export function simperhu() {
-  return new LanguageSupport(simperhuLanguage);
+export function musoJianpu() {
+  return new LanguageSupport(musoJianpuLanguage);
 }

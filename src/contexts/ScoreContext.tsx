@@ -9,9 +9,9 @@ import { generateMidiForAbc, exportScore } from '../lib/abcUtils.ts';
 import { parseMxlFile } from '../lib/mxlUtils.ts';
 import { detectChordEngine } from '../lib/chordSheetUtils.ts';
 import { loadScoreFromUrl, LoadScoreUrlResult } from '../lib/urlScoreLoader.ts';
-import { SIMPERHU_BLANK_TEMPLATE, SIMPERHU_JASMINE_SAMPLE } from '../lib/simperhu/samples.ts';
-import { detectSimpErhuFormat, parseSimpErhuScore } from '../lib/simperhu/parser.ts';
-import { generateMidiForSimpErhu } from '../lib/simperhu/audioEngine.ts';
+import { MUSOJIANPU_BLANK_TEMPLATE, MUSOJIANPU_JASMINE_SAMPLE } from '../lib/musojianpu/samples.ts';
+import { detectMusoJianpuFormat, parseMusoJianpuScore } from '../lib/musojianpu/parser.ts';
+import { generateMidiForMusoJianpu } from '../lib/musojianpu/audioEngine.ts';
 
 import { Waypoint } from '../components/Score/annotationTypes.ts';
 
@@ -63,23 +63,23 @@ interface ScoreContextType {
 
 const ScoreContext = createContext<ScoreContextType | undefined>(undefined);
 
-const DEFAULT_SIMPERHU_SCORE: ScoreData = {
-  id: 'simperhu-jasmine',
-  title: '茉莉花 (SimpErhu Jianpu)',
-  format: ScoreFormat.SimpErhu,
-  content: SIMPERHU_JASMINE_SAMPLE,
+const DEFAULT_MUSOJIANPU_SCORE: ScoreData = {
+  id: 'musojianpu-jasmine',
+  title: '茉莉花 (MusoJianpu)',
+  format: ScoreFormat.MusoJianpu,
+  content: MUSOJIANPU_JASMINE_SAMPLE,
   zoom: 1,
   pan: { x: 0, y: 0 },
   viewMode: 'scroll',
   showEditor: true,
-  simperhuLayout: 'split',
-  simperhuFingeringStyle: 'chinese',
-  simperhuPaperTheme: 'paper',
+  musoJianpuLayout: 'split',
+  musoJianpuFingeringStyle: 'chinese',
+  musoJianpuPaperTheme: 'paper',
   transpose: 0
 };
 
 const DEFAULT_SCORES: ScoreData[] = [
-  DEFAULT_SIMPERHU_SCORE,
+  DEFAULT_MUSOJIANPU_SCORE,
   {
     id: 'cooleys-reel',
     title: "Cooley's Reel",
@@ -212,13 +212,28 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasSimpErhu = parsed.some((s: ScoreData) => s.format === ScoreFormat.SimpErhu);
-          const alreadySeeded = localStorage.getItem('simperhu_sample_seeded_v1');
-          if (!hasSimpErhu && !alreadySeeded) {
-            localStorage.setItem('simperhu_sample_seeded_v1', '1');
-            return [DEFAULT_SIMPERHU_SCORE, ...parsed];
+          const validFormats = new Set<string>(Object.values(ScoreFormat));
+          const normalized: ScoreData[] = parsed.map((raw: any) => {
+            if (!validFormats.has(raw.format) && typeof raw.content === 'string' && detectMusoJianpuFormat(raw.content)) {
+              const parsedDoc = parseMusoJianpuScore(raw.content);
+              return {
+                ...raw,
+                title: parsedDoc.header.title !== 'Untitled Jianpu Score' ? `${parsedDoc.header.title} (MusoJianpu)` : raw.title,
+                format: ScoreFormat.MusoJianpu,
+                musoJianpuLayout: raw.musoJianpuLayout || 'split',
+                musoJianpuFingeringStyle: raw.musoJianpuFingeringStyle || 'chinese',
+                musoJianpuPaperTheme: raw.musoJianpuPaperTheme || 'paper',
+              };
+            }
+            return raw;
+          });
+          const hasMusoJianpu = normalized.some((s: ScoreData) => s.format === ScoreFormat.MusoJianpu);
+          const alreadySeeded = localStorage.getItem('musojianpu_sample_seeded_v1');
+          if (!hasMusoJianpu && !alreadySeeded) {
+            localStorage.setItem('musojianpu_sample_seeded_v1', '1');
+            return [DEFAULT_MUSOJIANPU_SCORE, ...normalized];
           }
-          return parsed;
+          return normalized;
         }
       } catch (e) {
         console.warn('Failed to parse saved scores:', e);
@@ -229,15 +244,19 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
   
   const [activeScoreIdState, setActiveScoreIdState] = useState<string | null>(() => {
     const savedId = localStorage.getItem('studio_buddy_active_score_id');
-    const alreadySeeded = localStorage.getItem('simperhu_sample_seeded_v1');
+    const alreadySeeded = localStorage.getItem('musojianpu_sample_seeded_v1');
     const savedScores = localStorage.getItem('studio_buddy_scores');
     if (savedScores) {
       try {
         const parsed = JSON.parse(savedScores);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const hasSimpErhu = parsed.some((s: ScoreData) => s.format === ScoreFormat.SimpErhu);
-          if (!hasSimpErhu && !alreadySeeded) {
-            return DEFAULT_SIMPERHU_SCORE.id;
+          const validFormats = new Set<string>(Object.values(ScoreFormat));
+          const hasMusoJianpu = parsed.some((s: any) =>
+            s.format === ScoreFormat.MusoJianpu ||
+            (!validFormats.has(s.format) && typeof s.content === 'string' && detectMusoJianpuFormat(s.content))
+          );
+          if (!hasMusoJianpu && !alreadySeeded) {
+            return DEFAULT_MUSOJIANPU_SCORE.id;
           }
           if (savedId) return savedId;
           return parsed[0].id;
@@ -481,14 +500,14 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
           audioName: `${s.title || 'score'}.mid`
         } : s));
       }
-    } else if (activeScore.format === ScoreFormat.SimpErhu && (!activeScore.audioUrl || activeScore.audioUrl === '')) {
-      const parsed = parseSimpErhuScore(activeScore.content as string);
-      const midiUrl = generateMidiForSimpErhu(parsed, activeScore.transpose || 0);
+    } else if (activeScore.format === ScoreFormat.MusoJianpu && (!activeScore.audioUrl || activeScore.audioUrl === '')) {
+      const parsed = parseMusoJianpuScore(activeScore.content as string);
+      const midiUrl = generateMidiForMusoJianpu(parsed, activeScore.transpose || 0);
       if (midiUrl) {
         setScores(prev => prev.map(s => s.id === activeScore.id ? {
           ...s,
           audioUrl: midiUrl,
-          audioName: `${s.title || 'erhu-score'}.mid`
+          audioName: `${s.title || 'jianpu-score'}.mid`
         } : s));
       }
     }
@@ -527,9 +546,9 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
 {chorus}
 [C]Singing chords over [G]lyrics
 [Am]Or use chords over [F]words format!`;
-    } else if (format === ScoreFormat.SimpErhu) {
-      title = '未命名二胡曲 (SimpErhu)';
-      initialContent = SIMPERHU_BLANK_TEMPLATE;
+    } else if (format === ScoreFormat.MusoJianpu) {
+      title = '未命名二胡曲 (MusoJianpu)';
+      initialContent = MUSOJIANPU_BLANK_TEMPLATE;
     } else if (format === ScoreFormat.Text) {
       title = 'New Text Sheet';
       initialContent = '';
@@ -537,8 +556,8 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
 
     const midiUrl = format === ScoreFormat.ABC
       ? generateMidiForAbc(initialContent, 0)
-      : format === ScoreFormat.SimpErhu
-        ? generateMidiForSimpErhu(parseSimpErhuScore(initialContent), 0)
+      : format === ScoreFormat.MusoJianpu
+        ? generateMidiForMusoJianpu(parseMusoJianpuScore(initialContent), 0)
         : null;
     const newScore: ScoreData = {
       id,
@@ -548,15 +567,15 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       zoom: 1,
       pan: { x: 0, y: 0 },
       viewMode: 'scroll',
-      showEditor: format === ScoreFormat.ABC || format === ScoreFormat.ChordSheet || format === ScoreFormat.SimpErhu,
+      showEditor: format === ScoreFormat.ABC || format === ScoreFormat.ChordSheet || format === ScoreFormat.MusoJianpu,
       selectedTuneIndex: 0,
       audioUrl: midiUrl || undefined,
       audioName: midiUrl ? 'rendering.mid' : undefined,
       chordEngine: format === ScoreFormat.ChordSheet ? 'auto' : undefined,
       chordFormat: format === ScoreFormat.ChordSheet ? 'html' : undefined,
-      simperhuLayout: format === ScoreFormat.SimpErhu ? 'split' : undefined,
-      simperhuFingeringStyle: format === ScoreFormat.SimpErhu ? 'chinese' : undefined,
-      simperhuPaperTheme: format === ScoreFormat.SimpErhu ? 'paper' : undefined,
+      musoJianpuLayout: format === ScoreFormat.MusoJianpu ? 'split' : undefined,
+      musoJianpuFingeringStyle: format === ScoreFormat.MusoJianpu ? 'chinese' : undefined,
+      musoJianpuPaperTheme: format === ScoreFormat.MusoJianpu ? 'paper' : undefined,
       transpose: 0
     };
 
@@ -638,19 +657,19 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
       } else if (['pro', 'chordpro', 'chopro', 'crd', 'cho'].includes(ext || '')) {
         format = ScoreFormat.ChordSheet;
         content = await file.text();
-      } else if (['erhu', 'simperhu', 'jianpu'].includes(ext || '')) {
-        format = ScoreFormat.SimpErhu;
+      } else if (['erhu', 'musojianpu', 'jianpu'].includes(ext || '')) {
+        format = ScoreFormat.MusoJianpu;
         content = await file.text();
-        const midiUrl = generateMidiForSimpErhu(parseSimpErhuScore(content), 0);
+        const midiUrl = generateMidiForMusoJianpu(parseMusoJianpuScore(content), 0);
         if (midiUrl) {
           audioUrl = midiUrl;
           audioName = `${name}.mid`;
         }
       } else if (ext === 'txt') {
         const text = await file.text();
-        if (detectSimpErhuFormat(text)) {
-          format = ScoreFormat.SimpErhu;
-          const midiUrl = generateMidiForSimpErhu(parseSimpErhuScore(text), 0);
+        if (detectMusoJianpuFormat(text)) {
+          format = ScoreFormat.MusoJianpu;
+          const midiUrl = generateMidiForMusoJianpu(parseMusoJianpuScore(text), 0);
           if (midiUrl) {
             audioUrl = midiUrl;
             audioName = `${name}.mid`;
@@ -679,10 +698,10 @@ export function ScoreProvider({ children }: { children: React.ReactNode }) {
         viewMode: 'scroll',
         audioUrl,
         audioName,
-        showEditor: format === ScoreFormat.SimpErhu,
-        simperhuLayout: format === ScoreFormat.SimpErhu ? 'split' : undefined,
-        simperhuFingeringStyle: format === ScoreFormat.SimpErhu ? 'chinese' : undefined,
-        simperhuPaperTheme: format === ScoreFormat.SimpErhu ? 'paper' : undefined,
+        showEditor: format === ScoreFormat.MusoJianpu,
+        musoJianpuLayout: format === ScoreFormat.MusoJianpu ? 'split' : undefined,
+        musoJianpuFingeringStyle: format === ScoreFormat.MusoJianpu ? 'chinese' : undefined,
+        musoJianpuPaperTheme: format === ScoreFormat.MusoJianpu ? 'paper' : undefined,
         selectedTuneIndex: 0
       });
     }

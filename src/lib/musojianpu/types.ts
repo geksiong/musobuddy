@@ -39,6 +39,7 @@ export interface ErhuMarkings {
   bowing?: BowingType;
   finger?: '0' | '1' | '2' | '3' | '4';
   string?: StringType;
+  position?: string;
   ornaments: OrnamentType[];
   dynamic?: DynamicType;
   customText?: string;
@@ -48,10 +49,11 @@ export interface GraceNote {
   degree: number; // 1-7
   octave: number; // -2..+2
   accidental: AccidentalType;
-  underlines: number; // typically 1 or 2
+  underlines: number; // typically 1, 2, or 3
+  slashed?: boolean; // acciaccatura diagonal slash (^/5)
 }
 
-export interface SimpErhuNote {
+export interface MusoJianpuNote {
   kind: 'note';
   id: string;
   /** 0 = rest, 1-7 = scale degree, -1 = prolongation dash '-' */
@@ -64,8 +66,10 @@ export interface SimpErhuNote {
   dots: number;
   /** Tied to next note */
   tiedToNext?: boolean;
-  /** Grace notes preceding this note */
+  /** Grace notes preceding this note (前倚音) */
   graceNotes: GraceNote[];
+  /** Optional trailing grace notes after this note (后倚音) */
+  postGraceNotes?: GraceNote[];
   /** Erhu bowing, fingering, string, ornaments, dynamics */
   markings: ErhuMarkings;
   /** Slur group IDs for rendering SVG arcs */
@@ -86,12 +90,12 @@ export interface SimpErhuNote {
 export interface BeatGroup {
   kind: 'group';
   id: string;
-  notes: SimpErhuNote[];
+  notes: MusoJianpuNote[];
 }
 
 export type BarlineType = '|' | '||' | '|]' | '|:' | ':|' | ':||:';
 
-export interface SimpErhuMeasure {
+export interface MusoJianpuMeasure {
   id: string;
   measureNumber: number;
   startBarline?: BarlineType;
@@ -107,7 +111,7 @@ export interface MusicLineNode {
   kind: 'music';
   id: string;
   lineNumber: number;
-  measures: SimpErhuMeasure[];
+  measures: MusoJianpuMeasure[];
   rawLyrics?: string[];
 }
 
@@ -125,9 +129,9 @@ export interface TextLineNode {
   text: string;
 }
 
-export type SimpErhuLine = MusicLineNode | SectionLineNode | TextLineNode;
+export type MusoJianpuLine = MusicLineNode | SectionLineNode | TextLineNode;
 
-export interface SimpErhuHeader {
+export interface MusoJianpuHeader {
   title: string;
   subtitle?: string;
   composer?: string;
@@ -140,9 +144,9 @@ export interface SimpErhuHeader {
   columns?: number;   // optional measures per row hint
 }
 
-export interface SimpErhuDocument {
-  header: SimpErhuHeader;
-  lines: SimpErhuLine[];
+export interface MusoJianpuDocument {
+  header: MusoJianpuHeader;
+  lines: MusoJianpuLine[];
   totalMeasures: number;
   totalNotes: number;
 }

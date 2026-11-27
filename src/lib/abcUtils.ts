@@ -305,14 +305,14 @@ export async function exportScore(score: ScoreData | null | undefined, saveAsMxl
   let mimeType = 'text/plain';
   let fileName = '';
 
-  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text || score.format === ScoreFormat.ChordSheet || score.format === ScoreFormat.SimpErhu || (score.format === ScoreFormat.GuitarPro && typeof score.content === 'string' && !score.content.startsWith('blob:') && !score.content.startsWith('http'))) {
+  if (score.format === ScoreFormat.ABC || score.format === ScoreFormat.Text || score.format === ScoreFormat.ChordSheet || score.format === ScoreFormat.MusoJianpu || (score.format === ScoreFormat.GuitarPro && typeof score.content === 'string' && !score.content.startsWith('blob:') && !score.content.startsWith('http'))) {
     content = score.content as string;
     const ext = score.format === ScoreFormat.ABC
       ? 'abc'
       : score.format === ScoreFormat.ChordSheet
         ? 'chordpro'
-        : score.format === ScoreFormat.SimpErhu
-          ? 'erhu.txt'
+        : score.format === ScoreFormat.MusoJianpu
+          ? 'jianpu.txt'
           : score.format === ScoreFormat.GuitarPro
             ? 'gp'
             : 'txt';

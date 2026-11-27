@@ -13,11 +13,11 @@ import {
   GraceNote,
   MusicLineNode,
   OrnamentType,
-  SimpErhuDocument,
-  SimpErhuHeader,
-  SimpErhuLine,
-  SimpErhuMeasure,
-  SimpErhuNote,
+  MusoJianpuDocument,
+  MusoJianpuHeader,
+  MusoJianpuLine,
+  MusoJianpuMeasure,
+  MusoJianpuNote,
   StringType
 } from './types.ts';
 import { getErhuKeyInfo, normalizeKeyName } from './erhuKeys.ts';
@@ -43,6 +43,15 @@ const FINGER_ALIASES: Record<string, '0' | '1' | '2' | '3' | '4'> = {
 const STRING_ALIASES: Record<string, StringType> = {
   in: 'in', inner: 'in', nei: 'in', '内': 'in', '内弦': 'in',
   out: 'out', outer: 'out', wai: 'out', '外': 'out', '外弦': 'out'
+};
+
+const POSITION_ALIASES: Record<string, string> = {
+  pos1: '一把', p1: '一把', '一把': '一把', '第一把': '一把', '传统一把': '一把',
+  pos2: '二把', p2: '二把', '二把': '二把', '第二把': '二把',
+  pos3: '三把', p3: '三把', '三把': '三把', '第三把': '三把',
+  pos4: '四把', p4: '四把', '四把': '四把', '第四把': '四把',
+  pos5: '五把', p5: '五把', '五把': '五把', '第五把': '五把',
+  '上把': '上把', '中把': '中把', '下把': '下把', '次下把': '次下把', '最下把': '最下把', '换把': '换把'
 };
 
 const ORNAMENT_ALIASES: Record<string, OrnamentType> = {
@@ -83,6 +92,8 @@ function parseMarkingsBlock(raw: string, target: ErhuMarkings) {
       target.finger = FINGER_ALIASES[lower] || FINGER_ALIASES[part];
     } else if (STRING_ALIASES[lower] || STRING_ALIASES[part]) {
       target.string = STRING_ALIASES[lower] || STRING_ALIASES[part];
+    } else if (POSITION_ALIASES[lower] || POSITION_ALIASES[part]) {
+      target.position = POSITION_ALIASES[lower] || POSITION_ALIASES[part];
     } else if (ORNAMENT_ALIASES[lower] || ORNAMENT_ALIASES[part]) {
       const orn = ORNAMENT_ALIASES[lower] || ORNAMENT_ALIASES[part];
       if (!target.ornaments.includes(orn)) {
@@ -97,7 +108,7 @@ function parseMarkingsBlock(raw: string, target: ErhuMarkings) {
   }
 }
 
-function parseGraceString(raw: string): GraceNote[] {
+function parseGraceString(raw: string, slashed: boolean = false): GraceNote[] {
   const notes: GraceNote[] = [];
   const regex = /([#b=]?)([1-7])([',]*)([_/]*)/g;
   let m: RegExpExecArray | null;
@@ -110,8 +121,10 @@ function parseGraceString(raw: string): GraceNote[] {
       if (ch === "'") octave++;
       else if (ch === ',') octave--;
     }
-    const underlines = Math.max(1, (m[4] || '').length || 2);
-    notes.push({ degree, octave, accidental: acc, underlines });
+    octave = Math.max(-2, Math.min(2, octave));
+    const rawUnderlines = (m[4] || '').length;
+    const underlines = Math.min(3, Math.max(1, rawUnderlines || 2));
+    notes.push({ degree, octave, accidental: acc, underlines, slashed: slashed || undefined });
   }
   return notes;
 }
@@ -146,18 +159,18 @@ function createEmptyMarkings(): ErhuMarkings {
 }
 
 /**
- * Parses a SimpErhu text-formatted score into a structured AST with exact character offsets.
+ * Parses a MusoJianpu text-formatted score into a structured AST with exact character offsets.
  */
-export function parseSimpErhuScore(text: string): SimpErhuDocument {
+export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
   const safeText = typeof text === 'string' ? text : '';
-  const header: SimpErhuHeader = {
-    title: 'Untitled Erhu Score',
+  const header: MusoJianpuHeader = {
+    title: 'Untitled Jianpu Score',
     key: 'D',
     time: '4/4',
     tempo: 80
   };
 
-  const lines: SimpErhuLine[] = [];
+  const lines: MusoJianpuLine[] = [];
   let totalMeasures = 0;
   let totalNotes = 0;
   let nextSlurId = 1;
@@ -272,20 +285,22 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
     }
 
     // Otherwise, parse as a Music Line!
-    const measures: SimpErhuMeasure[] = [];
-    let currentMeasure: SimpErhuMeasure | null = null;
+    const measures: MusoJianpuMeasure[] = [];
+    let currentMeasure: MusoJianpuMeasure | null = null;
     let currentGroup: BeatGroup | null = null;
 
     let inSlur = false;
     let activeSlurId: number | undefined = undefined;
     let pendingSlurStart = false;
-    let lastNoteInSlur: SimpErhuNote | null = null;
+    let lastNoteInSlur: MusoJianpuNote | null = null;
 
     let pendingTupletStart: number | undefined = undefined;
     let inTuplet = false;
-    let lastNoteInTuplet: SimpErhuNote | null = null;
+    let lastNoteInTuplet: MusoJianpuNote | null = null;
 
     let pendingGraceNotes: GraceNote[] = [];
+    let pendingMarkings: ErhuMarkings | null = null;
+    let lastPitchedNote: MusoJianpuNote | null = null;
     let pendingVolta: string | undefined = undefined;
 
     const ensureMeasure = (offset: number, startBar?: BarlineType) => {
@@ -422,21 +437,27 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
         continue;
       }
 
-      // Grace note prefix: ^{5_6_} or ^5_
+      // Grace note prefix: ^{5/6/}, ^5/, ^5//, ^5_, ^5, or slashed acciaccatura ^/5, ^/{5 6}
       if (ch === '^') {
-        if (rawLine[i + 1] === '{') {
-          const closeIdx = rawLine.indexOf('}', i + 2);
+        let cursor = i + 1;
+        let slashed = false;
+        if (rawLine[cursor] === '/') {
+          slashed = true;
+          cursor++;
+        }
+        if (rawLine[cursor] === '{') {
+          const closeIdx = rawLine.indexOf('}', cursor + 1);
           if (closeIdx !== -1) {
-            const inner = rawLine.slice(i + 2, closeIdx);
-            pendingGraceNotes.push(...parseGraceString(inner));
+            const inner = rawLine.slice(cursor + 1, closeIdx);
+            pendingGraceNotes.push(...parseGraceString(inner, slashed));
             i = closeIdx + 1;
             continue;
           }
         } else {
-          const gm = rawLine.slice(i + 1).match(/^([#b=]?)([1-7])([',]*)([_/]*)/);
+          const gm = rawLine.slice(cursor).match(/^([#b=]?)([1-7])([',]*)([_/]*)/);
           if (gm) {
-            pendingGraceNotes.push(...parseGraceString(gm[0]));
-            i += 1 + gm[0].length;
+            pendingGraceNotes.push(...parseGraceString(gm[0], slashed));
+            i = cursor + gm[0].length;
             continue;
           }
         }
@@ -444,8 +465,28 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
         continue;
       }
 
+      // Stray {markings} block before a main note (e.g. ^5/{pull}6): capture cleanly for the upcoming note
+      if (ch === '{') {
+        const closeIdx = rawLine.indexOf('}', i + 1);
+        if (closeIdx !== -1) {
+          if (!pendingMarkings) pendingMarkings = createEmptyMarkings();
+          parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), pendingMarkings);
+          i = closeIdx + 1;
+          continue;
+        }
+      }
+
       // Prolongation dash '-'
       if (ch === '-') {
+        // If a grace note appeared immediately before a prolongation dash (e.g. 5 ^6/ -),
+        // attach it as a trailing post-grace note on the held note instead of leaking it across the dash.
+        if (pendingGraceNotes.length > 0 && lastPitchedNote) {
+          lastPitchedNote.postGraceNotes = [
+            ...(lastPitchedNote.postGraceNotes || []),
+            ...pendingGraceNotes
+          ];
+          pendingGraceNotes = [];
+        }
         ensureMeasure(lineStart + i);
         const startOffset = lineStart + i;
         i++;
@@ -458,7 +499,7 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
         }
 
         totalNotes++;
-        const dashNote: SimpErhuNote = {
+        const dashNote: MusoJianpuNote = {
           kind: 'note',
           id: `n-${totalNotes}`,
           degree: -1,
@@ -511,7 +552,8 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
         i += noteMatch[0].length;
 
         // Parse any trailing {markings} blocks (supports {pull,二} or {pull}{二})
-        const markings = createEmptyMarkings();
+        const markings = pendingMarkings ? pendingMarkings : createEmptyMarkings();
+        pendingMarkings = null;
         while (i < len && rawLine[i] === '{') {
           const closeIdx = rawLine.indexOf('}', i + 1);
           if (closeIdx === -1) break;
@@ -527,7 +569,7 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
         }
 
         totalNotes++;
-        const note: SimpErhuNote = {
+        const note: MusoJianpuNote = {
           kind: 'note',
           id: `n-${totalNotes}`,
           degree,
@@ -543,6 +585,9 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
           lineNumber
         };
         pendingGraceNotes = [];
+        if (degree >= 1 && degree <= 7) {
+          lastPitchedNote = note;
+        }
 
         if (inSlur && activeSlurId !== undefined) {
           note.slurId = activeSlurId;
@@ -588,6 +633,15 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
       i++;
     }
 
+    // Attach any trailing end-of-line grace notes as post-grace notes on the last pitched note
+    if (pendingGraceNotes.length > 0 && lastPitchedNote) {
+      lastPitchedNote.postGraceNotes = [
+        ...(lastPitchedNote.postGraceNotes || []),
+        ...pendingGraceNotes
+      ];
+      pendingGraceNotes = [];
+    }
+
     flushGroup();
 
     // Filter out completely empty trailing measures created by trailing barline
@@ -626,9 +680,9 @@ export function parseSimpErhuScore(text: string): SimpErhuDocument {
 }
 
 /**
- * Heuristically detects whether an arbitrary text file is a SimpErhu / Jianpu text score.
+ * Heuristically detects whether an arbitrary text file is a MusoJianpu text score.
  */
-export function detectSimpErhuFormat(text: string): boolean {
+export function detectMusoJianpuFormat(text: string): boolean {
   if (!text || typeof text !== 'string') return false;
   const hasHeader = /^@(title|key|strings|time|tempo)\s*[:：]/im.test(text);
   if (hasHeader) return true;

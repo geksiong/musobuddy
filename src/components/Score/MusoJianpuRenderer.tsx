@@ -8,17 +8,18 @@ import {
   BarlineType,
   BeatGroup,
   BowingType,
+  GraceNote,
   MusicLineNode,
   OrnamentType,
-  SimpErhuDocument,
-  SimpErhuMeasure,
-  SimpErhuNote
-} from '../../lib/simperhu/types.ts';
-import { CHINESE_FINGERS, formatJianpuKeyLabel, getErhuKeyInfo } from '../../lib/simperhu/erhuKeys.ts';
+  MusoJianpuDocument,
+  MusoJianpuMeasure,
+  MusoJianpuNote
+} from '../../lib/musojianpu/types.ts';
+import { CHINESE_FINGERS, formatJianpuKeyLabel, getErhuKeyInfo } from '../../lib/musojianpu/erhuKeys.ts';
 import { cn } from '../../lib/utils.ts';
 
-export interface SimpErhuRendererProps {
-  document: SimpErhuDocument;
+export interface MusoJianpuRendererProps {
+  document: MusoJianpuDocument;
   zoom?: number;
   paperTheme?: 'paper' | 'adaptive';
   resolvedTheme: string;
@@ -28,12 +29,11 @@ export interface SimpErhuRendererProps {
   highlightMarkings?: boolean;
   activeNoteId?: string | null;
   selectedOffset?: number | null;
-  customFontFamily?: string | null;
-  onNoteClick?: (note: SimpErhuNote) => void;
+  onNoteClick?: (note: MusoJianpuNote) => void;
 }
 
 /**
- * Vector Erhu Bowing Symbol (authentic Chinese Jianpu / SimpErhu geometry)
+ * Vector Erhu Bowing Symbol (Chinese Jianpu geometry)
  */
 function BowingGlyph({ type, className }: { type: BowingType; className?: string }) {
   switch (type) {
@@ -172,6 +172,119 @@ function OrnamentGlyph({ type, className }: { type: OrnamentType; className?: st
   }
 }
 
+/**
+ * Miniature Jianpu Grace Note Cluster (前倚音 / 后倚音) with octave dots, accidentals,
+ * accurate beam underlines, optional acciaccatura slash, and connecting curved slur arc.
+ */
+function GraceNoteCluster({
+  notes,
+  position,
+  colorClass
+}: {
+  notes: GraceNote[];
+  position: 'pre' | 'post';
+  colorClass: string;
+}) {
+  if (notes.length === 0) return null;
+  const maxUnderlines = Math.min(3, Math.max(1, ...notes.map(n => n.underlines)));
+  const isSlashed = notes.some(n => n.slashed);
+
+  return (
+    <span
+      className={cn(
+        'relative inline-flex items-end select-none leading-none',
+        colorClass
+      )}
+    >
+      <span className="relative inline-flex items-end">
+        {notes.map((gn, gIdx) => {
+          const underlineCount = Math.min(3, Math.max(1, gn.underlines));
+          return (
+            <span
+              key={gIdx}
+              className="relative inline-flex flex-col items-center px-[0.5px]"
+            >
+              {/* High octave dots above miniature grace digit */}
+              {gn.octave >= 1 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 pb-[1px] flex flex-col items-center gap-[1.5px] pointer-events-none"
+                >
+                  {gn.octave >= 2 && <span className="w-[2.5px] h-[2.5px] rounded-full bg-current" />}
+                  <span className="w-[2.5px] h-[2.5px] rounded-full bg-current" />
+                </span>
+              )}
+
+              {/* Accidental + Grace Numeral */}
+              <span className="inline-flex items-baseline text-[11px] font-bold tabular-nums leading-none">
+                {gn.accidental && (
+                  <span className="text-[8px] font-bold -translate-y-[2px] mr-[0.5px]">
+                    {gn.accidental === '#' ? '♯' : gn.accidental === 'b' ? '♭' : '♮'}
+                  </span>
+                )}
+                <span>{gn.degree}</span>
+              </span>
+
+              {/* Grace Underlines (respecting 1, 2, or 3 beams) */}
+              <span className="relative w-full flex flex-col gap-[1.5px] mt-[1.5px]">
+                {Array.from({ length: maxUnderlines }).map((_, uIdx) => (
+                  <span
+                    key={uIdx}
+                    className={cn(
+                      'w-full h-[1px]',
+                      uIdx < underlineCount ? 'bg-current' : 'bg-transparent'
+                    )}
+                    style={{
+                      marginLeft: gIdx > 0 && uIdx < underlineCount ? '-0.5px' : undefined,
+                      marginRight: gIdx < notes.length - 1 && uIdx < underlineCount ? '-0.5px' : undefined
+                    }}
+                  />
+                ))}
+              </span>
+
+              {/* Low octave dots below grace underlines */}
+              {gn.octave <= -1 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-full left-1/2 -translate-x-1/2 pt-[1.5px] flex flex-col items-center gap-[1.5px] pointer-events-none"
+                >
+                  <span className="w-[2.5px] h-[2.5px] rounded-full bg-current" />
+                  {gn.octave <= -2 && <span className="w-[2.5px] h-[2.5px] rounded-full bg-current" />}
+                </span>
+              )}
+            </span>
+          );
+        })}
+
+        {/* Optional diagonal acciaccatura slash (^/5) */}
+        {isSlashed && (
+          <svg
+            viewBox="0 0 12 8"
+            className="w-3 h-2 absolute -bottom-[2px] -left-[1px] pointer-events-none opacity-90"
+            aria-hidden="true"
+          >
+            <path d="M1 7L11 1" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        )}
+      </span>
+
+      {/* Connecting Jianpu Grace Slur Arc (倚音小弧线) tucked tightly toward the main note */}
+      <svg
+        viewBox="0 0 10 6"
+        className={cn(
+          'w-[7px] h-[5px] pointer-events-none opacity-80 shrink-0',
+          position === 'pre'
+            ? '-ml-[2px] -mr-[2px] translate-y-[4px]'
+            : '-mr-[2px] -ml-[2px] translate-y-[4px] -scale-x-100 order-first'
+        )}
+        aria-hidden="true"
+      >
+        <path d="M1 1Q4.8 5.4 9 2.4" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      </svg>
+    </span>
+  );
+}
+
 function BarlineGlyph({ type, inkClass }: { type: BarlineType; inkClass: string }) {
   const barH = 'h-[26px]';
   switch (type) {
@@ -242,7 +355,7 @@ interface SlurArc {
 /**
  * Computes visual rhythmic weight for proportional Jianpu spacing (quarter note / dash = 1).
  */
-function getNoteBeatWeight(note: SimpErhuNote): number {
+function getNoteBeatWeight(note: MusoJianpuNote): number {
   let base = 1;
   if (note.underlines === 1) base = 0.5;
   else if (note.underlines === 2) base = 0.25;
@@ -258,7 +371,7 @@ function getGroupBeatWeight(group: BeatGroup): number {
   return Math.max(0.45, total);
 }
 
-function getMeasureBeatWeight(measure: SimpErhuMeasure): number {
+function getMeasureBeatWeight(measure: MusoJianpuMeasure): number {
   const total = measure.groups.reduce((sum, g) => sum + getGroupBeatWeight(g), 0);
   return Math.max(1, total);
 }
@@ -275,7 +388,6 @@ function MusicLineView({
   activeNoteId,
   selectedOffset,
   isDarkSurface,
-  customFontFamily,
   onNoteClick
 }: {
   line: MusicLineNode;
@@ -286,8 +398,7 @@ function MusicLineView({
   activeNoteId?: string | null;
   selectedOffset?: number | null;
   isDarkSurface: boolean;
-  customFontFamily?: string | null;
-  onNoteClick?: (note: SimpErhuNote) => void;
+  onNoteClick?: (note: MusoJianpuNote) => void;
 }) {
   const lineContainerRef = useRef<HTMLDivElement>(null);
   const noteElMapRef = useRef<Map<string, HTMLSpanElement>>(new Map());
@@ -300,6 +411,16 @@ function MusicLineView({
     );
   }, [line, showLyrics]);
 
+  const hasAnyDynamics = useMemo(() => {
+    if (!showMarkings) return false;
+    return line.measures.some(m =>
+      m.groups.some(g => g.notes.some(n => Boolean(n.markings.dynamic)))
+    );
+  }, [line, showMarkings]);
+
+  const barlineBottomOffset = 25 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
+  const measureNumberBottomOffset = 31 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
+
   const measureSlurs = () => {
     const container = lineContainerRef.current;
     if (!container) return;
@@ -307,7 +428,7 @@ function MusicLineView({
     const scale = container.offsetWidth > 0 ? containerRect.width / container.offsetWidth : 1;
 
     // Group notes by slurId across the line
-    const slurGroups = new Map<number, SimpErhuNote[]>();
+    const slurGroups = new Map<number, MusoJianpuNote[]>();
     for (const m of line.measures) {
       for (const g of m.groups) {
         for (const n of g.notes) {
@@ -355,7 +476,7 @@ function MusicLineView({
 
   useLayoutEffect(() => {
     measureSlurs();
-  }, [line, showMarkings, showLyrics, fingeringStyle, customFontFamily]);
+  }, [line, showMarkings, showLyrics, fingeringStyle]);
 
   useEffect(() => {
     const el = lineContainerRef.current;
@@ -376,7 +497,7 @@ function MusicLineView({
     else noteElMapRef.current.delete(noteId);
   };
 
-  const renderNoteCell = (note: SimpErhuNote, group: BeatGroup, noteIdxInGroup: number) => {
+  const renderNoteCell = (note: MusoJianpuNote, group: BeatGroup, noteIdxInGroup: number) => {
     const isPlaying = activeNoteId === note.id;
     const isSelected =
       selectedOffset !== null &&
@@ -394,12 +515,24 @@ function MusicLineView({
         ? '外'
         : null;
 
-    const upperOrnaments = note.markings.ornaments.filter(o => o !== 'su' && o !== 'sd');
+    const harmonicOrnaments = note.markings.ornaments.filter(o => o === 'harm' || o === 'aharm');
+    const positionShiftOrnaments = note.markings.ornaments.filter(o => o === 'shiftUp' || o === 'shiftDown');
     const slideOrnaments = note.markings.ornaments.filter(o => o === 'su' || o === 'sd');
+    const upperOrnaments = note.markings.ornaments.filter(
+      o => o !== 'su' && o !== 'sd' && o !== 'harm' && o !== 'aharm' && o !== 'shiftUp' && o !== 'shiftDown'
+    );
+    const hasTopPerformanceRow = Boolean(
+      note.markings.bowing || upperOrnaments.length > 0 || note.markings.customText
+    );
+    const hasPositionRow = Boolean(note.markings.position || positionShiftOrnaments.length > 0);
 
     // Continuous beaming logic across adjacent notes in the same BeatGroup
     const prevUnderlines = noteIdxInGroup > 0 ? group.notes[noteIdxInGroup - 1].underlines : 0;
     const nextUnderlines = noteIdxInGroup < group.notes.length - 1 ? group.notes[noteIdxInGroup + 1].underlines : 0;
+
+    const hasPreGrace = note.graceNotes.length > 0;
+    const hasPostGrace = Boolean(note.postGraceNotes && note.postGraceNotes.length > 0);
+    const noteColorClass = isPlaying ? 'text-[#E05A2B]' : inkClass;
 
     const noteMinWidthClass =
       note.underlines === 0
@@ -415,184 +548,254 @@ function MusicLineView({
         onClick={() => onNoteClick?.(note)}
         title={`Line ${note.lineNumber} · Click to edit in source`}
         className={cn(
-          'relative shrink-0 flex flex-col items-center justify-end group/note px-[5px] pt-1 pb-0.5 rounded-md transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E05A2B]',
+          'relative shrink-0 flex items-end justify-center group/note px-[5px] pt-1 pb-0.5 rounded-md transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E05A2B]',
           noteMinWidthClass,
           isPlaying && (isDarkSurface ? 'bg-[#E05A2B]/30 ring-1 ring-[#E05A2B]' : 'bg-[#E05A2B]/15 ring-1 ring-[#E05A2B]'),
           !isPlaying && isSelected && (isDarkSurface ? 'bg-white/10' : 'bg-amber-100/80'),
           !isPlaying && !isSelected && (isDarkSurface ? 'hover:bg-white/[0.06]' : 'hover:bg-neutral-100')
         )}
       >
-        {/* Top Markings Lanes (Reserved height so rows stay aligned cleanly) */}
-        {showMarkings && (
-          <div className="flex flex-col items-center justify-end min-h-[34px] mb-0.5 select-none">
-            {/* Lane 1: Dynamics + Bowing */}
-            <div className="flex items-center justify-center gap-0.5 min-h-[14px] whitespace-nowrap">
-              {note.markings.dynamic && (
-                <span className={cn('text-[10px] font-serif italic font-bold leading-none', isDarkSurface ? 'text-amber-300' : 'text-neutral-800')}>
-                  {note.markings.dynamic}
-                </span>
-              )}
-              {note.markings.bowing && (
-                <BowingGlyph type={note.markings.bowing} className={erhuAccentClass} />
-              )}
-              {upperOrnaments.map((orn, idx) => (
-                <OrnamentGlyph key={idx} type={orn} className={erhuAccentClass} />
-              ))}
+        {/* Left Pre-Grace Note Slot (tucked close to the main digit, keeping main markings centered) */}
+        {hasPreGrace && (
+          <div className="flex flex-col items-end justify-end -mr-[1px]">
+            <div className="h-[24px] flex items-center -translate-y-[6px]">
+              <GraceNoteCluster notes={note.graceNotes} position="pre" colorClass={noteColorClass} />
             </div>
-
-            {/* Lane 2: String + Fingering + Custom Text */}
-            <div className="flex items-center justify-center gap-0.5 min-h-[14px]">
-              {stringDisplay && (
-                <span className={cn('text-[10px] font-bold leading-none', erhuAccentClass)}>
-                  {stringDisplay}
-                </span>
-              )}
-              {fingerDisplay && (
-                <span className={cn('text-[10.5px] font-semibold leading-none', inkClass)}>
-                  {fingerDisplay}
-                </span>
-              )}
-              {note.markings.customText && (
-                <span className={cn('text-[9.5px] font-medium leading-none whitespace-nowrap', subtleInkClass)}>
-                  {note.markings.customText}
-                </span>
-              )}
+            {/* Beam bridge only when this note continues an incoming beam from the left */}
+            <div className="relative w-full h-[11px] flex flex-col justify-start gap-[2.5px] mt-[1px]">
+              {[1, 2, 3].map(level => {
+                const bridgeLeft = note.underlines >= level && prevUnderlines >= level;
+                if (!bridgeLeft) return <div key={level} className="h-[1.5px]" />;
+                return (
+                  <div
+                    key={level}
+                    className={cn('h-[1.5px] bg-current transition-none', noteColorClass)}
+                    style={{ marginLeft: '-5px', marginRight: '-1px' }}
+                  />
+                );
+              })}
             </div>
+            <div className="h-[11px] mt-[1px]" aria-hidden="true" />
+            {hasAnyDynamics && <div className="h-[15px] mt-[1px]" aria-hidden="true" />}
+            {hasAnyLyrics && <div className="h-[20px] mt-1" aria-hidden="true" />}
           </div>
         )}
 
-        {/* Reserved vertical lane for High Octave Dots & Slur Arcs */}
-        <div className="h-[16px] mb-[2px]" aria-hidden="true" />
-
-        {/* Main Pitch Numeral Row (with optional Grace Notes, Accidental, Dot, Slide) */}
-        <div className="relative flex items-center justify-center leading-none h-[24px]">
-          {/* Grace Notes (Superscript miniature Jianpu) */}
-          {note.graceNotes.length > 0 && (
-            <span className="inline-flex items-baseline mr-0.5 -translate-y-2 text-[10px] font-semibold opacity-85">
-              {note.graceNotes.map((gn, gIdx) => (
-                <span key={gIdx} className="inline-flex flex-col items-center mx-[0.5px]">
-                  <span className="leading-none">
-                    {gn.accidental === '#' ? '♯' : gn.accidental === 'b' ? '♭' : ''}
-                    {gn.degree}
-                  </span>
-                  <span className="w-full h-[1px] bg-current mt-[1px]" />
-                  <span className="w-full h-[1px] bg-current mt-[1px]" />
-                </span>
-              ))}
-            </span>
-          )}
-
-          {/* Slide Arrows (上滑音 / 下滑音 leading into the note from the left) */}
-          {showMarkings && slideOrnaments.length > 0 && (
-            <span className="inline-flex items-center mr-[1px]">
-              {slideOrnaments.map((sOrn, sIdx) => (
-                <OrnamentGlyph key={sIdx} type={sOrn} className={erhuAccentClass} />
-              ))}
-            </span>
-          )}
-
-          {/* Accidental */}
-          {note.accidental && (
-            <span className={cn('text-[11px] font-bold -translate-y-1.5 mr-[0.5px] leading-none', inkClass)}>
-              {note.accidental === '#' ? '♯' : note.accidental === 'b' ? '♭' : '♮'}
-            </span>
-          )}
-
-          {/* Core Jianpu Digit or Prolongation Dash (anchors octave dots & slurs to the digit itself) */}
-          <span
-            ref={registerNoteRef(note.id)}
-            className={cn(
-              'relative inline-flex items-center justify-center h-[22px] text-[21px] font-bold tabular-nums tracking-tight leading-none select-text',
-              isPlaying ? 'text-[#E05A2B]' : inkClass
-            )}
-            style={customFontFamily ? { fontFamily: `"${customFontFamily}", serif` } : { fontFamily: '"Plus Jakarta Sans", "Noto Sans SC", system-ui, sans-serif' }}
-          >
-            {/* High Octave Dots anchored directly above the digit */}
-            {note.octave >= 1 && (
-              <span
-                aria-hidden="true"
-                className="absolute bottom-full left-1/2 -translate-x-1/2 pb-[2px] flex flex-col items-center gap-[2px] pointer-events-none"
-              >
-                {note.octave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
-                <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
-              </span>
-            )}
-
-            {note.degree === -1 ? '–' : note.degree}
-
-            {/* Low Octave Dots anchored directly below the digit & duration underlines */}
-            {note.octave <= -1 && (
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'absolute top-full left-1/2 -translate-x-1/2 flex flex-col items-center gap-[2px] pointer-events-none',
-                  note.underlines === 0
-                    ? 'pt-[3px]'
-                    : note.underlines === 1
-                      ? 'pt-[6px]'
-                      : note.underlines === 2
-                        ? 'pt-[10px]'
-                        : 'pt-[14px]'
-                )}
-              >
-                <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
-                {note.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
-              </span>
-            )}
-          </span>
-
-          {/* Augmentation Dot(s) */}
-          {note.dots > 0 && (
-            <span
-              className={cn(
-                'inline-flex items-center',
-                note.underlines === 0 ? 'ml-[8px] mr-[1px] gap-[4px]' : 'ml-[5px] gap-[3px]',
-                inkClass
+        {/* Main Note Column */}
+        <div className="flex flex-col items-center justify-end">
+          {/* Top Markings Stack (Bottom-first closest to note: Harmonics → Fingers → String → Position, then Bowing/Ornaments above) */}
+          {showMarkings && (
+            <div className="flex flex-col items-center justify-end gap-[2px] min-h-[34px] mb-0.5 select-none">
+              {/* Topmost: Bowing, Other Ornaments & Custom Text */}
+              {hasTopPerformanceRow && (
+                <div className="flex items-center justify-center gap-0.5 min-h-[13px] whitespace-nowrap">
+                  {note.markings.bowing && (
+                    <BowingGlyph type={note.markings.bowing} className={erhuAccentClass} />
+                  )}
+                  {upperOrnaments.map((orn, idx) => (
+                    <OrnamentGlyph key={idx} type={orn} className={erhuAccentClass} />
+                  ))}
+                  {note.markings.customText && (
+                    <span className={cn('text-[9.5px] font-medium leading-none whitespace-nowrap', subtleInkClass)}>
+                      {note.markings.customText}
+                    </span>
+                  )}
+                </div>
               )}
+
+              {/* Layer 4 (Top of left-hand stack): Position */}
+              {hasPositionRow && (
+                <div className="flex items-center justify-center gap-0.5 min-h-[12px] whitespace-nowrap">
+                  {positionShiftOrnaments.map((orn, idx) => (
+                    <OrnamentGlyph key={idx} type={orn} className={erhuAccentClass} />
+                  ))}
+                  {note.markings.position && (
+                    <span className={cn('text-[9.5px] font-semibold leading-none', subtleInkClass)}>
+                      {note.markings.position}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Layer 3: String (内 / 外) */}
+              {stringDisplay && (
+                <div className="flex items-center justify-center min-h-[12px] leading-none">
+                  <span className={cn('text-[10px] font-bold leading-none', erhuAccentClass)}>
+                    {stringDisplay}
+                  </span>
+                </div>
+              )}
+
+              {/* Layer 2: Fingers (0 / 一二三四 / 1234) */}
+              {fingerDisplay && (
+                <div className="flex items-center justify-center min-h-[12px] leading-none">
+                  <span className={cn('text-[10.5px] font-semibold leading-none', inkClass)}>
+                    {fingerDisplay}
+                  </span>
+                </div>
+              )}
+
+              {/* Layer 1 (Bottom, closest to note): Harmonics (○ / ◇) */}
+              {harmonicOrnaments.length > 0 && (
+                <div className="flex items-center justify-center gap-0.5 min-h-[11px] leading-none">
+                  {harmonicOrnaments.map((orn, idx) => (
+                    <OrnamentGlyph key={idx} type={orn} className={erhuAccentClass} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Reserved vertical lane for High Octave Dots & Slur Arcs */}
+          <div className="h-[16px] mb-[2px]" aria-hidden="true" />
+
+          {/* Main Pitch Numeral Row (with optional Slide, Accidental, Dot, Tie) */}
+          <div className="relative flex items-center justify-center leading-none h-[24px]">
+            {/* Slide Arrows (上滑音 / 下滑音 leading into the note from the left) */}
+            {showMarkings && slideOrnaments.length > 0 && (
+              <span className="inline-flex items-center mr-[1px]">
+                {slideOrnaments.map((sOrn, sIdx) => (
+                  <OrnamentGlyph key={sIdx} type={sOrn} className={erhuAccentClass} />
+                ))}
+              </span>
+            )}
+
+            {/* Accidental */}
+            {note.accidental && (
+              <span className={cn('text-[11px] font-bold -translate-y-1.5 mr-[0.5px] leading-none', inkClass)}>
+                {note.accidental === '#' ? '♯' : note.accidental === 'b' ? '♭' : '♮'}
+              </span>
+            )}
+
+            {/* Core Jianpu Digit or Prolongation Dash (anchors octave dots & slurs to the digit itself) */}
+            <span
+              ref={registerNoteRef(note.id)}
+              className={cn(
+                'relative inline-flex items-center justify-center h-[22px] text-[21px] font-bold tabular-nums tracking-tight leading-none select-text',
+                noteColorClass
+              )}
+              style={{ fontFamily: '"Plus Jakarta Sans", "Noto Sans SC", system-ui, sans-serif' }}
             >
-              {Array.from({ length: note.dots }).map((_, dIdx) => (
-                <span key={dIdx} className="w-[4px] h-[4px] rounded-full bg-current inline-block" />
-              ))}
+              {/* High Octave Dots anchored directly above the digit */}
+              {note.octave >= 1 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 pb-[2px] flex flex-col items-center gap-[2px] pointer-events-none"
+                >
+                  {note.octave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                  <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
+                </span>
+              )}
+
+              {note.degree === -1 ? '–' : note.degree}
+
+              {/* Low Octave Dots anchored directly below the digit & duration underlines */}
+              {note.octave <= -1 && (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'absolute top-full left-1/2 -translate-x-1/2 flex flex-col items-center gap-[2px] pointer-events-none',
+                    note.underlines === 0
+                      ? 'pt-[3px]'
+                      : note.underlines === 1
+                        ? 'pt-[6px]'
+                        : note.underlines === 2
+                          ? 'pt-[10px]'
+                          : 'pt-[14px]'
+                  )}
+                >
+                  <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
+                  {note.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                </span>
+              )}
             </span>
-          )}
 
-          {/* Tie Curve (~) */}
-          {note.tiedToNext && (
-            <svg viewBox="0 0 16 8" className={cn('w-4 h-2 absolute -right-3 -top-2 pointer-events-none', inkClass)}>
-              <path d="M1 7Q8 1 15 7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-          )}
-        </div>
-
-        {/* Duration Underlines (Continuous Horizontal Beams across BeatGroup) */}
-        <div className="relative w-full h-[11px] flex flex-col justify-start gap-[2.5px] mt-[1px]">
-          {[1, 2, 3].map(level => {
-            if (note.underlines < level) return <div key={level} className="h-[1.5px]" />;
-            const connectLeft = prevUnderlines >= level;
-            const connectRight = nextUnderlines >= level;
-            return (
-              <div
-                key={level}
+            {/* Augmentation Dot(s) */}
+            {note.dots > 0 && (
+              <span
                 className={cn(
-                  'h-[1.5px] bg-current transition-none',
-                  isPlaying ? 'text-[#E05A2B]' : inkClass
+                  'inline-flex items-center',
+                  note.underlines === 0 ? 'ml-[8px] mr-[1px] gap-[4px]' : 'ml-[5px] gap-[3px]',
+                  inkClass
                 )}
-                style={{
-                  marginLeft: connectLeft ? '-5px' : '1px',
-                  marginRight: connectRight ? '-5px' : '1px'
-                }}
-              />
-            );
-          })}
+              >
+                {Array.from({ length: note.dots }).map((_, dIdx) => (
+                  <span key={dIdx} className="w-[4px] h-[4px] rounded-full bg-current inline-block" />
+                ))}
+              </span>
+            )}
+
+            {/* Tie Curve (~) */}
+            {note.tiedToNext && (
+              <svg viewBox="0 0 16 8" className={cn('w-4 h-2 absolute -right-3 -top-2 pointer-events-none', inkClass)}>
+                <path d="M1 7Q8 1 15 7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            )}
+          </div>
+
+          {/* Duration Underlines (Continuous Horizontal Beams across BeatGroup) */}
+          <div className="relative w-full h-[11px] flex flex-col justify-start gap-[2.5px] mt-[1px]">
+            {[1, 2, 3].map(level => {
+              if (note.underlines < level) return <div key={level} className="h-[1.5px]" />;
+              const connectLeft = prevUnderlines >= level;
+              const connectRight = nextUnderlines >= level;
+              return (
+                <div
+                  key={level}
+                  className={cn('h-[1.5px] bg-current transition-none', noteColorClass)}
+                  style={{
+                    marginLeft: connectLeft ? (hasPreGrace ? '-2px' : '-5px') : '1px',
+                    marginRight: connectRight ? (hasPostGrace ? '-2px' : '-5px') : '1px'
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Reserved vertical lane for Low Octave Dots */}
+          <div className="h-[11px] mt-[1px]" aria-hidden="true" />
+
+          {/* Dynamic Marking below the note (p, mp, mf, f, cresc, dim, rit, etc.) */}
+          {hasAnyDynamics && (
+            <div className="h-[15px] mt-[1px] flex items-center justify-center whitespace-nowrap select-none">
+              {note.markings.dynamic && (
+                <span className={cn('text-[11px] font-serif italic font-bold leading-none', isDarkSurface ? 'text-amber-300' : 'text-neutral-800')}>
+                  {note.markings.dynamic}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Aligned Lyric Syllable */}
+          {hasAnyLyrics && (
+            <div className={cn('h-[20px] mt-1 text-[13px] font-medium leading-tight whitespace-nowrap', isDarkSurface ? 'text-neutral-200' : 'text-neutral-800')}>
+              {note.lyric || ''}
+            </div>
+          )}
         </div>
 
-        {/* Reserved vertical lane for Low Octave Dots */}
-        <div className="h-[11px] mt-[1px]" aria-hidden="true" />
-
-        {/* Aligned Lyric Syllable */}
-        {hasAnyLyrics && (
-          <div className={cn('h-[20px] mt-1 text-[13px] font-medium leading-tight whitespace-nowrap', isDarkSurface ? 'text-neutral-200' : 'text-neutral-800')}>
-            {note.lyric || ''}
+        {/* Optional Right Post-Grace Note Slot (后倚音) */}
+        {hasPostGrace && note.postGraceNotes && (
+          <div className="flex flex-col items-start justify-end -ml-[1px]">
+            <div className="h-[24px] flex items-center -translate-y-[6px]">
+              <GraceNoteCluster notes={note.postGraceNotes} position="post" colorClass={noteColorClass} />
+            </div>
+            <div className="relative w-full h-[11px] flex flex-col justify-start gap-[2.5px] mt-[1px]">
+              {[1, 2, 3].map(level => {
+                const bridgeRight = note.underlines >= level && nextUnderlines >= level;
+                if (!bridgeRight) return <div key={level} className="h-[1.5px]" />;
+                return (
+                  <div
+                    key={level}
+                    className={cn('h-[1.5px] bg-current transition-none', noteColorClass)}
+                    style={{ marginLeft: '-1px', marginRight: '-5px' }}
+                  />
+                );
+              })}
+            </div>
+            <div className="h-[11px] mt-[1px]" aria-hidden="true" />
+            {hasAnyDynamics && <div className="h-[15px] mt-[1px]" aria-hidden="true" />}
+            {hasAnyLyrics && <div className="h-[20px] mt-1" aria-hidden="true" />}
           </div>
         )}
       </button>
@@ -625,7 +828,7 @@ function MusicLineView({
 
       {/* Measures Flex Row */}
       <div className="flex flex-wrap items-end gap-y-7 w-full">
-        {line.measures.map((measure: SimpErhuMeasure, mIdx: number) => {
+        {line.measures.map((measure: MusoJianpuMeasure, mIdx: number) => {
           const isLastInLine = mIdx === line.measures.length - 1;
           const measureWeight = getMeasureBeatWeight(measure);
           return (
@@ -637,9 +840,9 @@ function MusicLineView({
               {/* Measure Number subtle cue on first measure of each line */}
               {mIdx === 0 && (
                 <span
+                  style={{ bottom: `${measureNumberBottomOffset}px` }}
                   className={cn(
                     'absolute -left-5 text-[10px] font-mono tabular-nums opacity-40 select-none',
-                    hasAnyLyrics ? 'bottom-[55px]' : 'bottom-[31px]',
                     inkClass
                   )}
                 >
@@ -659,7 +862,7 @@ function MusicLineView({
 
               {/* Start Barline */}
               {measure.startBarline && (
-                <div className={cn('mr-2 shrink-0 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
+                <div className="mr-2 shrink-0 self-end" style={{ marginBottom: `${barlineBottomOffset}px` }}>
                   <BarlineGlyph type={measure.startBarline} inkClass={inkClass} />
                 </div>
               )}
@@ -694,7 +897,7 @@ function MusicLineView({
 
               {/* End Barline */}
               {(measure.endBarline || !isLastInLine) && (
-                <div className={cn('ml-2 shrink-0 self-end', hasAnyLyrics ? 'mb-[49px]' : 'mb-[25px]')}>
+                <div className="ml-2 shrink-0 self-end" style={{ marginBottom: `${barlineBottomOffset}px` }}>
                   <BarlineGlyph type={measure.endBarline || '|'} inkClass={inkClass} />
                 </div>
               )}
@@ -706,7 +909,7 @@ function MusicLineView({
   );
 }
 
-export function SimpErhuRenderer({
+export function MusoJianpuRenderer({
   document,
   zoom = 1,
   paperTheme = 'paper',
@@ -717,9 +920,8 @@ export function SimpErhuRenderer({
   highlightMarkings = true,
   activeNoteId,
   selectedOffset,
-  customFontFamily,
   onNoteClick
-}: SimpErhuRendererProps) {
+}: MusoJianpuRendererProps) {
   const isDarkSurface = paperTheme === 'adaptive';
   const keyInfo = getErhuKeyInfo(document.header.key);
   const stringsLabel = document.header.strings || keyInfo.strings;
@@ -728,7 +930,7 @@ export function SimpErhuRenderer({
 
   return (
     <div
-      className="simperhu-print-sheet w-full overflow-x-auto"
+      className="musojianpu-print-sheet w-full overflow-x-auto"
       style={{
         transform: zoom !== 1 ? `scale(${zoom})` : undefined,
         transformOrigin: 'top left',
@@ -871,7 +1073,6 @@ export function SimpErhuRenderer({
                   activeNoteId={activeNoteId}
                   selectedOffset={selectedOffset}
                   isDarkSurface={isDarkSurface}
-                  customFontFamily={customFontFamily}
                   onNoteClick={onNoteClick}
                 />
               );

@@ -11,14 +11,12 @@ import {
   Square,
   Printer,
   BookOpen,
-  Type,
   Columns2,
   Rows2,
   Eye,
   Wand2,
   SlidersHorizontal,
   ChevronDown,
-  Upload,
   Check,
   X,
   ArrowUp,
@@ -28,10 +26,11 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
-import { parseSimpErhuScore } from '../../lib/simperhu/parser.ts';
-import { simperhu } from '../../lib/simperhu/language.ts';
+import { parseMusoJianpuScore } from '../../lib/musojianpu/parser.ts';
+import { musoJianpu } from '../../lib/musojianpu/language.ts';
 import {
   macroAdjustUnderlines,
+  macroInsertGraceNote,
   macroInsertSnippet,
   macroSetKey,
   macroSetTempo,
@@ -44,18 +43,18 @@ import {
   macroToggleSlur,
   macroWrapTriplet,
   TextEditResult
-} from '../../lib/simperhu/macros.ts';
-import { ERHU_KEYS, getErhuKeyInfo } from '../../lib/simperhu/erhuKeys.ts';
-import { SIMPERHU_TEMPLATES } from '../../lib/simperhu/samples.ts';
-import { SimpErhuPlayer } from '../../lib/simperhu/audioEngine.ts';
-import { SimpErhuNote } from '../../lib/simperhu/types.ts';
-import { SimpErhuRenderer } from './SimpErhuRenderer.tsx';
+} from '../../lib/musojianpu/macros.ts';
+import { ERHU_KEYS, getErhuKeyInfo } from '../../lib/musojianpu/erhuKeys.ts';
+import { MUSOJIANPU_TEMPLATES } from '../../lib/musojianpu/samples.ts';
+import { MusoJianpuPlayer } from '../../lib/musojianpu/audioEngine.ts';
+import { MusoJianpuNote } from '../../lib/musojianpu/types.ts';
+import { MusoJianpuRenderer } from './MusoJianpuRenderer.tsx';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 
 type MacroTab = 'rhythm' | 'bowing' | 'fingering' | 'ornaments' | 'structure';
 
-export interface SimpErhuWorkbenchProps {
+export interface MusoJianpuWorkbenchProps {
   content: string;
   zoom: number;
   showEditor: boolean;
@@ -70,7 +69,7 @@ export interface SimpErhuWorkbenchProps {
   onPaperThemeChange: (theme: 'paper' | 'adaptive') => void;
 }
 
-export function SimpErhuWorkbench({
+export function MusoJianpuWorkbench({
   content,
   zoom,
   showEditor,
@@ -83,13 +82,12 @@ export function SimpErhuWorkbench({
   onLayoutChange,
   onFingeringStyleChange,
   onPaperThemeChange
-}: SimpErhuWorkbenchProps) {
+}: MusoJianpuWorkbenchProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
   const editorRef = useRef<ReactCodeMirrorRef>(null);
-  const playerRef = useRef<SimpErhuPlayer | null>(null);
-  const fontInputRef = useRef<HTMLInputElement>(null);
+  const playerRef = useRef<MusoJianpuPlayer | null>(null);
   const sheetPaneRef = useRef<HTMLDivElement>(null);
 
   const [activeMacroTab, setActiveMacroTab] = useState<MacroTab>('bowing');
@@ -111,24 +109,21 @@ export function SimpErhuWorkbench({
   const [tempoInputBpm, setTempoInputBpm] = useState('80');
   const [tempoInputExpr, setTempoInputExpr] = useState('');
 
-  // Custom SimpErhuFont.ttf state
-  const [customFontFamily, setCustomFontFamily] = useState<string | null>(null);
-  const [customFontName, setCustomFontName] = useState<string | null>(null);
-  const [useCustomFont, setUseCustomFont] = useState(false);
-  const [fontStatusMsg, setFontStatusMsg] = useState<string | null>(null);
+  // Status notice toast (e.g. print fallback notice)
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   // Template selector menu
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
   const [templateMenuAlign, setTemplateMenuAlign] = useState<'left' | 'right'>('left');
   const templateMenuRef = useRef<HTMLDivElement>(null);
 
-  // Parse the SimpErhu text score into AST
-  const parsedDoc = useMemo(() => parseSimpErhuScore(content), [content]);
+  // Parse the MusoJianpu text score into AST
+  const parsedDoc = useMemo(() => parseMusoJianpuScore(content), [content]);
   const keyInfo = useMemo(() => getErhuKeyInfo(parsedDoc.header.key), [parsedDoc.header.key]);
 
   // Cleanup player on unmount
   useEffect(() => {
-    playerRef.current = new SimpErhuPlayer();
+    playerRef.current = new MusoJianpuPlayer();
     return () => {
       playerRef.current?.dispose();
       playerRef.current = null;
@@ -143,18 +138,6 @@ export function SimpErhuWorkbench({
       setActiveNoteId(null);
     }
   }, [content]);
-
-  // Check if SimpErhuFont is already installed locally on the system
-  useEffect(() => {
-    try {
-      if (document.fonts && document.fonts.check('16px "SimpErhuFont"')) {
-        setCustomFontFamily('SimpErhuFont');
-        setCustomFontName('System SimpErhuFont');
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
 
   // Close template popover on click outside
   useEffect(() => {
@@ -211,8 +194,8 @@ export function SimpErhuWorkbench({
     setIsTempoModalOpen(false);
   };
 
-  // CodeMirror Keymap porting SimpErhu Word VBA shortcuts
-  const simperhuKeymap = useMemo(() => {
+  // CodeMirror Keymap for MusoJianpu shortcuts
+  const musoJianpuKeymap = useMemo(() => {
     const wrapMacro = (fn: (text: string, from: number, to: number) => TextEditResult | null) => {
       return (view: any) => {
         const docText = view.state.doc.toString();
@@ -260,7 +243,7 @@ export function SimpErhuWorkbench({
 
   // Handle clicking a note on the engraved sheet -> select & focus in CodeMirror!
   const handleNoteClick = useCallback(
-    (note: SimpErhuNote) => {
+    (note: MusoJianpuNote) => {
       setCursorOffset(note.startOffset);
       if (layout === 'sheet') {
         onLayoutChange('split');
@@ -303,33 +286,9 @@ export function SimpErhuWorkbench({
     });
   };
 
-  // Load user-provided SimpErhuFont.ttf (or .otf/.woff2) via FontFace API
-  const handleFontFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const buffer = await file.arrayBuffer();
-      const familyName = 'SimpErhuUserFont';
-      const face = new FontFace(familyName, buffer);
-      await face.load();
-      document.fonts.add(face);
-      setCustomFontFamily(familyName);
-      setCustomFontName(file.name);
-      setUseCustomFont(true);
-      setFontStatusMsg(`Loaded ${file.name}`);
-      setTimeout(() => setFontStatusMsg(null), 4000);
-    } catch (err) {
-      console.error('Failed to load custom font:', err);
-      setFontStatusMsg('Invalid font file (expected .ttf, .otf, or .woff2)');
-      setTimeout(() => setFontStatusMsg(null), 4000);
-    } finally {
-      e.target.value = '';
-    }
-  };
-
   // Export a self-contained print-ready HTML sheet (used as fallback when sandboxed iframe blocks window.print())
   const downloadPrintableHtml = useCallback(() => {
-    const sheetEl = sheetPaneRef.current?.querySelector('.simperhu-print-sheet');
+    const sheetEl = sheetPaneRef.current?.querySelector('.musojianpu-print-sheet');
     if (!sheetEl) return;
 
     const clone = sheetEl.cloneNode(true) as HTMLElement;
@@ -364,7 +323,7 @@ export function SimpErhuWorkbench({
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapedTitle} - SimpErhu Sheet Music</title>
+  <title>${escapedTitle} - MusoJianpu Sheet Music</title>
   <style>
 ${collectedCss}
     body {
@@ -398,20 +357,20 @@ ${collectedCss}
     .standalone-print-btn:hover {
       background: #E05A2B;
     }
-    .simperhu-print-sheet > div {
+    .musojianpu-print-sheet > div {
       background: #FFFEFA !important;
       color: #161616 !important;
       border-color: #e5e5e5 !important;
     }
-    .simperhu-print-sheet [class*="text-neutral-100"],
-    .simperhu-print-sheet [class*="text-white"] {
+    .musojianpu-print-sheet [class*="text-neutral-100"],
+    .musojianpu-print-sheet [class*="text-white"] {
       color: #161616 !important;
     }
-    .simperhu-print-sheet [class*="text-neutral-200"],
-    .simperhu-print-sheet [class*="text-neutral-300"] {
+    .musojianpu-print-sheet [class*="text-neutral-200"],
+    .musojianpu-print-sheet [class*="text-neutral-300"] {
       color: #262626 !important;
     }
-    .simperhu-print-sheet svg path[stroke="#E5E7EB"] {
+    .musojianpu-print-sheet svg path[stroke="#E5E7EB"] {
       stroke: #1A1A1A !important;
     }
     @media print {
@@ -422,7 +381,7 @@ ${collectedCss}
 </head>
 <body>
   <div class="standalone-print-bar">
-    <span><strong>${escapedTitle}</strong> — Print-ready SimpErhu Jianpu Sheet</span>
+    <span><strong>${escapedTitle}</strong> — Print-ready MusoJianpu Sheet</span>
     <button class="standalone-print-btn" onclick="window.print()">Print / Save as PDF</button>
   </div>
   ${clone.outerHTML}
@@ -458,8 +417,8 @@ ${collectedCss}
       window.removeEventListener('beforeprint', onBeforePrint);
       if (!beforePrintFired) {
         downloadPrintableHtml();
-        setFontStatusMsg('Preview iframe blocks the browser print dialog — downloaded a print-ready HTML sheet you can open & print directly.');
-        setTimeout(() => setFontStatusMsg(null), 7000);
+        setStatusMsg('Preview iframe blocks the browser print dialog — downloaded a print-ready HTML sheet you can open & print directly.');
+        setTimeout(() => setStatusMsg(null), 7000);
       }
     }, 250);
   }, [downloadPrintableHtml]);
@@ -476,16 +435,7 @@ ${collectedCss}
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-[1440px] mx-auto">
-      {/* Hidden Font Upload Input */}
-      <input
-        ref={fontInputRef}
-        type="file"
-        accept=".ttf,.otf,.woff,.woff2"
-        className="hidden"
-        onChange={handleFontFileUpload}
-      />
-
-      {/* Primary SimpErhu Studio Control Strip (Non-printing) */}
+      {/* Primary MusoJianpu Studio Control Strip (Non-printing) */}
       <div className={cn(
         'no-print rounded-xl border px-3 py-2 flex flex-wrap items-center justify-between gap-3 transition-colors',
         isDark
@@ -554,7 +504,7 @@ ${collectedCss}
             </select>
 
             {/* Diatonic Scale Degree Shift Macros */}
-            <div className="flex items-center gap-0.5" title="Shift all Jianpu notes by scale degree (SimpErhu Transpose Macro)">
+            <div className="flex items-center gap-0.5" title="Shift all Jianpu notes by scale degree">
               <button
                 type="button"
                 onClick={() => onChangeContent(macroShiftScaleDegrees(content, -1))}
@@ -589,7 +539,7 @@ ${collectedCss}
           </div>
         </div>
 
-        {/* Right: Templates, Font Loader, Display Options, Layout Switcher, Print */}
+        {/* Right: Templates, Display Options, Layout Switcher, Print */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Repertoire Template Picker */}
           <div className="relative" ref={templateMenuRef}>
@@ -609,7 +559,7 @@ ${collectedCss}
                 });
               }}
               className={macroBtnClass}
-              title="Load an Erhu Jianpu template"
+              title="Load a MusoJianpu template"
             >
               <span>Templates</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
@@ -622,9 +572,9 @@ ${collectedCss}
                 isDark ? 'bg-[#181A1F] border-white/[0.12] text-neutral-200' : 'bg-white border-neutral-200 text-neutral-800'
               )}>
                 <div className="px-2 py-1 text-[11px] font-semibold text-neutral-400">
-                  Erhu Repertoire & Templates
+                  MusoJianpu Repertoire & Templates
                 </div>
-                {SIMPERHU_TEMPLATES.map(tpl => (
+                {MUSOJIANPU_TEMPLATES.map(tpl => (
                   <button
                     key={tpl.id}
                     type="button"
@@ -650,34 +600,6 @@ ${collectedCss}
               </div>
             )}
           </div>
-
-          {/* SimpErhuFont.ttf Loader / Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              if (customFontFamily) {
-                setUseCustomFont(prev => !prev);
-              } else {
-                fontInputRef.current?.click();
-              }
-            }}
-            onContextMenu={e => {
-              e.preventDefault();
-              fontInputRef.current?.click();
-            }}
-            className={cn(
-              macroBtnClass,
-              useCustomFont && customFontFamily && 'border-[#E05A2B]/50 text-[#E05A2B] bg-[#E05A2B]/10'
-            )}
-            title={
-              customFontFamily
-                ? `Toggle ${customFontName || 'SimpErhuFont'} (Right-click to load another .ttf)`
-                : 'Load local SimpErhuFont.ttf from simperhu.weebly.com'
-            }
-          >
-            {customFontFamily ? <Type className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
-            <span>{customFontFamily ? (useCustomFont ? 'SimpErhuFont On' : 'Vector Font') : 'Load .ttf'}</span>
-          </button>
 
           {/* Fingering Numerals Toggle (Chinese 一二三四 vs Arabic 1234) */}
           <button
@@ -758,7 +680,7 @@ ${collectedCss}
             type="button"
             onClick={() => setShowGuide(prev => !prev)}
             className={cn(macroBtnClass, showGuide && 'border-[#E05A2B]/50 text-[#E05A2B] bg-[#E05A2B]/10')}
-            title="Show SimpErhu syntax & keyboard shortcut reference"
+            title="Show MusoJianpu syntax & keyboard shortcut reference"
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Guide</span>
@@ -769,7 +691,7 @@ ${collectedCss}
             type="button"
             onClick={handlePrintSheet}
             className={macroBtnClass}
-            title="Print clean Jianpu sheet music (downloads print-ready HTML if blocked in embedded preview)"
+            title="Print clean MusoJianpu sheet music (downloads print-ready HTML if blocked in embedded preview)"
           >
             <Printer className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Print</span>
@@ -777,17 +699,17 @@ ${collectedCss}
         </div>
       </div>
 
-      {/* Subtle Toast for Font Loading */}
-      {fontStatusMsg && (
+      {/* Subtle Toast for Status Messages */}
+      {statusMsg && (
         <div className={cn(
           'no-print px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center justify-between',
           isDark ? 'bg-white/[0.06] border-white/10 text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-700'
         )}>
           <div className="flex items-center gap-2">
             <Check className="w-3.5 h-3.5 text-emerald-500" />
-            <span>{fontStatusMsg}</span>
+            <span>{statusMsg}</span>
           </div>
-          <button type="button" onClick={() => setFontStatusMsg(null)} className="cursor-pointer opacity-60 hover:opacity-100">
+          <button type="button" onClick={() => setStatusMsg(null)} className="cursor-pointer opacity-60 hover:opacity-100">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -801,7 +723,7 @@ ${collectedCss}
         )}>
           <div className="flex items-center justify-between mb-3">
             <div className="font-semibold text-sm text-neutral-900 dark:text-white">
-              SimpErhu Text Notation & Macro Shortcuts
+              MusoJianpu Text Notation & Macro Shortcuts
             </div>
             <button
               type="button"
@@ -817,7 +739,7 @@ ${collectedCss}
               <div><code className="font-mono text-[#E05A2B]">1–7</code> scale degrees · <code className="font-mono text-[#E05A2B]">0</code> rest · <code className="font-mono text-[#E05A2B]">-</code> prolong</div>
               <div><code className="font-mono text-[#E05A2B]">' / ''</code> high octave · <code className="font-mono text-[#E05A2B]">, / ,,</code> low octave (<kbd className="font-mono">Alt+↑/↓</kbd>)</div>
               <div><code className="font-mono text-[#E05A2B]">5/6/</code> or <code className="font-mono text-[#E05A2B]">5_6_</code> 8ths · <code className="font-mono text-[#E05A2B]">//</code> 16ths · <code className="font-mono text-[#E05A2B]">///</code> 32nds (<kbd className="font-mono">Alt+-/=</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">(3/5/ 6/1'/)</code> slur/legato bow (<kbd className="font-mono">Alt+S</kbd>) · <code className="font-mono text-[#E05A2B]">^5/</code> grace note</div>
+              <div><code className="font-mono text-[#E05A2B]">(3/5/ 6/1'/)</code> slur/legato bow (<kbd className="font-mono">Alt+S</kbd>) · <code className="font-mono text-[#E05A2B]">^5/</code> or <code className="font-mono text-[#E05A2B]">{'^{5/6/}'}</code> grace note</div>
             </div>
             <div className="space-y-1">
               <div className="font-semibold text-neutral-900 dark:text-neutral-100">Erhu Bowing, Fingers & Strings</div>
@@ -827,11 +749,11 @@ ${collectedCss}
               <div><code className="font-mono text-[#E05A2B]">{'{in}'}</code> / <code className="font-mono text-[#E05A2B]">{'{out}'}</code> Inner/Outer string (<kbd className="font-mono">Alt+I / O</kbd>)</div>
             </div>
             <div className="space-y-1">
-              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Ornaments, Lyrics & SimpErhuFont</div>
+              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Ornaments, Lyrics & Shortcuts</div>
               <div><code className="font-mono text-[#E05A2B]">{'{su}'}</code> / <code className="font-mono text-[#E05A2B]">{'{sd}'}</code> Slides (<kbd className="font-mono">Alt+U/D</kbd>) · <code className="font-mono text-[#E05A2B]">{'{vib}'}</code> Vibrato (<kbd className="font-mono">Alt+V</kbd>)</div>
               <div><code className="font-mono text-[#E05A2B]">S:</code> section · <code className="font-mono text-[#E05A2B]">L:</code> aligned lyrics · <code className="font-mono text-[#E05A2B]">T:</code> note</div>
-              <div>Press <kbd className="font-mono">Ctrl/Cmd+J</kbd> to set BPM & expression (ported from SimpErhu Word macro).</div>
-              <div>Have <code className="font-mono">SimpErhuFont.ttf</code>? Click <strong>Load .ttf</strong> above to render with it directly.</div>
+              <div>Press <kbd className="font-mono">Ctrl/Cmd+J</kbd> to set BPM & expression markings.</div>
+              <div>Click any note on the rendered sheet to jump straight to it in the editor.</div>
             </div>
           </div>
         </div>
@@ -844,7 +766,7 @@ ${collectedCss}
           effectiveLayout === 'split' ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'
         )}
       >
-        {/* Editor + SimpErhu Macro Ribbon Pane */}
+        {/* Editor + MusoJianpu Macro Ribbon Pane */}
         {showEditorPane && (
           <div
             className={cn(
@@ -853,7 +775,7 @@ ${collectedCss}
               isDark ? 'bg-[#17191E] border-white/[0.08]' : 'bg-white border-neutral-200'
             )}
           >
-            {/* SimpErhu Macro Ribbon Header Tabs */}
+            {/* MusoJianpu Macro Ribbon Header Tabs */}
             <div className={cn(
               'flex items-center justify-between gap-2 px-3 py-2 border-b overflow-x-auto no-scrollbar',
               isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-neutral-200 bg-neutral-50/80'
@@ -935,6 +857,9 @@ ${collectedCss}
                   </button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'shift+'))} className={macroBtnClass} title="Shift Position Up 上换把">↑ 上换把</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'shift-'))} className={macroBtnClass} title="Shift Position Down 下换把">↓ 下换把</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, '一把'))} className={macroBtnClass} title="1st Position 一把">一把</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, '二把'))} className={macroBtnClass} title="2nd Position 二把">二把</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, '三把'))} className={macroBtnClass} title="3rd Position 三把">三把</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'harm'))} className={macroBtnClass} title="Natural Harmonic 自然泛音">○ 泛音</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'aharm'))} className={macroBtnClass} title="Artificial Harmonic 人工泛音">◇ 人工泛</button>
                 </>
@@ -951,7 +876,7 @@ ${collectedCss}
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'da'))} className={macroBtnClass} title="Mordent 打音">打 打音</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'accent'))} className={macroBtnClass} title="Accent 重音">&gt; 重音</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'fermata'))} className={macroBtnClass} title="Fermata 延长">𝄐 延长</button>
-                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '^5_'))} className={macroBtnClass} title="Insert Grace Note 倚音">^5_ 倚音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertGraceNote(t, f, e, '5'))} className={macroBtnClass} title="Add Grace Note 倚音 before selected note (^5/ or ^{5/6/})">^5/ 倚音</button>
                 </>
               )}
 
@@ -1019,7 +944,7 @@ ${collectedCss}
                 value={content}
                 height={effectiveLayout === 'split' ? '560px' : '260px'}
                 theme={isDark ? vscodeDark : 'light'}
-                extensions={[simperhu(), simperhuKeymap]}
+                extensions={[musoJianpu(), musoJianpuKeymap]}
                 onChange={val => onChangeContent(val)}
                 onUpdate={update => {
                   if (update.selectionSet) {
@@ -1075,9 +1000,9 @@ ${collectedCss}
           </div>
         )}
 
-        {/* Live Engraved Jianpu / SimpErhu Sheet Pane */}
+        {/* Live Engraved MusoJianpu Sheet Pane */}
         <div ref={sheetPaneRef} className={cn(effectiveLayout === 'split' ? 'lg:col-span-7 min-w-0' : 'w-full min-w-0')}>
-          <SimpErhuRenderer
+          <MusoJianpuRenderer
             document={parsedDoc}
             zoom={zoom}
             paperTheme={paperTheme}
@@ -1088,13 +1013,12 @@ ${collectedCss}
             highlightMarkings={highlightMarkings}
             activeNoteId={activeNoteId}
             selectedOffset={cursorOffset}
-            customFontFamily={useCustomFont ? customFontFamily : null}
             onNoteClick={handleNoteClick}
           />
         </div>
       </div>
 
-      {/* Ctrl+J Tempo & Expression Macro Modal (Direct Port of SimpErhu Word Ctrl+J Macro) */}
+      {/* Ctrl+J Tempo & Expression Macro Modal */}
       {isTempoModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
