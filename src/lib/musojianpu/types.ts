@@ -35,6 +35,8 @@ export type DynamicType =
   | 'ppp' | 'pp' | 'p' | 'mp' | 'mf' | 'f' | 'ff' | 'fff'
   | 'sfz' | 'cresc' | 'dim' | 'rit' | 'accel' | 'atempo';
 
+export type HairpinType = 'cresc' | 'dim';
+
 export interface ErhuMarkings {
   bowing?: BowingType;
   finger?: '0' | '1' | '2' | '3' | '4';
@@ -76,6 +78,11 @@ export interface MusoJianpuNote {
   slurStart?: boolean;
   slurEnd?: boolean;
   slurId?: number;
+  /** Crescendo / Diminuendo hairpin passage span (<(...) / >(...)) */
+  hairpinId?: number;
+  hairpinType?: HairpinType;
+  hairpinStart?: boolean;
+  hairpinEnd?: boolean;
   /** Tuplet metadata (e.g. 3 for triplet) */
   tupletStart?: number;
   tupletEnd?: boolean;
@@ -95,12 +102,28 @@ export interface BeatGroup {
 
 export type BarlineType = '|' | '||' | '|]' | '|:' | ':|' | ':||:';
 
+export type NavMarkerType =
+  | 'segno'
+  | 'coda'
+  | 'toCoda'
+  | 'fine'
+  | 'dc'
+  | 'dcAlFine'
+  | 'dcAlCoda'
+  | 'ds'
+  | 'dsAlFine'
+  | 'dsAlCoda'
+  | 'segue'
+  | 'attacca';
+
 export interface MusoJianpuMeasure {
   id: string;
   measureNumber: number;
   startBarline?: BarlineType;
   endBarline?: BarlineType;
-  volta?: string; // e.g. "1." or "2."
+  volta?: string; // e.g. "1.", "2.", "1,2."
+  startMarkers?: NavMarkerType[]; // e.g. Segno, Coda at start of bar
+  endMarkers?: NavMarkerType[];   // e.g. Fine, To Coda, D.C., D.S., Segue at end of bar
   groups: BeatGroup[];
   startOffset: number;
   endOffset: number;

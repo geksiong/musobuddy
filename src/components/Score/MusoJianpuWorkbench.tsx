@@ -41,6 +41,7 @@ import {
   macroToggleDot,
   macroToggleMarking,
   macroToggleSlur,
+  macroWrapHairpin,
   macroWrapTriplet,
   TextEditResult
 } from '../../lib/musojianpu/macros.ts';
@@ -749,11 +750,11 @@ ${collectedCss}
               <div><code className="font-mono text-[#E05A2B]">{'{in}'}</code> / <code className="font-mono text-[#E05A2B]">{'{out}'}</code> Inner/Outer string (<kbd className="font-mono">Alt+I / O</kbd>)</div>
             </div>
             <div className="space-y-1">
-              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Ornaments, Lyrics & Shortcuts</div>
+              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Ornaments, Repeats &amp; Navigation</div>
               <div><code className="font-mono text-[#E05A2B]">{'{su}'}</code> / <code className="font-mono text-[#E05A2B]">{'{sd}'}</code> Slides (<kbd className="font-mono">Alt+U/D</kbd>) · <code className="font-mono text-[#E05A2B]">{'{vib}'}</code> Vibrato (<kbd className="font-mono">Alt+V</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">S:</code> section · <code className="font-mono text-[#E05A2B]">L:</code> aligned lyrics · <code className="font-mono text-[#E05A2B]">T:</code> note</div>
-              <div>Press <kbd className="font-mono">Ctrl/Cmd+J</kbd> to set BPM & expression markings.</div>
-              <div>Click any note on the rendered sheet to jump straight to it in the editor.</div>
+              <div><code className="font-mono text-[#E05A2B]">&lt;( ... )</code> Crescendo · <code className="font-mono text-[#E05A2B]">&gt;( ... )</code> Diminuendo hairpin passages</div>
+              <div><code className="font-mono text-[#E05A2B]">|: ... :|</code> repeats · <code className="font-mono text-[#E05A2B]">[1.</code> <code className="font-mono text-[#E05A2B]">[2.</code> endings · <code className="font-mono text-[#E05A2B]">[segno]</code> <code className="font-mono text-[#E05A2B]">[coda]</code> <code className="font-mono text-[#E05A2B]">[to coda]</code> <code className="font-mono text-[#E05A2B]">[fine]</code> <code className="font-mono text-[#E05A2B]">[dc al fine]</code> <code className="font-mono text-[#E05A2B]">[ds al coda]</code> <code className="font-mono text-[#E05A2B]">[segue]</code></div>
+              <div><code className="font-mono text-[#E05A2B]">S:</code> section · <code className="font-mono text-[#E05A2B]">L:</code> aligned lyrics · <code className="font-mono text-[#E05A2B]">T:</code> note · <kbd className="font-mono">Ctrl/Cmd+J</kbd> BPM</div>
             </div>
           </div>
         </div>
@@ -913,14 +914,46 @@ ${collectedCss}
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' | '))} className={macroBtnClass}>| Bar</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' || '))} className={macroBtnClass}>|| Double</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' |]'))} className={macroBtnClass}>|] End</button>
-                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' |: '))} className={macroBtnClass}>|: Repeat</button>
-                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' :| '))} className={macroBtnClass}>:| End Rep</button>
-                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '[1. '))} className={macroBtnClass}>[1.</button>
-                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '[2. '))} className={macroBtnClass}>[2.</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' |: '))} className={macroBtnClass} title="Start Repeat Barline">|: Repeat</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' :| '))} className={macroBtnClass} title="End Repeat Barline">:| End Rep</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' :||: '))} className={macroBtnClass} title="Double Repeat Barline (End & Start Repeat)">:||: Both</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '[1. '))} className={macroBtnClass} title="1st Ending Volta Bracket">[1.</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '[2. '))} className={macroBtnClass} title="2nd Ending Volta Bracket">[2.</button>
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '[segno] '))} className={macroBtnClass} title="Insert Segno target marker [segno]">
+                    <span className="font-bold text-[#E05A2B]">S</span> Segno
+                  </button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '[coda] '))} className={macroBtnClass} title="Insert Coda section marker [coda]">
+                    <span className="font-bold text-[#E05A2B]">⊕</span> Coda
+                  </button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' [to coda]'))} className={macroBtnClass} title="Jump to Coda on D.C./D.S. pass [to coda]">To Coda</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' [fine]'))} className={macroBtnClass} title="End of piece on D.C./D.S. pass [fine]">Fine</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' [dc al fine]'))} className={macroBtnClass} title="Return to beginning and stop at Fine [dc al fine]">D.C. al Fine</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' [ds al coda]'))} className={macroBtnClass} title="Return to Segno, then jump at To Coda [ds al coda]">D.S. al Coda</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' [segue]'))} className={macroBtnClass} title="Continue directly into next section [segue]">Segue</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, ' [attacca]'))} className={macroBtnClass} title="Proceed without pause [attacca]">Attacca</button>
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '\nS: 新段落\n| '))} className={macroBtnClass}>S: Section</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '\nL: '))} className={macroBtnClass}>L: Lyrics</button>
                   <button type="button" onClick={openTempoMacroDialog} className={macroBtnClass} title="Set BPM & Expression (Ctrl/Cmd+J)">
                     <SlidersHorizontal className="w-3 h-3 text-[#E05A2B]" /> BPM (Ctrl+J)
+                  </button>
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+                  <button
+                    type="button"
+                    onClick={() => runEditorMacro((t, f, e) => macroWrapHairpin(t, f, e, 'cresc'))}
+                    className={macroBtnClass}
+                    title="Wrap selected passage in a Crescendo hairpin <( ... )"
+                  >
+                    <span className="font-mono font-bold text-[#E05A2B]">&lt;( )</span> 渐强
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runEditorMacro((t, f, e) => macroWrapHairpin(t, f, e, 'dim'))}
+                    className={macroBtnClass}
+                    title="Wrap selected passage in a Diminuendo hairpin >( ... )"
+                  >
+                    <span className="font-mono font-bold text-[#E05A2B]">&gt;( )</span> 渐弱
                   </button>
                   <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
                   {(['p', 'mp', 'mf', 'f', 'ff', 'cresc', 'dim', 'rit'] as const).map(dyn => (

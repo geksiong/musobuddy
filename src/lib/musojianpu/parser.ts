@@ -11,7 +11,9 @@ import {
   DynamicType,
   ErhuMarkings,
   GraceNote,
+  HairpinType,
   MusicLineNode,
+  NavMarkerType,
   OrnamentType,
   MusoJianpuDocument,
   MusoJianpuHeader,
@@ -75,6 +77,68 @@ const DYNAMIC_ALIASES: Record<string, DynamicType> = {
   sfz: 'sfz', cresc: 'cresc', dim: 'dim', rit: 'rit', accel: 'accel', atempo: 'atempo',
   '渐强': 'cresc', '渐弱': 'dim', '渐慢': 'rit', '渐快': 'accel', '原速': 'atempo'
 };
+
+const START_NAV_MARKERS = new Set<NavMarkerType>(['segno', 'coda']);
+
+function parseNavMarkerTag(rawInner: string): NavMarkerType | null {
+  const normalized = rawInner.trim().toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ');
+  switch (normalized) {
+    case 'segno':
+    case 's':
+    case '$':
+    case '记号':
+    case '反复记号':
+      return 'segno';
+    case 'coda':
+    case 'o':
+    case '⊕':
+    case '尾声':
+    case '结束句':
+      return 'coda';
+    case 'to coda':
+    case 'tocoda':
+    case '进尾声':
+    case '至尾声':
+      return 'toCoda';
+    case 'fine':
+    case 'end':
+    case '结束':
+    case '曲终':
+      return 'fine';
+    case 'dc':
+    case 'da capo':
+    case '从头反复':
+      return 'dc';
+    case 'dc al fine':
+    case 'da capo al fine':
+    case '从头反复至结束':
+      return 'dcAlFine';
+    case 'dc al coda':
+    case 'da capo al coda':
+    case '从头反复进尾声':
+      return 'dcAlCoda';
+    case 'ds':
+    case 'dal segno':
+    case '从记号反复':
+      return 'ds';
+    case 'ds al fine':
+    case 'dal segno al fine':
+    case '从记号反复至结束':
+      return 'dsAlFine';
+    case 'ds al coda':
+    case 'dal segno al coda':
+    case '从记号反复进尾声':
+      return 'dsAlCoda';
+    case 'segue':
+    case '紧接':
+      return 'segue';
+    case 'attacca':
+    case '紧接下段':
+      return 'attacca';
+    default:
+      return null;
+  }
+}
 
 function parseMarkingsBlock(raw: string, target: ErhuMarkings) {
   const parts = raw.split(/[,，;\s]+/).map(s => s.trim()).filter(Boolean);
@@ -174,6 +238,7 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
   let totalMeasures = 0;
   let totalNotes = 0;
   let nextSlurId = 1;
+  let nextHairpinId = 1;
 
   // Compute exact line start offsets for bidirectional editor-sheet sync
   const rawLines = safeText.split(/\r?\n/);
@@ -289,6 +354,8 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
     let currentMeasure: MusoJianpuMeasure | null = null;
     let currentGroup: BeatGroup | null = null;
 
+    const parenStack: ('slur' | 'tuplet' | 'hairpin')[] = [];
+
     let inSlur = false;
     let activeSlurId: number | undefined = undefined;
     let pendingSlurStart = false;
@@ -298,10 +365,24 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
     let inTuplet = false;
     let lastNoteInTuplet: MusoJianpuNote | null = null;
 
+    let inHairpin = false;
+    let activeHairpinId: number | undefined = undefined;
+    let activeHairpinType: HairpinType | undefined = undefined;
+    let pendingHairpinStart = false;
+    let lastNoteInHairpin: MusoJianpuNote | null = null;
+
     let pendingGraceNotes: GraceNote[] = [];
     let pendingMarkings: ErhuMarkings | null = null;
     let lastPitchedNote: MusoJianpuNote | null = null;
     let pendingVolta: string | undefined = undefined;
+    let pendingStartMarkers: NavMarkerType[] = [];
+    let lastCompletedMeasure: MusoJianpuMeasure | null = null;
+
+    const addMarkerUnique = (list: NavMarkerType[] | undefined, marker: NavMarkerType): NavMarkerType[] => {
+      const next = list ? [...list] : [];
+      if (!next.includes(marker)) next.push(marker);
+      return next;
+    };
 
     const ensureMeasure = (offset: number, startBar?: BarlineType) => {
       if (!currentMeasure) {
@@ -311,16 +392,26 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
           measureNumber: totalMeasures,
           startBarline: startBar,
           volta: pendingVolta,
+          startMarkers: pendingStartMarkers.length > 0 ? [...pendingStartMarkers] : undefined,
           groups: [],
           startOffset: offset,
           endOffset: offset,
           lineNumber
         };
         pendingVolta = undefined;
+        pendingStartMarkers = [];
         measures.push(currentMeasure);
-      } else if (pendingVolta && !currentMeasure.volta) {
-        currentMeasure.volta = pendingVolta;
-        pendingVolta = undefined;
+      } else {
+        if (pendingVolta && !currentMeasure.volta) {
+          currentMeasure.volta = pendingVolta;
+          pendingVolta = undefined;
+        }
+        if (pendingStartMarkers.length > 0 && currentMeasure.groups.length === 0) {
+          for (const mk of pendingStartMarkers) {
+            currentMeasure.startMarkers = addMarkerUnique(currentMeasure.startMarkers, mk);
+          }
+          pendingStartMarkers = [];
+        }
       }
     };
 
@@ -375,6 +466,7 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
           // Closes current measure
           currentMeasure.endBarline = barStr;
           currentMeasure.endOffset = lineStart + i + step;
+          lastCompletedMeasure = currentMeasure;
           currentMeasure = null;
           // If :||:, next measure also begins with |:
           if (barStr === ':||:') {
@@ -389,15 +481,73 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
         continue;
       }
 
-      // Volta bracket: [1. or [2.
-      const voltaMatch = rawLine.slice(i).match(/^\[(\d+\.)/);
-      if (voltaMatch) {
-        pendingVolta = voltaMatch[1];
-        if (currentMeasure && currentMeasure.groups.length === 0) {
-          currentMeasure.volta = pendingVolta;
-          pendingVolta = undefined;
+      // Navigation markers ([segno], [coda], [to coda], [fine], [dc al fine], [ds al coda], [segue], [attacca])
+      // and Volta brackets ([1., [2., [1.], [1,2.], [1-2.])
+      if (ch === '[') {
+        const bracketMatch = rawLine.slice(i).match(/^\[([^\]]+)\]/);
+        if (bracketMatch) {
+          const inner = bracketMatch[1].trim();
+          const navMarker = parseNavMarkerTag(inner);
+          if (navMarker) {
+            if (START_NAV_MARKERS.has(navMarker)) {
+              if (currentMeasure && currentMeasure.groups.length === 0) {
+                currentMeasure.startMarkers = addMarkerUnique(currentMeasure.startMarkers, navMarker);
+              } else {
+                if (!pendingStartMarkers.includes(navMarker)) pendingStartMarkers.push(navMarker);
+              }
+            } else {
+              // End-of-measure marker: attach to current measure if it has notes, else to the just-closed measure
+              if (currentMeasure && currentMeasure.groups.length > 0) {
+                currentMeasure.endMarkers = addMarkerUnique(currentMeasure.endMarkers, navMarker);
+              } else if (lastCompletedMeasure) {
+                lastCompletedMeasure.endMarkers = addMarkerUnique(lastCompletedMeasure.endMarkers, navMarker);
+              } else {
+                // Fallback if placed at the start of a single-bar fragment
+                ensureMeasure(lineStart + i);
+                currentMeasure!.endMarkers = addMarkerUnique(currentMeasure!.endMarkers, navMarker);
+              }
+            }
+            i += bracketMatch[0].length;
+            continue;
+          }
+
+          // Closed volta bracket e.g. [1.] or [1,2.] or [1-3.]
+          if (/^\d+(?:[,\-]\d+)*\.?$/.test(inner)) {
+            const formatted = inner.endsWith('.') ? inner : `${inner}.`;
+            pendingVolta = formatted;
+            if (currentMeasure && currentMeasure.groups.length === 0) {
+              currentMeasure.volta = pendingVolta;
+              pendingVolta = undefined;
+            }
+            i += bracketMatch[0].length;
+            continue;
+          }
         }
-        i += voltaMatch[0].length;
+
+        // Open volta bracket syntax: [1. or [2. or [1,2. (without closing ])
+        const openVoltaMatch = rawLine.slice(i).match(/^\[(\d+(?:[,\-]\d+)*\.)/);
+        if (openVoltaMatch) {
+          pendingVolta = openVoltaMatch[1];
+          if (currentMeasure && currentMeasure.groups.length === 0) {
+            currentMeasure.volta = pendingVolta;
+            pendingVolta = undefined;
+          }
+          i += openVoltaMatch[0].length;
+          continue;
+        }
+      }
+
+      // Crescendo / Diminuendo hairpin passage start: <( or >( or cresc( or dim(
+      const hairpinMatch = rawLine.slice(i).match(/^(<|>|cresc|dim)\(/i);
+      if (hairpinMatch) {
+        const token = hairpinMatch[1].toLowerCase();
+        inHairpin = true;
+        activeHairpinId = nextHairpinId++;
+        activeHairpinType = (token === '<' || token === 'cresc') ? 'cresc' : 'dim';
+        pendingHairpinStart = true;
+        lastNoteInHairpin = null;
+        parenStack.push('hairpin');
+        i += hairpinMatch[0].length;
         continue;
       }
 
@@ -406,6 +556,7 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
       if (tupletMatch) {
         pendingTupletStart = parseInt(tupletMatch[1], 10);
         inTuplet = true;
+        parenStack.push('tuplet');
         i += tupletMatch[0].length;
         continue;
       }
@@ -416,17 +567,26 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
         activeSlurId = nextSlurId++;
         pendingSlurStart = true;
         lastNoteInSlur = null;
+        parenStack.push('slur');
         i++;
         continue;
       }
 
-      // Slur or tuplet end ')'
+      // Close innermost slur, tuplet, or hairpin passage ')'
       if (ch === ')') {
-        if (inTuplet) {
+        const closing = parenStack.pop();
+        if (closing === 'tuplet' || (!closing && inTuplet)) {
           if (lastNoteInTuplet) lastNoteInTuplet.tupletEnd = true;
           inTuplet = false;
           lastNoteInTuplet = null;
-        } else if (inSlur) {
+        } else if (closing === 'hairpin' || (!closing && inHairpin)) {
+          if (lastNoteInHairpin) lastNoteInHairpin.hairpinEnd = true;
+          inHairpin = false;
+          activeHairpinId = undefined;
+          activeHairpinType = undefined;
+          pendingHairpinStart = false;
+          lastNoteInHairpin = null;
+        } else if (closing === 'slur' || (!closing && inSlur)) {
           if (lastNoteInSlur) lastNoteInSlur.slurEnd = true;
           inSlur = false;
           activeSlurId = undefined;
@@ -521,6 +681,15 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
           }
           lastNoteInSlur = dashNote;
         }
+        if (inHairpin && activeHairpinId !== undefined && activeHairpinType) {
+          dashNote.hairpinId = activeHairpinId;
+          dashNote.hairpinType = activeHairpinType;
+          if (pendingHairpinStart) {
+            dashNote.hairpinStart = true;
+            pendingHairpinStart = false;
+          }
+          lastNoteInHairpin = dashNote;
+        }
         flushGroup();
         currentMeasure!.groups.push({
           kind: 'group',
@@ -598,6 +767,16 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
           lastNoteInSlur = note;
         }
 
+        if (inHairpin && activeHairpinId !== undefined && activeHairpinType) {
+          note.hairpinId = activeHairpinId;
+          note.hairpinType = activeHairpinType;
+          if (pendingHairpinStart) {
+            note.hairpinStart = true;
+            pendingHairpinStart = false;
+          }
+          lastNoteInHairpin = note;
+        }
+
         if (inTuplet) {
           if (pendingTupletStart !== undefined) {
             note.tupletStart = pendingTupletStart;
@@ -647,12 +826,15 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
     // Filter out completely empty trailing measures created by trailing barline
     const validMeasures = measures.filter(m => m.groups.length > 0);
     if (validMeasures.length > 0) {
-      // Close any unclosed slur at end of line
+      // Close any unclosed slur, tuplet, or hairpin at end of line
       if (inSlur && lastNoteInSlur) {
         lastNoteInSlur.slurEnd = true;
       }
       if (inTuplet && lastNoteInTuplet) {
         lastNoteInTuplet.tupletEnd = true;
+      }
+      if (inHairpin && lastNoteInHairpin) {
+        lastNoteInHairpin.hairpinEnd = true;
       }
 
       const musicNode: MusicLineNode = {

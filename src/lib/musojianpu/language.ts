@@ -43,8 +43,8 @@ const musoJianpuParser: StreamParser<unknown> = {
       return 'meta';
     }
 
-    // Volta brackets [1. [2.
-    if (stream.match(/^\[\d+\./)) {
+    // Volta brackets ([1., [2., [1,2.]) & navigation markers ([segno], [coda], [to coda], [fine], [dc al fine], [ds al coda], [segue])
+    if (stream.match(/^\[(?:\d+(?:[,\-]\d+)*\.\]?|[^\[\]]+\])/)) {
       return 'tagName';
     }
 
@@ -53,8 +53,8 @@ const musoJianpuParser: StreamParser<unknown> = {
       return 'punctuation';
     }
 
-    // Slur & tuplet parentheses
-    if (stream.match(/^(\d+\(|\(|\))/)) {
+    // Slur, tuplet & crescendo/diminuendo hairpin parentheses
+    if (stream.match(/^((<|>|cresc|dim)\(|\d+\(|\(|\))/i)) {
       return 'bracket';
     }
 

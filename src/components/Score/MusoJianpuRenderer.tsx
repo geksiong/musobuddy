@@ -9,7 +9,9 @@ import {
   BeatGroup,
   BowingType,
   GraceNote,
+  HairpinType,
   MusicLineNode,
+  NavMarkerType,
   OrnamentType,
   MusoJianpuDocument,
   MusoJianpuMeasure,
@@ -345,8 +347,146 @@ function BarlineGlyph({ type, inkClass }: { type: BarlineType; inkClass: string 
   }
 }
 
+/**
+ * Vector Segno Glyph (𝄋) — crisp engraving across all font stacks
+ */
+function SegnoGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 18 22" className={cn('w-3.5 h-4 inline-block shrink-0', className)} aria-label="Segno">
+      {/* Stylized S-curve */}
+      <path
+        d="M12.8 5.2C12.8 3.3 11.1 2.2 9.1 2.2C6.9 2.2 5.4 3.5 5.4 5.4C5.4 7.7 7.8 8.9 9.7 10.2C11.9 11.7 13.4 13.1 13.4 15.6C13.4 18.1 11.4 19.8 8.7 19.8C6.4 19.8 4.8 18.5 4.8 16.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      {/* End terminals */}
+      <circle cx="12.7" cy="5.2" r="1.15" fill="currentColor" />
+      <circle cx="4.9" cy="16.4" r="1.15" fill="currentColor" />
+      {/* Diagonal slash */}
+      <path d="M3.2 19.2L14.8 2.8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+      {/* Side dots */}
+      <circle cx="4.2" cy="9.7" r="1.15" fill="currentColor" />
+      <circle cx="13.8" cy="12.3" r="1.15" fill="currentColor" />
+    </svg>
+  );
+}
+
+/**
+ * Vector Coda Glyph (𝄌) — oval with extended crosshairs
+ */
+function CodaGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 18 18" className={cn('w-3.5 h-3.5 inline-block shrink-0', className)} aria-label="Coda">
+      <ellipse cx="9" cy="9" rx="4.8" ry="5.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M9 1.2V16.8M1.8 9H16.2" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Renders a musical navigation marker (Segno, Coda, To Coda, Fine, D.C., D.S., Segue, Attacca)
+ */
+function NavMarkerBadge({
+  type,
+  accentClass,
+  inkClass
+}: {
+  type: NavMarkerType;
+  accentClass: string;
+  inkClass: string;
+}) {
+  switch (type) {
+    case 'segno':
+      return (
+        <span className={cn('inline-flex items-center leading-none', accentClass)} title="Segno (Repeat sign)">
+          <SegnoGlyph />
+        </span>
+      );
+    case 'coda':
+      return (
+        <span className={cn('inline-flex items-center gap-0.5 font-serif font-bold text-[11px] leading-none', accentClass)} title="Coda">
+          <CodaGlyph />
+          <span>Coda</span>
+        </span>
+      );
+    case 'toCoda':
+      return (
+        <span className={cn('inline-flex items-center gap-0.5 font-serif italic font-bold text-[11px] leading-none', accentClass)} title="To Coda">
+          <span>To</span>
+          <CodaGlyph className="w-3 h-3" />
+        </span>
+      );
+    case 'fine':
+      return (
+        <span className={cn('font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Fine (End)">
+          Fine
+        </span>
+      );
+    case 'dc':
+      return (
+        <span className={cn('font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Da Capo (From the beginning)">
+          D.C.
+        </span>
+      );
+    case 'dcAlFine':
+      return (
+        <span className={cn('font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Da Capo al Fine">
+          D.C. al Fine
+        </span>
+      );
+    case 'dcAlCoda':
+      return (
+        <span className={cn('inline-flex items-center gap-0.5 font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Da Capo al Coda">
+          <span>D.C. al</span>
+          <CodaGlyph className="w-3 h-3" />
+        </span>
+      );
+    case 'ds':
+      return (
+        <span className={cn('font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Dal Segno (From the Segno)">
+          D.S.
+        </span>
+      );
+    case 'dsAlFine':
+      return (
+        <span className={cn('font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Dal Segno al Fine">
+          D.S. al Fine
+        </span>
+      );
+    case 'dsAlCoda':
+      return (
+        <span className={cn('inline-flex items-center gap-0.5 font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Dal Segno al Coda">
+          <span>D.S. al</span>
+          <CodaGlyph className="w-3 h-3" />
+        </span>
+      );
+    case 'segue':
+      return (
+        <span className={cn('font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Segue (Continue directly into next section)">
+          Segue
+        </span>
+      );
+    case 'attacca':
+      return (
+        <span className={cn('font-serif italic font-bold text-[11px] leading-none', inkClass)} title="Attacca (Proceed without pause)">
+          Attacca
+        </span>
+      );
+  }
+}
+
 interface SlurArc {
   id: number;
+  x1: number;
+  x2: number;
+  y: number;
+}
+
+interface HairpinSpan {
+  key: string;
+  type: HairpinType;
   x1: number;
   x2: number;
   y: number;
@@ -403,6 +543,7 @@ function MusicLineView({
   const lineContainerRef = useRef<HTMLDivElement>(null);
   const noteElMapRef = useRef<Map<string, HTMLSpanElement>>(new Map());
   const [slurArcs, setSlurArcs] = useState<SlurArc[]>([]);
+  const [hairpinSpans, setHairpinSpans] = useState<HairpinSpan[]>([]);
 
   const hasAnyLyrics = useMemo(() => {
     if (!showLyrics) return false;
@@ -414,21 +555,34 @@ function MusicLineView({
   const hasAnyDynamics = useMemo(() => {
     if (!showMarkings) return false;
     return line.measures.some(m =>
-      m.groups.some(g => g.notes.some(n => Boolean(n.markings.dynamic)))
+      m.groups.some(g => g.notes.some(n => Boolean(n.markings.dynamic || n.hairpinId !== undefined)))
     );
   }, [line, showMarkings]);
+
+  const hasTopNavMarkers = useMemo(() => {
+    return line.measures.some(m =>
+      Boolean(m.volta || (m.startMarkers && m.startMarkers.length > 0) || (m.endMarkers && m.endMarkers.length > 0))
+    );
+  }, [line]);
+
+  const hasStackedNavAndVolta = useMemo(() => {
+    return line.measures.some(m =>
+      Boolean(m.volta && ((m.startMarkers && m.startMarkers.length > 0) || (m.endMarkers && m.endMarkers.length > 0)))
+    );
+  }, [line]);
 
   const barlineBottomOffset = 25 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
   const measureNumberBottomOffset = 31 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
 
-  const measureSlurs = () => {
+  const measureOverlays = () => {
     const container = lineContainerRef.current;
     if (!container) return;
     const containerRect = container.getBoundingClientRect();
     const scale = container.offsetWidth > 0 ? containerRect.width / container.offsetWidth : 1;
 
-    // Group notes by slurId across the line
+    // Group notes by slurId and hairpinId across the line
     const slurGroups = new Map<number, MusoJianpuNote[]>();
+    const hairpinGroups = new Map<number, { type: HairpinType; notes: MusoJianpuNote[] }>();
     for (const m of line.measures) {
       for (const g of m.groups) {
         for (const n of g.notes) {
@@ -436,6 +590,11 @@ function MusicLineView({
             const arr = slurGroups.get(n.slurId) || [];
             arr.push(n);
             slurGroups.set(n.slurId, arr);
+          }
+          if (showMarkings && n.hairpinId !== undefined && n.hairpinType) {
+            const entry = hairpinGroups.get(n.hairpinId) || { type: n.hairpinType, notes: [] };
+            entry.notes.push(n);
+            hairpinGroups.set(n.hairpinId, entry);
           }
         }
       }
@@ -471,20 +630,75 @@ function MusicLineView({
       }
     });
 
+    const nextHairpins: HairpinSpan[] = [];
+    hairpinGroups.forEach(({ type, notes }, hairpinId) => {
+      if (notes.length === 0) return;
+
+      // Split into visual rows in case a long hairpin wraps onto a second flex row
+      const visualRows: { note: MusoJianpuNote; rect: DOMRect }[][] = [];
+      for (const n of notes) {
+        const el = noteElMapRef.current.get(n.id);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const currentRow = visualRows[visualRows.length - 1];
+        if (!currentRow || Math.abs(rect.top - currentRow[0].rect.top) / scale > 40) {
+          visualRows.push([{ note: n, rect }]);
+        } else {
+          currentRow.push({ note: n, rect });
+        }
+      }
+
+      visualRows.forEach((row, rowIdx) => {
+        const first = row[0];
+        const last = row[row.length - 1];
+        let x1 = (first.rect.left - containerRect.left) / scale;
+        let x2 = (last.rect.right - containerRect.left) / scale;
+
+        if (row.length === 1) {
+          x1 -= 6;
+          x2 += 6;
+        } else {
+          // Avoid colliding with dynamic text (e.g. p / f) on the boundary notes
+          if (first.note.markings.dynamic) {
+            x1 = (first.rect.right - containerRect.left) / scale + 4;
+          }
+          if (last.note.markings.dynamic) {
+            x2 = (last.rect.left - containerRect.left) / scale - 4;
+          }
+        }
+
+        const maxDigitBottom = row.reduce(
+          (max, item) => Math.max(max, (item.rect.bottom - containerRect.top) / scale),
+          0
+        );
+
+        if (x2 > x1 + 6) {
+          nextHairpins.push({
+            key: `${hairpinId}-${rowIdx}`,
+            type,
+            x1,
+            x2,
+            y: maxDigitBottom + 33
+          });
+        }
+      });
+    });
+
     setSlurArcs(nextArcs);
+    setHairpinSpans(nextHairpins);
   };
 
   useLayoutEffect(() => {
-    measureSlurs();
+    measureOverlays();
   }, [line, showMarkings, showLyrics, fingeringStyle]);
 
   useEffect(() => {
     const el = lineContainerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => measureSlurs());
+    const ro = new ResizeObserver(() => measureOverlays());
     ro.observe(el);
     return () => ro.disconnect();
-  }, [line]);
+  }, [line, showMarkings, showLyrics]);
 
   const inkClass = isDarkSurface ? 'text-neutral-100' : 'text-[#161616]';
   const erhuAccentClass = highlightMarkings
@@ -518,12 +732,10 @@ function MusicLineView({
     const harmonicOrnaments = note.markings.ornaments.filter(o => o === 'harm' || o === 'aharm');
     const positionShiftOrnaments = note.markings.ornaments.filter(o => o === 'shiftUp' || o === 'shiftDown');
     const slideOrnaments = note.markings.ornaments.filter(o => o === 'su' || o === 'sd');
-    const upperOrnaments = note.markings.ornaments.filter(
-      o => o !== 'su' && o !== 'sd' && o !== 'harm' && o !== 'aharm' && o !== 'shiftUp' && o !== 'shiftDown'
-    );
-    const hasTopPerformanceRow = Boolean(
-      note.markings.bowing || upperOrnaments.length > 0 || note.markings.customText
-    );
+    const accentOrnaments = note.markings.ornaments.filter(o => o === 'accent');
+    const vibratoOrnaments = note.markings.ornaments.filter(o => o === 'vib' || o === 'pvib');
+    const melodicOrnaments = note.markings.ornaments.filter(o => o === 'sr' || o === 'da' || o === 'tr');
+    const fermataOrnaments = note.markings.ornaments.filter(o => o === 'fermata');
     const hasPositionRow = Boolean(note.markings.position || positionShiftOrnaments.length > 0);
 
     // Continuous beaming logic across adjacent notes in the same BeatGroup
@@ -583,27 +795,56 @@ function MusicLineView({
 
         {/* Main Note Column */}
         <div className="flex flex-col items-center justify-end">
-          {/* Top Markings Stack (Bottom-first closest to note: Harmonics → Fingers → String → Position, then Bowing/Ornaments above) */}
+          {/* Top Markings Stack (Conventional bottom-to-top order closest to note upward:
+              1. Harmonics → 2. Fingers → 3. String → 4. Position → 5. Accent →
+              6. Vibrato → 7. Melodic Ornaments (sr/da/tr) → 8. Bowing → 9. Fermata → 10. Custom Text) */}
           {showMarkings && (
             <div className="flex flex-col items-center justify-end gap-[2px] min-h-[34px] mb-0.5 select-none">
-              {/* Topmost: Bowing, Other Ornaments & Custom Text */}
-              {hasTopPerformanceRow && (
-                <div className="flex items-center justify-center gap-0.5 min-h-[13px] whitespace-nowrap">
-                  {note.markings.bowing && (
-                    <BowingGlyph type={note.markings.bowing} className={erhuAccentClass} />
-                  )}
-                  {upperOrnaments.map((orn, idx) => (
-                    <OrnamentGlyph key={idx} type={orn} className={erhuAccentClass} />
-                  ))}
-                  {note.markings.customText && (
-                    <span className={cn('text-[9.5px] font-medium leading-none whitespace-nowrap', subtleInkClass)}>
-                      {note.markings.customText}
-                    </span>
-                  )}
+              {/* Layer 10 (Topmost): Custom Performance Text */}
+              {note.markings.customText && (
+                <div className="flex items-center justify-center min-h-[12px] whitespace-nowrap">
+                  <span className={cn('text-[9.5px] font-medium leading-none whitespace-nowrap', subtleInkClass)}>
+                    {note.markings.customText}
+                  </span>
                 </div>
               )}
 
-              {/* Layer 4 (Top of left-hand stack): Position */}
+              {/* Layer 9: Fermata (𝄐 sits above ornaments & bowing) */}
+              {fermataOrnaments.map((orn, idx) => (
+                <div key={`ferm-${idx}`} className="flex items-center justify-center min-h-[12px] leading-none">
+                  <OrnamentGlyph type={orn} className={erhuAccentClass} />
+                </div>
+              ))}
+
+              {/* Layer 8: Bowing (Π / V / /// / ▼ / · / + / ’) */}
+              {note.markings.bowing && (
+                <div className="flex items-center justify-center min-h-[12px] leading-none">
+                  <BowingGlyph type={note.markings.bowing} className={erhuAccentClass} />
+                </div>
+              )}
+
+              {/* Layer 7: Melodic Ornaments (tr / 打 / ⌒回滑) stacked vertically */}
+              {melodicOrnaments.map((orn, idx) => (
+                <div key={`mel-${idx}`} className="flex items-center justify-center min-h-[11px] leading-none">
+                  <OrnamentGlyph type={orn} className={erhuAccentClass} />
+                </div>
+              ))}
+
+              {/* Layer 6: Vibrato (〰 / 压) stacked vertically */}
+              {vibratoOrnaments.map((orn, idx) => (
+                <div key={`vib-${idx}`} className="flex items-center justify-center min-h-[10px] leading-none">
+                  <OrnamentGlyph type={orn} className={erhuAccentClass} />
+                </div>
+              ))}
+
+              {/* Layer 5: Articulation / Accent (>) */}
+              {accentOrnaments.map((orn, idx) => (
+                <div key={`acc-${idx}`} className="flex items-center justify-center min-h-[11px] leading-none">
+                  <OrnamentGlyph type={orn} className={erhuAccentClass} />
+                </div>
+              ))}
+
+              {/* Layer 4: Position & Position Shift */}
               {hasPositionRow && (
                 <div className="flex items-center justify-center gap-0.5 min-h-[12px] whitespace-nowrap">
                   {positionShiftOrnaments.map((orn, idx) => (
@@ -636,13 +877,11 @@ function MusicLineView({
               )}
 
               {/* Layer 1 (Bottom, closest to note): Harmonics (○ / ◇) */}
-              {harmonicOrnaments.length > 0 && (
-                <div className="flex items-center justify-center gap-0.5 min-h-[11px] leading-none">
-                  {harmonicOrnaments.map((orn, idx) => (
-                    <OrnamentGlyph key={idx} type={orn} className={erhuAccentClass} />
-                  ))}
+              {harmonicOrnaments.map((orn, idx) => (
+                <div key={`harm-${idx}`} className="flex items-center justify-center min-h-[11px] leading-none">
+                  <OrnamentGlyph type={orn} className={erhuAccentClass} />
                 </div>
-              )}
+              ))}
             </div>
           )}
 
@@ -803,9 +1042,9 @@ function MusicLineView({
   };
 
   return (
-    <div ref={lineContainerRef} className="relative w-full pt-2 pb-3">
-      {/* SVG Slur Overlay Layer */}
-      {slurArcs.length > 0 && (
+    <div ref={lineContainerRef} className={cn('relative w-full pb-3', hasStackedNavAndVolta ? 'pt-10' : hasTopNavMarkers ? 'pt-7' : 'pt-2')}>
+      {/* SVG Slur & Hairpin Overlay Layer */}
+      {(slurArcs.length > 0 || hairpinSpans.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-10">
           {slurArcs.map(arc => {
             const midX = (arc.x1 + arc.x2) / 2;
@@ -814,7 +1053,7 @@ function MusicLineView({
             const yBase = arc.y;
             return (
               <path
-                key={arc.id}
+                key={`slur-${arc.id}`}
                 d={`M ${arc.x1} ${yBase} Q ${midX} ${yBase - lift} ${arc.x2} ${yBase}`}
                 fill="none"
                 stroke={isDarkSurface ? '#E5E7EB' : '#1A1A1A'}
@@ -823,19 +1062,39 @@ function MusicLineView({
               />
             );
           })}
+          {hairpinSpans.map(hp => {
+            const halfH = 4.2;
+            const d = hp.type === 'cresc'
+              ? `M ${hp.x2} ${hp.y - halfH} L ${hp.x1} ${hp.y} L ${hp.x2} ${hp.y + halfH}`
+              : `M ${hp.x1} ${hp.y - halfH} L ${hp.x2} ${hp.y} L ${hp.x1} ${hp.y + halfH}`;
+            return (
+              <path
+                key={`hp-${hp.key}`}
+                d={d}
+                fill="none"
+                stroke={isDarkSurface ? '#FCD34D' : '#1F2937'}
+                strokeWidth="1.35"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            );
+          })}
         </svg>
       )}
 
       {/* Measures Flex Row */}
-      <div className="flex flex-wrap items-end gap-y-7 w-full">
+      <div className={cn('flex flex-wrap items-end w-full', hasTopNavMarkers ? 'gap-y-10' : 'gap-y-7')}>
         {line.measures.map((measure: MusoJianpuMeasure, mIdx: number) => {
           const isLastInLine = mIdx === line.measures.length - 1;
           const measureWeight = getMeasureBeatWeight(measure);
+          const closesVoltaHook = measure.endBarline === ':|' || measure.endBarline === ':||:';
+          const isCodaStart = Boolean(measure.startMarkers?.includes('coda')) && mIdx > 0;
+          const navTopClass = measure.volta ? '-top-9' : '-top-5';
           return (
             <div
               key={measure.id}
               style={{ flex: `${measureWeight} 0 auto` }}
-              className="relative flex items-end"
+              className={cn('relative flex items-end', isCodaStart && 'ml-3')}
             >
               {/* Measure Number subtle cue on first measure of each line */}
               {mIdx === 0 && (
@@ -850,10 +1109,29 @@ function MusicLineView({
                 </span>
               )}
 
-              {/* Volta Bracket ([1. / [2.) */}
+              {/* Start Navigation Markers (Segno, Coda) */}
+              {measure.startMarkers && measure.startMarkers.length > 0 && (
+                <div className={cn('absolute left-0 flex items-center gap-1.5 whitespace-nowrap select-none pointer-events-none', navTopClass)}>
+                  {measure.startMarkers.map((marker, idx) => (
+                    <NavMarkerBadge key={`${marker}-${idx}`} type={marker} accentClass={erhuAccentClass} inkClass={inkClass} />
+                  ))}
+                </div>
+              )}
+
+              {/* End Navigation Markers (To Coda, Fine, D.C., D.S., Segue, Attacca) */}
+              {measure.endMarkers && measure.endMarkers.length > 0 && (
+                <div className={cn('absolute right-0 flex items-center gap-1.5 whitespace-nowrap select-none pointer-events-none', navTopClass)}>
+                  {measure.endMarkers.map((marker, idx) => (
+                    <NavMarkerBadge key={`${marker}-${idx}`} type={marker} accentClass={erhuAccentClass} inkClass={inkClass} />
+                  ))}
+                </div>
+              )}
+
+              {/* Volta Bracket ([1. / [2. / [1,2.) */}
               {measure.volta && (
                 <div className={cn(
-                  'absolute -top-2 left-1 right-1 h-3.5 border-t border-l flex items-start pl-1 text-[10px] font-bold leading-none pt-0.5 pointer-events-none',
+                  'absolute -top-4 left-1 right-1 h-3.5 border-t border-l flex items-start pl-1 text-[10px] font-bold leading-none pt-0.5 pointer-events-none select-none',
+                  closesVoltaHook && 'border-r',
                   isDarkSurface ? 'border-neutral-400 text-neutral-300' : 'border-neutral-700 text-neutral-800'
                 )}>
                   {measure.volta}

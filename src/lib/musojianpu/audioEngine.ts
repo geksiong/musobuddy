@@ -4,7 +4,7 @@
  */
 
 import * as Tone from 'tone';
-import { MusoJianpuDocument, MusoJianpuNote } from './types.ts';
+import { MusoJianpuDocument, MusoJianpuMeasure, MusoJianpuNote } from './types.ts';
 import { jianpuToMidi } from './erhuKeys.ts';
 
 export interface ScheduledErhuEvent {
@@ -34,25 +34,214 @@ const DYNAMIC_VELOCITIES: Record<string, number> = {
 };
 
 /**
+ * Parses a volta label (e.g. "1.", "2.", "1,2.", "1-3.") into the set of 1-based repeat pass numbers.
+ */
+function parseVoltaPasses(volta?: string): number[] | null {
+  if (!volta) return null;
+  const cleaned = volta.replace(/\.$/, '').trim();
+  if (!cleaned) return null;
+  const passes = new Set<number>();
+  for (const part of cleaned.split(',')) {
+    const rangeMatch = part.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+    if (rangeMatch) {
+      const a = parseInt(rangeMatch[1], 10);
+      const b = parseInt(rangeMatch[2], 10);
+      for (let k = Math.min(a, b); k <= Math.max(a, b); k++) passes.add(k);
+    } else {
+      const num = parseInt(part.trim(), 10);
+      if (!isNaN(num) && num >= 1) passes.add(num);
+    }
+  }
+  return passes.size > 0 ? Array.from(passes) : null;
+}
+
+/**
+ * Expands a score's measures into the actual performed sequence obeying repeats (|: :| :||:),
+ * volta endings ([1. [2. [1,2.), Segno, Coda, To Coda, Fine, D.C., and D.S. jumps with loop guards.
+ */
+export function expandMeasurePlaybackOrder(
+  measures: MusoJianpuMeasure[]
+): { measure: MusoJianpuMeasure; measureIndex: number }[] {
+  const result: { measure: MusoJianpuMeasure; measureIndex: number }[] = [];
+  if (measures.length === 0) return result;
+
+  const segnoIndex = measures.findIndex(m => m.startMarkers?.includes('segno'));
+  const codaIndex = measures.findIndex(m => m.startMarkers?.includes('coda'));
+
+  // Track repeat pass counts per repeat-end bar index, and one-shot navigation jump tracking
+  const repeatPassCount = new Map<number, number>();
+  const usedNavJumps = new Set<number>();
+
+  let currentRepeatStart = 0;
+  let currentPass = 1;
+  let activeJumpGoal: 'none' | 'fine' | 'coda' = 'none';
+  let idx = 0;
+  let guard = 0;
+  const maxSteps = Math.max(200, measures.length * 8);
+
+  while (idx >= 0 && idx < measures.length && guard < maxSteps) {
+    guard++;
+    const m = measures[idx];
+
+    if (m.startBarline === '|:' || m.startBarline === ':||:') {
+      if (currentRepeatStart !== idx) {
+        currentRepeatStart = idx;
+        currentPass = 1;
+      }
+    }
+
+    // Check volta ending eligibility (skip ending if current pass doesn't match)
+    const voltaPasses = parseVoltaPasses(m.volta);
+    if (voltaPasses && !voltaPasses.includes(currentPass)) {
+      // Advance past this volta section until a matching volta or non-volta measure
+      let skipIdx = idx + 1;
+      while (skipIdx < measures.length) {
+        const nextVolta = parseVoltaPasses(measures[skipIdx].volta);
+        if (nextVolta && nextVolta.includes(currentPass)) break;
+        if (!nextVolta && (measures[skipIdx - 1].endBarline === ':|' || measures[skipIdx - 1].endBarline === ':||:')) {
+          break;
+        }
+        skipIdx++;
+      }
+      idx = skipIdx;
+      continue;
+    }
+
+    // Play this measure
+    result.push({ measure: m, measureIndex: idx });
+
+    const endMarks = m.endMarkers || [];
+
+    // 1. After a D.C./D.S. jump, honor Fine or To Coda
+    if (activeJumpGoal === 'fine' && endMarks.includes('fine')) {
+      break;
+    }
+    if (activeJumpGoal === 'coda' && endMarks.includes('toCoda') && codaIndex !== -1) {
+      activeJumpGoal = 'none';
+      idx = codaIndex;
+      continue;
+    }
+
+    // 2. Check repeat end barlines (:| or :||:)
+    if (m.endBarline === ':|' || m.endBarline === ':||:') {
+      // Determine how many times this repeat should trigger (based on highest volta in section, default 2 passes)
+      let maxPasses = 2;
+      for (let k = currentRepeatStart; k < measures.length; k++) {
+        const vp = parseVoltaPasses(measures[k].volta);
+        if (vp) {
+          maxPasses = Math.max(maxPasses, ...vp);
+        }
+        if (k > idx && (measures[k].startBarline === '|:' || measures[k].startBarline === ':||:')) {
+          break;
+        }
+      }
+      const timesTaken = repeatPassCount.get(idx) || 0;
+      // Standard convention: skip inner repeats after a D.C./D.S. jump unless explicitly needed
+      if (activeJumpGoal === 'none' && timesTaken < maxPasses - 1) {
+        repeatPassCount.set(idx, timesTaken + 1);
+        currentPass = timesTaken + 2;
+        idx = currentRepeatStart;
+        continue;
+      } else {
+        currentPass = 1;
+        if (m.endBarline === ':||:') {
+          currentRepeatStart = idx + 1;
+        }
+      }
+    }
+
+    // 3. Check D.C. / D.S. jumps (fire once each to avoid infinite loops)
+    if (!usedNavJumps.has(idx)) {
+      if (endMarks.includes('dcAlFine')) {
+        usedNavJumps.add(idx);
+        activeJumpGoal = 'fine';
+        currentPass = 1;
+        currentRepeatStart = 0;
+        idx = 0;
+        continue;
+      }
+      if (endMarks.includes('dcAlCoda')) {
+        usedNavJumps.add(idx);
+        activeJumpGoal = 'coda';
+        currentPass = 1;
+        currentRepeatStart = 0;
+        idx = 0;
+        continue;
+      }
+      if (endMarks.includes('dc')) {
+        usedNavJumps.add(idx);
+        activeJumpGoal = 'none';
+        currentPass = 1;
+        currentRepeatStart = 0;
+        idx = 0;
+        continue;
+      }
+      if (endMarks.includes('dsAlFine')) {
+        usedNavJumps.add(idx);
+        activeJumpGoal = 'fine';
+        currentPass = 1;
+        const target = segnoIndex !== -1 ? segnoIndex : 0;
+        currentRepeatStart = target;
+        idx = target;
+        continue;
+      }
+      if (endMarks.includes('dsAlCoda')) {
+        usedNavJumps.add(idx);
+        activeJumpGoal = 'coda';
+        currentPass = 1;
+        const target = segnoIndex !== -1 ? segnoIndex : 0;
+        currentRepeatStart = target;
+        idx = target;
+        continue;
+      }
+      if (endMarks.includes('ds')) {
+        usedNavJumps.add(idx);
+        activeJumpGoal = 'none';
+        currentPass = 1;
+        const target = segnoIndex !== -1 ? segnoIndex : 0;
+        currentRepeatStart = target;
+        idx = target;
+        continue;
+      }
+    }
+
+    idx++;
+  }
+
+  return result;
+}
+
+/**
  * Flattens a parsed MusoJianpuDocument into sequential timed musical events,
- * combining prolongation dashes ('-') and ties ('~') into accurate note durations.
+ * obeying repeats, voltas, Segno, Coda, D.C./D.S., Fine, dashes ('-'), ties ('~'), and hairpins.
  */
 export function buildErhuPlaybackTimeline(
   doc: MusoJianpuDocument,
   transposeSemitones: number = 0
 ): { events: ScheduledErhuEvent[]; totalBeats: number } {
-  const flatNotes: { note: MusoJianpuNote; measureIndex: number }[] = [];
-  let measureIdx = 0;
-
+  const allMeasures: MusoJianpuMeasure[] = [];
   for (const line of doc.lines) {
     if (line.kind !== 'music') continue;
-    for (const measure of line.measures) {
-      for (const group of measure.groups) {
-        for (const note of group.notes) {
-          flatNotes.push({ note, measureIndex: measureIdx });
-        }
+    allMeasures.push(...line.measures);
+  }
+
+  const expandedMeasures = expandMeasurePlaybackOrder(allMeasures);
+  const flatNotes: { note: MusoJianpuNote; measureIndex: number }[] = [];
+
+  for (const { measure, measureIndex } of expandedMeasures) {
+    for (const group of measure.groups) {
+      for (const note of group.notes) {
+        flatNotes.push({ note, measureIndex });
       }
-      measureIdx++;
+    }
+  }
+
+  // Pre-compute note counts per hairpin span for smooth velocity ramps
+  const hairpinTotals = new Map<number, number>();
+  const hairpinSeen = new Map<number, number>();
+  for (const { note } of flatNotes) {
+    if (note.hairpinId !== undefined && note.degree >= 1 && note.degree <= 7) {
+      hairpinTotals.set(note.hairpinId, (hairpinTotals.get(note.hairpinId) || 0) + 1);
     }
   }
 
@@ -65,6 +254,22 @@ export function buildErhuPlaybackTimeline(
 
     if (note.markings.dynamic && DYNAMIC_VELOCITIES[note.markings.dynamic] !== undefined) {
       currentVelocity = DYNAMIC_VELOCITIES[note.markings.dynamic];
+    }
+
+    // Smoothly ramp velocity across crescendo/diminuendo hairpin passages
+    let noteVelocity = currentVelocity;
+    if (note.hairpinId !== undefined && note.hairpinType && note.degree >= 1 && note.degree <= 7) {
+      const idx = hairpinSeen.get(note.hairpinId) || 0;
+      hairpinSeen.set(note.hairpinId, idx + 1);
+      const total = Math.max(1, hairpinTotals.get(note.hairpinId) || 1);
+      const progress = total > 1 ? idx / (total - 1) : 1;
+      const delta = 0.24 * progress;
+      noteVelocity = note.hairpinType === 'cresc'
+        ? Math.min(1.0, currentVelocity + delta)
+        : Math.max(0.28, currentVelocity - delta);
+      if (idx === total - 1) {
+        currentVelocity = noteVelocity;
+      }
     }
 
     // Calculate base duration in quarter-note beats
@@ -98,7 +303,7 @@ export function buildErhuPlaybackTimeline(
             isStaccato: false,
             isTremolo: false,
             isPizzicato: note.markings.bowing === 'pizz',
-            velocity: currentVelocity * 0.85
+            velocity: noteVelocity * 0.85
           });
           currentBeat += graceDur;
           beats = Math.max(0.12, beats - graceDur);
@@ -148,8 +353,8 @@ export function buildErhuPlaybackTimeline(
         isTremolo: note.markings.bowing === 'trem',
         isPizzicato: note.markings.bowing === 'pizz',
         velocity: note.markings.ornaments.includes('accent')
-          ? Math.min(1.0, currentVelocity * 1.18)
-          : currentVelocity
+          ? Math.min(1.0, noteVelocity * 1.18)
+          : noteVelocity
       });
       currentBeat += effectiveBeats;
     }
@@ -168,7 +373,7 @@ export function buildErhuPlaybackTimeline(
             isStaccato: false,
             isTremolo: false,
             isPizzicato: note.markings.bowing === 'pizz',
-            velocity: currentVelocity * 0.8
+            velocity: noteVelocity * 0.8
           });
           currentBeat += postGraceDur;
         }

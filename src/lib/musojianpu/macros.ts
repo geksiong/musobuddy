@@ -13,7 +13,7 @@ export interface TextEditResult {
 
 const NOTE_REGEX = /([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)/g;
 const GRACE_PREFIX_REGEX = /\^\/?(?:\{[^}]*\}|[#b=]?[1-7][',]*[_/]*)/;
-const LINE_TOKEN_REGEX = /(\^\/?(?:\{[^}]*\}|[#b=]?[1-7][',]*[_/]*))|(\{[^}]*\})|(([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*))/g;
+const LINE_TOKEN_REGEX = /(\^\/?(?:\{[^}]*\}|[#b=]?[1-7][',]*[_/]*))|(\{[^}]*\})|(\[(?:\d+(?:[,\-]\d+)*\.\]?|[^\[\]]+\]))|(([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*))/g;
 
 interface NoteSpan {
   start: number;
@@ -22,19 +22,19 @@ interface NoteSpan {
 }
 
 /**
- * Finds all main note spans in a single music line, ignoring grace-note prefixes (^5/, ^{5/6/})
- * and standalone marking blocks ({...}) so macros never corrupt grace notes.
+ * Finds all main note spans in a single music line, ignoring grace-note prefixes (^5/, ^{5/6/}),
+ * bracket navigation/volta tags ([1., [segno], [coda]), and standalone marking blocks ({...}).
  */
 function findMainNotesInLine(line: string, lineStart: number): NoteSpan[] {
   const spans: NoteSpan[] = [];
   LINE_TOKEN_REGEX.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = LINE_TOKEN_REGEX.exec(line)) !== null) {
-    if (m[3]) {
+    if (m[4]) {
       spans.push({
         start: lineStart + m.index,
-        end: lineStart + m.index + m[3].length,
-        text: m[3]
+        end: lineStart + m.index + m[4].length,
+        text: m[4]
       });
     }
   }
@@ -171,8 +171,8 @@ function applyNoteTransform(
 ): TextEditResult | null {
   if (selStart !== selEnd) {
     const selected = text.slice(selStart, selEnd);
-    const replaced = selected.replace(LINE_TOKEN_REGEX, (full, graceTok, braceTok, noteTok) => {
-      if (graceTok || braceTok) return full;
+    const replaced = selected.replace(LINE_TOKEN_REGEX, (full, graceTok, braceTok, bracketTok, noteTok) => {
+      if (graceTok || braceTok || bracketTok) return full;
       return noteTok ? transformer(noteTok) : full;
     });
     if (replaced === selected) return null;
@@ -277,11 +277,51 @@ export function macroWrapTriplet(text: string, selStart: number, selEnd: number)
       selectionEnd: selStart + wrapped.length
     };
   }
-  const snippet = '3(5_ 6_ 5_)';
+  const snippet = '3(5/ 6/ 5/)';
   return {
     text: text.slice(0, selStart) + snippet + text.slice(selEnd),
     selectionStart: selStart + 2,
     selectionEnd: selStart + snippet.length - 1
+  };
+}
+
+/**
+ * Wrap / Unwrap Crescendo (<(...)) or Diminuendo (>(...)) Hairpin Passage
+ */
+export function macroWrapHairpin(
+  text: string,
+  selStart: number,
+  selEnd: number,
+  type: 'cresc' | 'dim'
+): TextEditResult {
+  const prefix = type === 'cresc' ? '<(' : '>(';
+  if (selStart !== selEnd) {
+    const selected = text.slice(selStart, selEnd);
+    const trimmed = selected.trim();
+    if (trimmed.startsWith(prefix) && trimmed.endsWith(')')) {
+      const unwrapped = trimmed.slice(prefix.length, -1).trim();
+      const next = text.slice(0, selStart) + unwrapped + text.slice(selEnd);
+      return {
+        text: next,
+        selectionStart: selStart,
+        selectionEnd: selStart + unwrapped.length
+      };
+    }
+    const wrapped = `${prefix}${selected})`;
+    const next = text.slice(0, selStart) + wrapped + text.slice(selEnd);
+    return {
+      text: next,
+      selectionStart: selStart,
+      selectionEnd: selStart + wrapped.length
+    };
+  }
+
+  const sampleBody = type === 'cresc' ? '1 2 3 5' : '5 3 2 1';
+  const snippet = `${prefix}${sampleBody})`;
+  return {
+    text: text.slice(0, selStart) + snippet + text.slice(selEnd),
+    selectionStart: selStart + prefix.length,
+    selectionEnd: selStart + prefix.length + sampleBody.length
   };
 }
 
@@ -463,20 +503,24 @@ export function macroShiftScaleDegrees(text: string, steps: number): string {
     const t = line.trim();
     if (!t || /^(@|S:|L:|T:|#|\/\/)/i.test(t)) return line;
 
-    return line.replace(NOTE_REGEX, (full, acc, digit, octStr, underlines, dots, tie, markings) => {
-      const deg = parseInt(digit, 10);
-      if (deg === 0) return full;
-      let oct = 0;
-      for (const ch of octStr) {
-        if (ch === "'") oct++;
-        else if (ch === ',') oct--;
+    return line.replace(
+      /(\[(?:\d+(?:[,\-]\d+)*\.\]?|[^\[\]]+\]))|(\{[^}]*\})|(([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*))/g,
+      (full, bracketTok, braceTok, noteTok, acc, digit, octStr, underlines, dots, tie, markings) => {
+        if (bracketTok || braceTok || !noteTok) return full;
+        const deg = parseInt(digit, 10);
+        if (deg === 0) return full;
+        let oct = 0;
+        for (const ch of octStr) {
+          if (ch === "'") oct++;
+          else if (ch === ',') oct--;
+        }
+        const totalStep = oct * 7 + (deg - 1) + steps;
+        const newOct = Math.max(-2, Math.min(2, Math.floor(totalStep / 7)));
+        const newDeg = ((totalStep % 7) + 7) % 7 + 1;
+        const newOctStr = newOct > 0 ? "'".repeat(newOct) : newOct < 0 ? ','.repeat(-newOct) : '';
+        return `${acc}${newDeg}${newOctStr}${underlines}${dots}${tie}${markings}`;
       }
-      const totalStep = oct * 7 + (deg - 1) + steps;
-      const newOct = Math.max(-2, Math.min(2, Math.floor(totalStep / 7)));
-      const newDeg = ((totalStep % 7) + 7) % 7 + 1;
-      const newOctStr = newOct > 0 ? "'".repeat(newOct) : newOct < 0 ? ','.repeat(-newOct) : '';
-      return `${acc}${newDeg}${newOctStr}${underlines}${dots}${tie}${markings}`;
-    });
+    );
   });
   return transformed.join('\n');
 }
