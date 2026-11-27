@@ -8,11 +8,14 @@ import {
   BarlineType,
   BeatGroup,
   BowingType,
+  ChordPitch,
   GraceNote,
   HairpinType,
+  InstrumentType,
   MusicLineNode,
   NavMarkerType,
   OrnamentType,
+  PluckTechniqueType,
   MusoJianpuDocument,
   MusoJianpuMeasure,
   MusoJianpuNote
@@ -88,7 +91,7 @@ function BowingGlyph({ type, className }: { type: BowingType; className?: string
 /**
  * Vector Erhu Ornament Symbol (Slides, Vibrato, Harmonics, Fermata, Trill)
  */
-function OrnamentGlyph({ type, className }: { type: OrnamentType; className?: string }) {
+function OrnamentGlyph({ type, instrument, className }: { type: OrnamentType; instrument?: InstrumentType; className?: string }) {
   switch (type) {
     case 'su': // 上滑音
       return (
@@ -128,12 +131,14 @@ function OrnamentGlyph({ type, className }: { type: OrnamentType; className?: st
           tr
         </span>
       );
-    case 'da':
+    case 'da': {
+      const isWind = instrument === 'dizi' || instrument === 'xiao';
       return (
-        <span className={cn('text-[9px] font-semibold leading-none', className)} title="打音">
-          打
+        <span className={cn('text-[9.5px] font-bold leading-none', className)} title={isWind ? '打音 (丁)' : '打音'}>
+          {isWind ? '丁' : '打'}
         </span>
       );
+    }
     case 'fermata':
       return (
         <svg viewBox="0 0 18 11" className={cn('w-4 h-2.5 inline-block', className)} aria-label="延长记号 Fermata">
@@ -170,6 +175,254 @@ function OrnamentGlyph({ type, className }: { type: OrnamentType; className?: st
         <span className={cn('text-[10px] font-bold leading-none', className)} title="下换把">
           ↓
         </span>
+      );
+  }
+}
+
+/**
+ * Left-of-chord vertical wavy Arpeggio Glyph (琶音)
+ */
+function ArpeggioGlyph({ tall, className }: { tall?: boolean; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 8 36"
+      className={cn(tall ? 'w-[7px] h-[38px]' : 'w-[6px] h-[22px]', 'inline-block shrink-0', className)}
+      aria-label="琶音 Arpeggio"
+    >
+      <path
+        d="M4 2Q1.2 5 4 8T4 14T4 20T4 26T4 32"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+      />
+      <path
+        d="M1.8 4.8L4 1.6L6.2 4.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Vector & Conservatory Notation Glyphs for Pipa (琵琶) and Guzheng (古筝) Techniques
+ */
+function PluckTechniqueGlyph({ type, className }: { type: PluckTechniqueType; className?: string }) {
+  switch (type) {
+    // Pipa right-hand & left-hand
+    case 'tan': // 弹 (inward index pluck — classic downward-left stroke)
+      return (
+        <svg viewBox="0 0 12 12" className={cn('w-3 h-3 inline-block', className)} aria-label="弹 Tan (Pipa inward pluck)">
+          <path d="M9.5 2L3 10" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" />
+          <path d="M6.2 9.5L2.8 10.2L3.6 6.8" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'tiao': // 挑 (outward index pluck — classic upward-right stroke)
+      return (
+        <svg viewBox="0 0 12 12" className={cn('w-3 h-3 inline-block', className)} aria-label="挑 Tiao (Outward index pluck)">
+          <path d="M2.5 10L9.2 2.2" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" />
+          <path d="M5.8 2.4L9.4 2L8.8 5.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'gun': // 滚 (rapid tan-tiao alternation)
+      return (
+        <svg viewBox="0 0 14 12" className={cn('w-3.5 h-3 inline-block', className)} aria-label="滚 Gun (Rapid alternation)">
+          <path d="M3 2.5L11 9.5M11 2.5L3 9.5" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+          <circle cx="7" cy="2" r="1" fill="currentColor" />
+          <circle cx="7" cy="10" r="1" fill="currentColor" />
+        </svg>
+      );
+    case 'lun': // 轮指
+      return (
+        <span className={cn('text-[10px] font-bold leading-none', className)} title="轮指 Five-finger roll">
+          轮
+        </span>
+      );
+    case 'banlun': // 半轮
+      return (
+        <span className={cn('text-[9.5px] font-bold leading-none', className)} title="半轮 Half roll">
+          半轮
+        </span>
+      );
+    case 'sao': // 扫 (bold downward strum)
+      return (
+        <span className={cn('inline-flex items-center gap-[1px] text-[9.5px] font-bold leading-none', className)} title="扫 Downward strum">
+          <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 inline-block">
+            <path d="M10 2L2.5 9.5M6.5 9.5H2.5V5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>扫</span>
+        </span>
+      );
+    case 'fu': // 拂 (bold upward strum)
+      return (
+        <span className={cn('inline-flex items-center gap-[1px] text-[9.5px] font-bold leading-none', className)} title="拂 Upward strum">
+          <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 inline-block">
+            <path d="M2 10L9.5 2.5M5.5 2.5H9.5V6.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>拂</span>
+        </span>
+      );
+    case 'fen':
+      return <span className={cn('text-[9.5px] font-bold leading-none', className)} title="分 Outward split chord">分</span>;
+    case 'zhi':
+      return <span className={cn('text-[9.5px] font-bold leading-none', className)} title="摭 Inward pinch chord">摭</span>;
+    case 'jiao': // 绞弦 ⊗
+      return (
+        <svg viewBox="0 0 12 12" className={cn('w-3 h-3 inline-block', className)} aria-label="绞弦 Twisted string">
+          <circle cx="6" cy="6" r="4.3" fill="none" stroke="currentColor" strokeWidth="1.35" />
+          <path d="M3.3 3.3L8.7 8.7M8.7 3.3L3.3 8.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      );
+    case 'sha': // 煞音 ×
+      return (
+        <svg viewBox="0 0 10 10" className={cn('w-2.5 h-2.5 inline-block', className)} aria-label="煞音 Muted percussive click">
+          <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" />
+        </svg>
+      );
+    case 'dai':
+      return <span className={cn('text-[9.5px] font-semibold leading-none', className)} title="带起 Pull-off">带</span>;
+    case 'tuixian':
+      return <span className={cn('text-[9.5px] font-semibold leading-none', className)} title="推弦 Push string">推</span>;
+    case 'laxian':
+      return <span className={cn('text-[9.5px] font-semibold leading-none', className)} title="拉弦 Pull string">拉</span>;
+
+    // Guzheng right-hand & left-hand
+    case 'tuo': // 托 ∟ (thumb outward)
+      return (
+        <svg viewBox="0 0 12 12" className={cn('w-3 h-3 inline-block', className)} aria-label="托 Tuo (Thumb outward)">
+          <path d="M3.5 2V9.5H9.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'pi': // 劈 ┐ (thumb inward)
+      return (
+        <svg viewBox="0 0 12 12" className={cn('w-3 h-3 inline-block', className)} aria-label="劈 Pi (Thumb inward)">
+          <path d="M2.5 2.5H8.5V10" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'mo': // 抹 ╲ (index inward)
+      return (
+        <svg viewBox="0 0 12 12" className={cn('w-3 h-3 inline-block', className)} aria-label="抹 Mo (Index inward)">
+          <path d="M3 2.2L9 9.8" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+        </svg>
+      );
+    case 'gou': // 勾 (middle inward hook)
+      return (
+        <svg viewBox="0 0 14 12" className={cn('w-3.5 h-3 inline-block', className)} aria-label="勾 Gou (Middle inward)">
+          <path d="M2.5 8.5C2.5 4.2 5.2 2.4 8.2 2.4C10.4 2.4 11.4 4.2 11.2 8.2L9.5 6.8" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'ti':
+      return <span className={cn('text-[9.5px] font-semibold leading-none', className)} title="剔 Middle outward">剔</span>;
+    case 'cuo': // 大撮 (stacked 勾 over 托)
+      return (
+        <svg viewBox="0 0 14 16" className={cn('w-3.5 h-4 inline-block', className)} aria-label="大撮 Da Cuo (Octave pinch)">
+          <path d="M3 6.5C3 3.2 5.4 1.8 8 1.8C10 1.8 11 3.3 10.8 6.4" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+          <path d="M4.2 8.2V14H10" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'xiaocuo': // 小撮 (stacked 抹 over 托)
+      return (
+        <svg viewBox="0 0 14 16" className={cn('w-3.5 h-4 inline-block', className)} aria-label="小撮 Xiao Cuo (Small pinch)">
+          <path d="M4.2 1.8L9.6 6.4" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />
+          <path d="M4.2 8.2V14H10" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'yao': // 摇指 彡
+      return (
+        <svg viewBox="0 0 14 12" className={cn('w-3.5 h-3 inline-block', className)} aria-label="摇指 Yaozhi (Thumb tremolo)">
+          <path d="M2.5 9.5L5.5 2.5M6 9.5L9 2.5M9.5 9.5L12.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" />
+        </svg>
+      );
+    case 'gua': // 刮奏 (upward wavy glissando arrow)
+      return (
+        <svg viewBox="0 0 16 14" className={cn('w-4 h-3.5 inline-block', className)} aria-label="刮奏 Upward glissando">
+          <path d="M2 12Q4.5 9.5 6 10Q7.5 10.5 9 7.5Q10.5 4.5 13.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+          <path d="M10.2 2.2H13.8V5.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'guadown': // 下行刮奏 (downward wavy glissando arrow)
+      return (
+        <svg viewBox="0 0 16 14" className={cn('w-4 h-3.5 inline-block', className)} aria-label="下行刮奏 Downward glissando">
+          <path d="M2 2.5Q4.5 5 6 4.5Q7.5 4 9 7Q10.5 10 13.5 12" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+          <path d="M10.2 12.2H13.8V8.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'huazhi':
+      return <span className={cn('text-[9.5px] font-bold leading-none', className)} title="花指 Ornamental flourish">花</span>;
+    case 'arp':
+      return <ArpeggioGlyph className={className} />;
+    case 'an':
+      return <span className={cn('text-[9.5px] font-semibold leading-none', className)} title="按音 Left-hand pitch press">按</span>;
+    case 'dian':
+      return <span className={cn('text-[9.5px] font-semibold leading-none', className)} title="点音 Quick press-release">点</span>;
+
+    // Dizi (笛子) & Xiao (箫) breath, tonguing & finger ornaments
+    case 'breath': // 换气 (V breath mark)
+      return (
+        <svg viewBox="0 0 12 10" className={cn('w-3 h-2.5 inline-block', className)} aria-label="换气 Breath mark">
+          <path d="M2 1.8L6 8.5L10 1.8" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'circ': // 循环换气
+      return <span className={cn('text-[9px] font-bold leading-none', className)} title="循环换气 Circular breathing">↻循</span>;
+    case 'tu': // 单吐 T
+      return <span className={cn('text-[10px] font-bold font-mono leading-none', className)} title="单吐 Single tonguing">T</span>;
+    case 'ktu': // K
+      return <span className={cn('text-[10px] font-bold font-mono leading-none', className)} title="吐音 Back-tongue K">K</span>;
+    case 'dtu': // 双吐 TK
+      return <span className={cn('text-[9.5px] font-bold font-mono leading-none tracking-tight', className)} title="双吐 Double tonguing">TK</span>;
+    case 'ttu': // 三吐 TTK
+      return <span className={cn('text-[9px] font-bold font-mono leading-none tracking-tight', className)} title="三吐 Triple tonguing">TTK</span>;
+    case 'huashe': // 花舌 ※
+      return (
+        <svg viewBox="0 0 12 12" className={cn('w-3 h-3 inline-block', className)} aria-label="花舌 Flutter-tongue">
+          <path d="M2.5 2.5L9.5 9.5M9.5 2.5L2.5 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="6" cy="2" r="1.05" fill="currentColor" />
+          <circle cx="6" cy="10" r="1.05" fill="currentColor" />
+          <circle cx="2" cy="6" r="1.05" fill="currentColor" />
+          <circle cx="10" cy="6" r="1.05" fill="currentColor" />
+        </svg>
+      );
+    case 'qizhen': // 气震音 (breath vibrato wave)
+      return (
+        <span className={cn('inline-flex items-center gap-[1px] text-[8.5px] font-semibold leading-none', className)} title="气震音 Breath vibrato">
+          <span>气</span>
+          <svg viewBox="0 0 14 7" className="w-3 h-1.5 inline-block">
+            <path d="M1 3.8Q2.8 1 4.6 3.8T8.2 3.8T11.8 3.8" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+          </svg>
+        </span>
+      );
+    case 'die': // 叠音 又
+      return <span className={cn('text-[9.5px] font-bold leading-none', className)} title="叠音 Upper-neighbor appoggiatura">又</span>;
+    case 'zeng': // 赠音
+      return <span className={cn('text-[9px] font-semibold leading-none', className)} title="赠音 Trailing grace ornament">赠</span>;
+    case 'li': // 历音 (upward rapid scale sweep)
+      return (
+        <svg viewBox="0 0 15 13" className={cn('w-3.5 h-3 inline-block', className)} aria-label="历音 Upward rapid scale sweep">
+          <path d="M2 11L12.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2.2 1.6" />
+          <path d="M9 2.2H13V6.2" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'lidown': // 下历音 (downward rapid scale sweep)
+      return (
+        <svg viewBox="0 0 15 13" className={cn('w-3.5 h-3 inline-block', className)} aria-label="下历音 Downward rapid scale sweep">
+          <path d="M2 2.5L12.5 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2.2 1.6" />
+          <path d="M9 11.2H13V7.2" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'duo': // 剁音
+      return <span className={cn('text-[9.5px] font-bold leading-none', className)} title="剁音 Percussive finger chop">剁</span>;
+    case 'feizhi': // 飞指
+      return <span className={cn('text-[9.5px] font-bold leading-none', className)} title="飞指 Flying-finger sweep">飞</span>;
+    case 'bo': // 波音 (mordent)
+      return (
+        <svg viewBox="0 0 16 9" className={cn('w-4 h-2 inline-block', className)} aria-label="波音 Mordent">
+          <path d="M1.5 6L4 2.5L6.5 6L9 2.5L11.5 6L14.5 2.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       );
   }
 }
@@ -478,7 +731,9 @@ function NavMarkerBadge({
 }
 
 interface SlurArc {
+  key: string;
   id: number;
+  tier: number;
   x1: number;
   x2: number;
   y: number;
@@ -521,6 +776,7 @@ function getMeasureBeatWeight(measure: MusoJianpuMeasure): number {
  */
 function MusicLineView({
   line,
+  instrument,
   fingeringStyle,
   showMarkings,
   showLyrics,
@@ -531,6 +787,7 @@ function MusicLineView({
   onNoteClick
 }: {
   line: MusicLineNode;
+  instrument?: InstrumentType;
   fingeringStyle: 'chinese' | 'arabic';
   showMarkings: boolean;
   showLyrics: boolean;
@@ -571,6 +828,24 @@ function MusicLineView({
     );
   }, [line]);
 
+  const maxSlurTier = useMemo(() => {
+    let maxTier = 0;
+    for (const m of line.measures) {
+      for (const g of m.groups) {
+        for (const n of g.notes) {
+          if (n.slurs) {
+            for (const s of n.slurs) {
+              if (s.tier > maxTier) maxTier = s.tier;
+            }
+          }
+        }
+      }
+    }
+    return maxTier;
+  }, [line]);
+
+  const slurLaneHeight = 16 + maxSlurTier * 11;
+
   const barlineBottomOffset = 25 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
   const measureNumberBottomOffset = 31 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
 
@@ -580,16 +855,23 @@ function MusicLineView({
     const containerRect = container.getBoundingClientRect();
     const scale = container.offsetWidth > 0 ? containerRect.width / container.offsetWidth : 1;
 
-    // Group notes by slurId and hairpinId across the line
-    const slurGroups = new Map<number, MusoJianpuNote[]>();
+    // Group notes by slurId (supporting nested slur stacks!) and hairpinId across the line
+    const slurGroups = new Map<number, { tier: number; notes: MusoJianpuNote[] }>();
     const hairpinGroups = new Map<number, { type: HairpinType; notes: MusoJianpuNote[] }>();
     for (const m of line.measures) {
       for (const g of m.groups) {
         for (const n of g.notes) {
-          if (n.slurId !== undefined) {
-            const arr = slurGroups.get(n.slurId) || [];
-            arr.push(n);
-            slurGroups.set(n.slurId, arr);
+          if (n.slurs && n.slurs.length > 0) {
+            for (const membership of n.slurs) {
+              const entry = slurGroups.get(membership.id) || { tier: membership.tier, notes: [] };
+              entry.tier = Math.max(entry.tier, membership.tier);
+              entry.notes.push(n);
+              slurGroups.set(membership.id, entry);
+            }
+          } else if (n.slurId !== undefined) {
+            const entry = slurGroups.get(n.slurId) || { tier: 0, notes: [] };
+            entry.notes.push(n);
+            slurGroups.set(n.slurId, entry);
           }
           if (showMarkings && n.hairpinId !== undefined && n.hairpinType) {
             const entry = hairpinGroups.get(n.hairpinId) || { type: n.hairpinType, notes: [] };
@@ -601,33 +883,50 @@ function MusicLineView({
     }
 
     const nextArcs: SlurArc[] = [];
-    slurGroups.forEach((notes, slurId) => {
+    slurGroups.forEach(({ tier, notes }, slurId) => {
       if (notes.length < 2) return;
-      const firstEl = noteElMapRef.current.get(notes[0].id);
-      const lastEl = noteElMapRef.current.get(notes[notes.length - 1].id);
-      if (!firstEl || !lastEl) return;
 
-      const r1 = firstEl.getBoundingClientRect();
-      const r2 = lastEl.getBoundingClientRect();
-
-      // Only draw continuous arc if both notes are on the same wrapped visual row
-      if (Math.abs(r1.top - r2.top) / scale > 40) return;
-
-      const x1 = (r1.left - containerRect.left + r1.width * 0.5) / scale;
-      const x2 = (r2.left - containerRect.left + r2.width * 0.5) / scale;
-      const minDigitTop = (Math.min(r1.top, r2.top) - containerRect.top) / scale;
-
-      const maxOctave = notes.reduce((max, n) => Math.max(max, n.octave), 0);
-      const octaveClearance = maxOctave >= 2 ? 12 : maxOctave === 1 ? 7 : 1;
-
-      if (x2 > x1 + 4) {
-        nextArcs.push({
-          id: slurId,
-          x1,
-          x2,
-          y: Math.max(4, minDigitTop - octaveClearance)
-        });
+      // Split into visual rows in case a long phrasing slur wraps across flex rows
+      const visualRows: { note: MusoJianpuNote; rect: DOMRect }[][] = [];
+      for (const n of notes) {
+        const el = noteElMapRef.current.get(n.id);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const currentRow = visualRows[visualRows.length - 1];
+        if (!currentRow || Math.abs(rect.bottom - currentRow[0].rect.bottom) / scale > 44) {
+          visualRows.push([{ note: n, rect }]);
+        } else {
+          currentRow.push({ note: n, rect });
+        }
       }
+
+      visualRows.forEach((row, rowIdx) => {
+        if (row.length < 2) return;
+        const firstRect = row[0].rect;
+        const lastRect = row[row.length - 1].rect;
+        const x1 = (firstRect.left - containerRect.left + firstRect.width * 0.5) / scale;
+        const x2 = (lastRect.left - containerRect.left + lastRect.width * 0.5) / scale;
+
+        // Anchor above the highest note/chord top in the spanned row
+        const minTop = row.reduce(
+          (min, item) => Math.min(min, (item.rect.top - containerRect.top) / scale),
+          Infinity
+        );
+        const maxOctave = row.reduce((max, item) => Math.max(max, item.note.octave), 0);
+        const octaveClearance = maxOctave >= 2 ? 12 : maxOctave === 1 ? 7 : 1;
+        const tierOffset = tier * 11;
+
+        if (x2 > x1 + 4) {
+          nextArcs.push({
+            key: `${slurId}-${rowIdx}`,
+            id: slurId,
+            tier,
+            x1,
+            x2,
+            y: Math.max(4, minTop - octaveClearance - tierOffset)
+          });
+        }
+      });
     });
 
     const nextHairpins: HairpinSpan[] = [];
@@ -727,7 +1026,15 @@ function MusicLineView({
       ? '内'
       : note.markings.string === 'out'
         ? '外'
-        : null;
+        : note.markings.string === 's1'
+          ? '一弦'
+          : note.markings.string === 's2'
+            ? '二弦'
+            : note.markings.string === 's3'
+              ? '三弦'
+              : note.markings.string === 's4'
+                ? '四弦'
+                : null;
 
     const harmonicOrnaments = note.markings.ornaments.filter(o => o === 'harm' || o === 'aharm');
     const positionShiftOrnaments = note.markings.ornaments.filter(o => o === 'shiftUp' || o === 'shiftDown');
@@ -736,7 +1043,14 @@ function MusicLineView({
     const vibratoOrnaments = note.markings.ornaments.filter(o => o === 'vib' || o === 'pvib');
     const melodicOrnaments = note.markings.ornaments.filter(o => o === 'sr' || o === 'da' || o === 'tr');
     const fermataOrnaments = note.markings.ornaments.filter(o => o === 'fermata');
+    const allTechniques = note.markings.techniques || [];
+    const hasArpeggio = allTechniques.includes('arp');
+    const leftGlissTechniques = allTechniques.filter(t => t === 'gua' || t === 'guadown' || t === 'li' || t === 'lidown');
+    const topTechniques = allTechniques.filter(t => t !== 'arp' && t !== 'gua' && t !== 'guadown' && t !== 'li' && t !== 'lidown');
     const hasPositionRow = Boolean(note.markings.position || positionShiftOrnaments.length > 0);
+
+    const isChord = Boolean(note.chordPitches && note.chordPitches.length >= 2);
+    const chordPitches: ChordPitch[] = isChord ? note.chordPitches! : [];
 
     // Continuous beaming logic across adjacent notes in the same BeatGroup
     const prevUnderlines = noteIdxInGroup > 0 ? group.notes[noteIdxInGroup - 1].underlines : 0;
@@ -793,11 +1107,11 @@ function MusicLineView({
           </div>
         )}
 
-        {/* Main Note Column */}
+        {/* Main Note / Chord Column */}
         <div className="flex flex-col items-center justify-end">
           {/* Top Markings Stack (Conventional bottom-to-top order closest to note upward:
               1. Harmonics → 2. Fingers → 3. String → 4. Position → 5. Accent →
-              6. Vibrato → 7. Melodic Ornaments (sr/da/tr) → 8. Bowing → 9. Fermata → 10. Custom Text) */}
+              6. Vibrato → 7. Melodic Ornaments → 8. Bowing / Pipa & Guzheng Techniques → 9. Fermata → 10. Custom Text) */}
           {showMarkings && (
             <div className="flex flex-col items-center justify-end gap-[2px] min-h-[34px] mb-0.5 select-none">
               {/* Layer 10 (Topmost): Custom Performance Text */}
@@ -809,24 +1123,29 @@ function MusicLineView({
                 </div>
               )}
 
-              {/* Layer 9: Fermata (𝄐 sits above ornaments & bowing) */}
+              {/* Layer 9: Fermata (𝄐 sits above ornaments & bowing/pluck techniques) */}
               {fermataOrnaments.map((orn, idx) => (
                 <div key={`ferm-${idx}`} className="flex items-center justify-center min-h-[12px] leading-none">
                   <OrnamentGlyph type={orn} className={erhuAccentClass} />
                 </div>
               ))}
 
-              {/* Layer 8: Bowing (Π / V / /// / ▼ / · / + / ’) */}
+              {/* Layer 8: Bowing & Plucked Instrument Techniques (Pipa / Guzheng) */}
+              {topTechniques.map((tech, idx) => (
+                <div key={`tech-${idx}`} className="flex items-center justify-center min-h-[12px] leading-none whitespace-nowrap">
+                  <PluckTechniqueGlyph type={tech} className={erhuAccentClass} />
+                </div>
+              ))}
               {note.markings.bowing && (
                 <div className="flex items-center justify-center min-h-[12px] leading-none">
                   <BowingGlyph type={note.markings.bowing} className={erhuAccentClass} />
                 </div>
               )}
 
-              {/* Layer 7: Melodic Ornaments (tr / 打 / ⌒回滑) stacked vertically */}
+              {/* Layer 7: Melodic Ornaments (tr / 打·丁 / ⌒回滑) stacked vertically */}
               {melodicOrnaments.map((orn, idx) => (
                 <div key={`mel-${idx}`} className="flex items-center justify-center min-h-[11px] leading-none">
-                  <OrnamentGlyph type={orn} className={erhuAccentClass} />
+                  <OrnamentGlyph type={orn} instrument={instrument} className={erhuAccentClass} />
                 </div>
               ))}
 
@@ -858,9 +1177,9 @@ function MusicLineView({
                 </div>
               )}
 
-              {/* Layer 3: String (内 / 外) */}
+              {/* Layer 3: String (Erhu 内/外 or Pipa 一弦–四弦) */}
               {stringDisplay && (
-                <div className="flex items-center justify-center min-h-[12px] leading-none">
+                <div className="flex items-center justify-center min-h-[12px] leading-none whitespace-nowrap">
                   <span className={cn('text-[10px] font-bold leading-none', erhuAccentClass)}>
                     {stringDisplay}
                   </span>
@@ -885,75 +1204,159 @@ function MusicLineView({
             </div>
           )}
 
-          {/* Reserved vertical lane for High Octave Dots & Slur Arcs */}
-          <div className="h-[16px] mb-[2px]" aria-hidden="true" />
+          {/* Reserved vertical lane for High Octave Dots & Nested Slur Arcs */}
+          <div style={{ height: `${slurLaneHeight}px` }} className="mb-[2px]" aria-hidden="true" />
 
-          {/* Main Pitch Numeral Row (with optional Slide, Accidental, Dot, Tie) */}
-          <div className="relative flex items-center justify-center leading-none h-[24px]">
-            {/* Slide Arrows (上滑音 / 下滑音 leading into the note from the left) */}
-            {showMarkings && slideOrnaments.length > 0 && (
-              <span className="inline-flex items-center mr-[1px]">
+          {/* Main Pitch Numeral / Vertical Chord Row (with optional Gliss, Slide, Arpeggio, Accidental, Dot, Tie) */}
+          <div className={cn('relative flex justify-center leading-none', isChord ? 'items-end' : 'items-center h-[24px]')}>
+            {/* Left-side Arpeggio wavy line (琶音), Glissando (刮奏), and Slide Arrows (上滑音 / 下滑音) */}
+            {showMarkings && (leftGlissTechniques.length > 0 || slideOrnaments.length > 0 || hasArpeggio) && (
+              <span className={cn('inline-flex items-center mr-[1.5px]', isChord && 'self-center')}>
+                {leftGlissTechniques.map((gTech, gIdx) => (
+                  <PluckTechniqueGlyph key={`gliss-${gIdx}`} type={gTech} className={erhuAccentClass} />
+                ))}
                 {slideOrnaments.map((sOrn, sIdx) => (
                   <OrnamentGlyph key={sIdx} type={sOrn} className={erhuAccentClass} />
                 ))}
+                {hasArpeggio && <ArpeggioGlyph tall={isChord} className={erhuAccentClass} />}
               </span>
             )}
 
-            {/* Accidental */}
-            {note.accidental && (
-              <span className={cn('text-[11px] font-bold -translate-y-1.5 mr-[0.5px] leading-none', inkClass)}>
-                {note.accidental === '#' ? '♯' : note.accidental === 'b' ? '♭' : '♮'}
+            {isChord ? (
+              /* Vertical Stacked Chord (highest pitch on top, lowest on bottom) */
+              <span
+                ref={registerNoteRef(note.id)}
+                className={cn(
+                  'relative inline-flex flex-col items-center justify-end gap-[2px] select-text',
+                  noteColorClass
+                )}
+                style={{ fontFamily: '"Plus Jakarta Sans", "Noto Sans SC", system-ui, sans-serif' }}
+              >
+                {chordPitches.map((cp, cpIdx) => {
+                  const isTop = cpIdx === 0;
+                  const isBottom = cpIdx === chordPitches.length - 1;
+                  return (
+                    <span
+                      key={cpIdx}
+                      className="relative inline-flex items-center justify-center leading-none"
+                    >
+                      {cp.accidental && (
+                        <span className={cn('text-[9.5px] font-bold -translate-y-[2px] mr-[0.5px] leading-none', inkClass)}>
+                          {cp.accidental === '#' ? '♯' : cp.accidental === 'b' ? '♭' : '♮'}
+                        </span>
+                      )}
+                      <span className="relative inline-flex flex-col items-center justify-center leading-none">
+                        {/* High octave dots above this chord pitch */}
+                        {cp.octave >= 1 && (
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'flex flex-col items-center gap-[1.5px] pointer-events-none',
+                              isTop ? 'absolute bottom-full left-1/2 -translate-x-1/2 pb-[2px]' : 'mb-[1px]'
+                            )}
+                          >
+                            {cp.octave >= 2 && <span className={cn('w-[3px] h-[3px] rounded-full bg-current', inkClass)} />}
+                            <span className={cn('w-[3px] h-[3px] rounded-full bg-current', inkClass)} />
+                          </span>
+                        )}
+
+                        <span className="text-[17.5px] font-bold tabular-nums leading-[18px]">
+                          {cp.degree}
+                        </span>
+
+                        {/* Low octave dots: inline for upper chord tones, below beam underlines for bottom tone */}
+                        {cp.octave <= -1 && !isBottom && (
+                          <span
+                            aria-hidden="true"
+                            className="flex flex-col items-center gap-[1.5px] mt-[1px] pointer-events-none"
+                          >
+                            <span className={cn('w-[3px] h-[3px] rounded-full bg-current', inkClass)} />
+                            {cp.octave <= -2 && <span className={cn('w-[3px] h-[3px] rounded-full bg-current', inkClass)} />}
+                          </span>
+                        )}
+                        {cp.octave <= -1 && isBottom && (
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'absolute top-full left-1/2 -translate-x-1/2 flex flex-col items-center gap-[2px] pointer-events-none',
+                              note.underlines === 0
+                                ? 'pt-[3px]'
+                                : note.underlines === 1
+                                  ? 'pt-[6px]'
+                                  : note.underlines === 2
+                                    ? 'pt-[10px]'
+                                    : 'pt-[14px]'
+                            )}
+                          >
+                            <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
+                            {cp.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  );
+                })}
               </span>
-            )}
+            ) : (
+              <>
+                {/* Accidental */}
+                {note.accidental && (
+                  <span className={cn('text-[11px] font-bold -translate-y-1.5 mr-[0.5px] leading-none', inkClass)}>
+                    {note.accidental === '#' ? '♯' : note.accidental === 'b' ? '♭' : '♮'}
+                  </span>
+                )}
 
-            {/* Core Jianpu Digit or Prolongation Dash (anchors octave dots & slurs to the digit itself) */}
-            <span
-              ref={registerNoteRef(note.id)}
-              className={cn(
-                'relative inline-flex items-center justify-center h-[22px] text-[21px] font-bold tabular-nums tracking-tight leading-none select-text',
-                noteColorClass
-              )}
-              style={{ fontFamily: '"Plus Jakarta Sans", "Noto Sans SC", system-ui, sans-serif' }}
-            >
-              {/* High Octave Dots anchored directly above the digit */}
-              {note.octave >= 1 && (
+                {/* Core Jianpu Digit or Prolongation Dash (anchors octave dots & slurs to the digit itself) */}
                 <span
-                  aria-hidden="true"
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 pb-[2px] flex flex-col items-center gap-[2px] pointer-events-none"
-                >
-                  {note.octave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
-                  <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
-                </span>
-              )}
-
-              {note.degree === -1 ? '–' : note.degree}
-
-              {/* Low Octave Dots anchored directly below the digit & duration underlines */}
-              {note.octave <= -1 && (
-                <span
-                  aria-hidden="true"
+                  ref={registerNoteRef(note.id)}
                   className={cn(
-                    'absolute top-full left-1/2 -translate-x-1/2 flex flex-col items-center gap-[2px] pointer-events-none',
-                    note.underlines === 0
-                      ? 'pt-[3px]'
-                      : note.underlines === 1
-                        ? 'pt-[6px]'
-                        : note.underlines === 2
-                          ? 'pt-[10px]'
-                          : 'pt-[14px]'
+                    'relative inline-flex items-center justify-center h-[22px] text-[21px] font-bold tabular-nums tracking-tight leading-none select-text',
+                    noteColorClass
                   )}
+                  style={{ fontFamily: '"Plus Jakarta Sans", "Noto Sans SC", system-ui, sans-serif' }}
                 >
-                  <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
-                  {note.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                  {/* High Octave Dots anchored directly above the digit */}
+                  {note.octave >= 1 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute bottom-full left-1/2 -translate-x-1/2 pb-[2px] flex flex-col items-center gap-[2px] pointer-events-none"
+                    >
+                      {note.octave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                      <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
+                    </span>
+                  )}
+
+                  {note.degree === -1 ? '–' : note.degree}
+
+                  {/* Low Octave Dots anchored directly below the digit & duration underlines */}
+                  {note.octave <= -1 && (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'absolute top-full left-1/2 -translate-x-1/2 flex flex-col items-center gap-[2px] pointer-events-none',
+                        note.underlines === 0
+                          ? 'pt-[3px]'
+                          : note.underlines === 1
+                            ? 'pt-[6px]'
+                            : note.underlines === 2
+                              ? 'pt-[10px]'
+                              : 'pt-[14px]'
+                      )}
+                    >
+                      <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
+                      {note.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
+              </>
+            )}
 
             {/* Augmentation Dot(s) */}
             {note.dots > 0 && (
               <span
                 className={cn(
                   'inline-flex items-center',
+                  isChord && 'mb-[6px]',
                   note.underlines === 0 ? 'ml-[8px] mr-[1px] gap-[4px]' : 'ml-[5px] gap-[3px]',
                   inkClass
                 )}
@@ -1043,21 +1446,21 @@ function MusicLineView({
 
   return (
     <div ref={lineContainerRef} className={cn('relative w-full pb-3', hasStackedNavAndVolta ? 'pt-10' : hasTopNavMarkers ? 'pt-7' : 'pt-2')}>
-      {/* SVG Slur & Hairpin Overlay Layer */}
+      {/* SVG Nested Slurs & Hairpin Overlay Layer */}
       {(slurArcs.length > 0 || hairpinSpans.length > 0) && (
         <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-10">
           {slurArcs.map(arc => {
             const midX = (arc.x1 + arc.x2) / 2;
             const span = arc.x2 - arc.x1;
-            const lift = Math.min(13, Math.max(7, span * 0.12));
+            const lift = Math.min(20, Math.max(7, span * 0.11) + arc.tier * 3.5);
             const yBase = arc.y;
             return (
               <path
-                key={`slur-${arc.id}`}
+                key={`slur-${arc.key}`}
                 d={`M ${arc.x1} ${yBase} Q ${midX} ${yBase - lift} ${arc.x2} ${yBase}`}
                 fill="none"
                 stroke={isDarkSurface ? '#E5E7EB' : '#1A1A1A'}
-                strokeWidth="1.45"
+                strokeWidth={arc.tier >= 1 ? '1.35' : '1.45'}
                 strokeLinecap="round"
               />
             );
@@ -1248,7 +1651,7 @@ export function MusoJianpuRenderer({
         )}>
           {/* Left Musical Signature Block */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {/* Key & Erhu Strings */}
+            {/* Key & Instrument Tuning */}
             <div className="flex items-baseline gap-1.5">
               <span className="text-base sm:text-lg font-bold tabular-nums tracking-tight">
                 {formatJianpuKeyLabel(document.header.key)}
@@ -1259,7 +1662,15 @@ export function MusoJianpuRenderer({
                   ? (isDarkSurface ? 'text-[#FF6B3D]' : 'text-[#C23E1E]')
                   : (isDarkSurface ? 'text-neutral-400' : 'text-neutral-600')
               )}>
-                ({stringsLabel}弦)
+                {document.header.instrument === 'pipa'
+                  ? `琵琶 (${document.header.strings || 'A-d-e-a'})`
+                  : document.header.instrument === 'guzheng'
+                    ? `古筝${document.header.strings ? ` (${document.header.strings})` : ''}`
+                    : document.header.instrument === 'dizi'
+                      ? `${document.header.fluteKey || '笛子'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
+                      : document.header.instrument === 'xiao'
+                        ? `${document.header.fluteKey || '洞箫'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
+                        : `(${stringsLabel}弦)`}
               </span>
             </div>
 
@@ -1344,6 +1755,7 @@ export function MusoJianpuRenderer({
                 <MusicLineView
                   key={line.id}
                   line={line}
+                  instrument={document.header.instrument}
                   fingeringStyle={fingeringStyle}
                   showMarkings={showMarkings}
                   showLyrics={showLyrics}

@@ -32,6 +32,8 @@ import {
   macroAdjustUnderlines,
   macroInsertGraceNote,
   macroInsertSnippet,
+  macroSetFingering,
+  macroSetInstrument,
   macroSetKey,
   macroSetTempo,
   macroShiftOctave,
@@ -41,6 +43,7 @@ import {
   macroToggleDot,
   macroToggleMarking,
   macroToggleSlur,
+  macroWrapChord,
   macroWrapHairpin,
   macroWrapTriplet,
   TextEditResult
@@ -48,12 +51,12 @@ import {
 import { ERHU_KEYS, getErhuKeyInfo } from '../../lib/musojianpu/erhuKeys.ts';
 import { MUSOJIANPU_TEMPLATES } from '../../lib/musojianpu/samples.ts';
 import { MusoJianpuPlayer } from '../../lib/musojianpu/audioEngine.ts';
-import { MusoJianpuNote } from '../../lib/musojianpu/types.ts';
+import { InstrumentType, MusoJianpuNote } from '../../lib/musojianpu/types.ts';
 import { MusoJianpuRenderer } from './MusoJianpuRenderer.tsx';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 
-type MacroTab = 'rhythm' | 'bowing' | 'fingering' | 'ornaments' | 'structure';
+type MacroTab = 'bowing' | 'pipa' | 'guzheng' | 'dizi' | 'fingering' | 'ornaments' | 'rhythm' | 'structure';
 
 export interface MusoJianpuWorkbenchProps {
   content: string;
@@ -121,6 +124,18 @@ export function MusoJianpuWorkbench({
   // Parse the MusoJianpu text score into AST
   const parsedDoc = useMemo(() => parseMusoJianpuScore(content), [content]);
   const keyInfo = useMemo(() => getErhuKeyInfo(parsedDoc.header.key), [parsedDoc.header.key]);
+  const activeInstrument: InstrumentType = parsedDoc.header.instrument || 'erhu';
+  const isWindInstrument = activeInstrument === 'dizi' || activeInstrument === 'xiao';
+  const instrumentPlayLabel =
+    activeInstrument === 'pipa'
+      ? 'Pipa'
+      : activeInstrument === 'guzheng'
+        ? 'Guzheng'
+        : activeInstrument === 'dizi'
+          ? 'Dizi'
+          : activeInstrument === 'xiao'
+            ? 'Xiao'
+            : 'Erhu';
 
   // Cleanup player on unmount
   useEffect(() => {
@@ -457,10 +472,10 @@ ${collectedCss}
                   ? 'bg-white/[0.08] hover:bg-white/[0.14] text-white'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-white'
             )}
-            title="Play score with synthesized Erhu bowed sound"
+            title={`Play score with synthesized ${instrumentPlayLabel} sound`}
           >
             {isPlaying ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-            <span>{isPlaying ? 'Stop Erhu' : 'Play Erhu'}</span>
+            <span>{isPlaying ? `Stop ${instrumentPlayLabel}` : `Play ${instrumentPlayLabel}`}</span>
           </button>
 
           {/* Tempo Multiplier */}
@@ -485,7 +500,36 @@ ${collectedCss}
 
           <div className={cn('h-4 w-[1px]', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
 
-          {/* Erhu Key & String Tuning Macro Picker */}
+          {/* Instrument Voice & Notation Selector */}
+          <select
+            value={activeInstrument}
+            onChange={e => {
+              const nextInst = e.target.value as InstrumentType;
+              onChangeContent(macroSetInstrument(content, nextInst));
+              setActiveMacroTab(
+                nextInst === 'pipa'
+                  ? 'pipa'
+                  : nextInst === 'guzheng'
+                    ? 'guzheng'
+                    : nextInst === 'dizi' || nextInst === 'xiao'
+                      ? 'dizi'
+                      : 'bowing'
+              );
+            }}
+            className={cn(
+              'h-7 px-2 rounded-md border text-xs font-semibold outline-none cursor-pointer',
+              isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+            )}
+            title="Select instrument voice and notation style (@instrument)"
+          >
+            <option value="erhu" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>二胡 Erhu</option>
+            <option value="pipa" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>琵琶 Pipa</option>
+            <option value="guzheng" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>古筝 Guzheng</option>
+            <option value="dizi" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>笛子 Dizi</option>
+            <option value="xiao" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>洞箫 Xiao</option>
+          </select>
+
+          {/* Key & String / Fingering Macro Picker */}
           <div className="flex items-center gap-1.5">
             <Music className="w-3.5 h-3.5 text-[#E05A2B] shrink-0" />
             <select
@@ -495,14 +539,33 @@ ${collectedCss}
                 'h-7 px-2 rounded-md border text-xs font-semibold outline-none cursor-pointer',
                 isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
               )}
-              title="Change Erhu key signature and string tuning (e.g. 1=G 5-2弦)"
+              title="Change key signature and tuning (e.g. 1=G)"
             >
               {ERHU_KEYS.map(k => (
                 <option key={k.key} value={k.key} className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>
-                  {k.label} · {k.strings}弦
+                  {activeInstrument === 'erhu' ? `${k.label} · ${k.strings}弦` : k.label}
                 </option>
               ))}
             </select>
+
+            {/* Dizi / Xiao 筒音作X Fingering System Picker */}
+            {isWindInstrument && (
+              <select
+                value={parsedDoc.header.fingering || '筒音作5'}
+                onChange={e => onChangeContent(macroSetFingering(content, e.target.value))}
+                className={cn(
+                  'h-7 px-2 rounded-md border text-xs font-semibold outline-none cursor-pointer',
+                  isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                )}
+                title="Set Dizi / Xiao all-holes-closed fingering (@fingering)"
+              >
+                {(['筒音作5', '筒音作2', '筒音作1', '筒音作6', '筒音作3'] as const).map(f => (
+                  <option key={f} value={f} className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {/* Diatonic Scale Degree Shift Macros */}
             <div className="flex items-center gap-0.5" title="Shift all Jianpu notes by scale degree">
@@ -586,6 +649,10 @@ ${collectedCss}
                         onChangeContent(tpl.content);
                         onChangeTitle?.(tpl.title);
                       }
+                      if (/^@instrument\s*:\s*pipa/im.test(tpl.content)) setActiveMacroTab('pipa');
+                      else if (/^@instrument\s*:\s*guzheng/im.test(tpl.content)) setActiveMacroTab('guzheng');
+                      else if (/^@instrument\s*:\s*(?:dizi|xiao)/im.test(tpl.content)) setActiveMacroTab('dizi');
+                      else setActiveMacroTab('bowing');
                       setCursorOffset(null);
                       setIsTemplateMenuOpen(false);
                     }}
@@ -736,24 +803,23 @@ ${collectedCss}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 leading-relaxed">
             <div className="space-y-1">
-              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Notes, Octaves & Beams</div>
-              <div><code className="font-mono text-[#E05A2B]">1–7</code> scale degrees · <code className="font-mono text-[#E05A2B]">0</code> rest · <code className="font-mono text-[#E05A2B]">-</code> prolong</div>
-              <div><code className="font-mono text-[#E05A2B]">' / ''</code> high octave · <code className="font-mono text-[#E05A2B]">, / ,,</code> low octave (<kbd className="font-mono">Alt+↑/↓</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">5/6/</code> or <code className="font-mono text-[#E05A2B]">5_6_</code> 8ths · <code className="font-mono text-[#E05A2B]">//</code> 16ths · <code className="font-mono text-[#E05A2B]">///</code> 32nds (<kbd className="font-mono">Alt+-/=</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">(3/5/ 6/1'/)</code> slur/legato bow (<kbd className="font-mono">Alt+S</kbd>) · <code className="font-mono text-[#E05A2B]">^5/</code> or <code className="font-mono text-[#E05A2B]">{'^{5/6/}'}</code> grace note</div>
+              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Notes, Chords &amp; Nested Slurs</div>
+              <div><code className="font-mono text-[#E05A2B]">1–7</code> notes · <code className="font-mono text-[#E05A2B]">0</code> rest · <code className="font-mono text-[#E05A2B]">-</code> prolong · <code className="font-mono text-[#E05A2B]">' / ,</code> octaves</div>
+              <div><code className="font-mono text-[#E05A2B]">&lt;1 3 5&gt;/</code> or <code className="font-mono text-[#E05A2B]">1+3+5/</code> vertical chords · <code className="font-mono text-[#E05A2B]">5/6/</code> 8ths · <code className="font-mono text-[#E05A2B]">//</code> 16ths</div>
+              <div><code className="font-mono text-[#E05A2B]">((1/ 2/) (3/ 5/))</code> nested phrasing + articulation slurs (<kbd className="font-mono">Alt+S</kbd>)</div>
+              <div><code className="font-mono text-[#E05A2B]">^5/</code> or <code className="font-mono text-[#E05A2B]">{'^{5/6/}'}</code> grace note · <code className="font-mono text-[#E05A2B]">&lt;( ... )</code> / <code className="font-mono text-[#E05A2B]">&gt;( ... )</code> hairpins</div>
             </div>
             <div className="space-y-1">
-              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Erhu Bowing, Fingers & Strings</div>
-              <div><code className="font-mono text-[#E05A2B]">{'{pull}'}</code> / <code className="font-mono text-[#E05A2B]">{'{拉}'}</code> Pull bow Π (<kbd className="font-mono">Alt+L</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">{'{push}'}</code> / <code className="font-mono text-[#E05A2B]">{'{推}'}</code> Push bow V (<kbd className="font-mono">Alt+T</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">{'{0..4}'}</code> or <code className="font-mono text-[#E05A2B]">{'{一..四}'}</code> Fingering (<kbd className="font-mono">Alt+0..4</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">{'{in}'}</code> / <code className="font-mono text-[#E05A2B]">{'{out}'}</code> Inner/Outer string (<kbd className="font-mono">Alt+I / O</kbd>)</div>
+              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Chinese Instrument Markings</div>
+              <div><code className="font-mono text-[#E05A2B]">@instrument:</code> <code className="font-mono">erhu</code> · <code className="font-mono">pipa</code> · <code className="font-mono">guzheng</code> · <code className="font-mono">dizi</code> · <code className="font-mono">xiao</code></div>
+              <div><span className="font-semibold">Erhu:</span> <code className="font-mono text-[#E05A2B]">{'{pull,push,in,out,一..四,su,sd,vib}'}</code></div>
+              <div><span className="font-semibold">Pipa / Guzheng:</span> <code className="font-mono text-[#E05A2B]">{'{tan,tiao,lun,sao,fu}'}</code> · <code className="font-mono text-[#E05A2B]">{'{tuo,mo,cuo,yao,gua,arp}'}</code></div>
+              <div><span className="font-semibold">Dizi / Xiao:</span> <code className="font-mono text-[#E05A2B]">@fingering: 筒音作5</code> · <code className="font-mono text-[#E05A2B]">{'{breath,tu,dtu,huashe,qizhen,die,da,zeng,li,duo,bo}'}</code></div>
             </div>
             <div className="space-y-1">
-              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Ornaments, Repeats &amp; Navigation</div>
-              <div><code className="font-mono text-[#E05A2B]">{'{su}'}</code> / <code className="font-mono text-[#E05A2B]">{'{sd}'}</code> Slides (<kbd className="font-mono">Alt+U/D</kbd>) · <code className="font-mono text-[#E05A2B]">{'{vib}'}</code> Vibrato (<kbd className="font-mono">Alt+V</kbd>)</div>
-              <div><code className="font-mono text-[#E05A2B]">&lt;( ... )</code> Crescendo · <code className="font-mono text-[#E05A2B]">&gt;( ... )</code> Diminuendo hairpin passages</div>
-              <div><code className="font-mono text-[#E05A2B]">|: ... :|</code> repeats · <code className="font-mono text-[#E05A2B]">[1.</code> <code className="font-mono text-[#E05A2B]">[2.</code> endings · <code className="font-mono text-[#E05A2B]">[segno]</code> <code className="font-mono text-[#E05A2B]">[coda]</code> <code className="font-mono text-[#E05A2B]">[to coda]</code> <code className="font-mono text-[#E05A2B]">[fine]</code> <code className="font-mono text-[#E05A2B]">[dc al fine]</code> <code className="font-mono text-[#E05A2B]">[ds al coda]</code> <code className="font-mono text-[#E05A2B]">[segue]</code></div>
+              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Repeats, Navigation &amp; Structure</div>
+              <div><code className="font-mono text-[#E05A2B]">|: ... :|</code> / <code className="font-mono text-[#E05A2B]">:||:</code> repeats · <code className="font-mono text-[#E05A2B]">[1.</code> <code className="font-mono text-[#E05A2B]">[2.</code> endings</div>
+              <div><code className="font-mono text-[#E05A2B]">[segno]</code> <code className="font-mono text-[#E05A2B]">[coda]</code> <code className="font-mono text-[#E05A2B]">[to coda]</code> <code className="font-mono text-[#E05A2B]">[fine]</code> <code className="font-mono text-[#E05A2B]">[dc al fine]</code> <code className="font-mono text-[#E05A2B]">[ds al coda]</code> <code className="font-mono text-[#E05A2B]">[segue]</code></div>
               <div><code className="font-mono text-[#E05A2B]">S:</code> section · <code className="font-mono text-[#E05A2B]">L:</code> aligned lyrics · <code className="font-mono text-[#E05A2B]">T:</code> note · <kbd className="font-mono">Ctrl/Cmd+J</kbd> BPM</div>
             </div>
           </div>
@@ -784,10 +850,13 @@ ${collectedCss}
               <div className="flex items-center gap-1">
                 {(
                   [
-                    { id: 'bowing', label: 'Bowing 弓法' },
+                    { id: 'bowing', label: 'Erhu 弓法' },
+                    { id: 'pipa', label: 'Pipa 琵琶' },
+                    { id: 'guzheng', label: 'Guzheng 古筝' },
+                    { id: 'dizi', label: 'Dizi/Xiao 笛箫' },
                     { id: 'fingering', label: 'Fingers 指法' },
                     { id: 'ornaments', label: 'Ornaments 技巧' },
-                    { id: 'rhythm', label: 'Pitch & Rhythm' },
+                    { id: 'rhythm', label: 'Pitch & Chords' },
                     { id: 'structure', label: 'Bars & Dynamics' }
                   ] as const
                 ).map(tab => (
@@ -821,8 +890,8 @@ ${collectedCss}
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'push'))} className={macroBtnClass} title="Push Bow / Up-bow (Alt+T)">
                     <span className="font-bold text-[#E05A2B]">V</span> 推弓
                   </button>
-                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleSlur(t, f, e))} className={macroBtnClass} title="Wrap / Unwrap Slur Bow 连弓线 (Alt+S)">
-                    <span>⌒</span> 连弓 ( )
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleSlur(t, f, e))} className={macroBtnClass} title="Wrap / Unwrap Slur or Nested Phrasing Slur 连音线 (Alt+S)">
+                    <span>⌒</span> 连音 ( )
                   </button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'trem'))} className={macroBtnClass} title="Tremolo Bow 颤弓">
                     <span className="font-mono">///</span> 颤弓
@@ -839,6 +908,80 @@ ${collectedCss}
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'retake'))} className={macroBtnClass} title="Bow Retake / Breath 换弓">
                     <span>’</span> 换弓
                   </button>
+                </>
+              )}
+
+              {activeMacroTab === 'pipa' && (
+                <>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'tan'))} className={macroBtnClass} title="Pipa inward index pluck {tan}">↙ 弹</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'tiao'))} className={macroBtnClass} title="Pipa outward index pluck {tiao}">↗ 挑</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'gun'))} className={macroBtnClass} title="Pipa rapid tan-tiao alternation {gun}">※ 滚</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'lun'))} className={macroBtnClass} title="Pipa five-finger roll {lun}">轮指</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'banlun'))} className={macroBtnClass} title="Pipa half roll {banlun}">半轮</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'sao'))} className={macroBtnClass} title="Pipa downward strum across strings {sao}">↙ 扫</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'fu'))} className={macroBtnClass} title="Pipa upward strum across strings {fu}">↗ 拂</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'fen'))} className={macroBtnClass} title="Pipa outward split chord {fen}">分</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'zhi'))} className={macroBtnClass} title="Pipa inward pinch chord {zhi}">摭</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'jiao'))} className={macroBtnClass} title="Twisted-string effect {jiao}">⊗ 绞弦</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'sha'))} className={macroBtnClass} title="Muted percussive click {sha}">× 煞音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'dai'))} className={macroBtnClass} title="Left-hand pull-off {dai}">带起</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'tuixian'))} className={macroBtnClass} title="Push string {tuixian}">推弦</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'laxian'))} className={macroBtnClass} title="Pull string {laxian}">拉弦</button>
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 's1'))} className={macroBtnClass} title="1st String 子弦 {s1}">一弦</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 's2'))} className={macroBtnClass} title="2nd String 中弦 {s2}">二弦</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 's3'))} className={macroBtnClass} title="3rd String 老弦 {s3}">三弦</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 's4'))} className={macroBtnClass} title="4th String 缠弦 {s4}">四弦</button>
+                </>
+              )}
+
+              {activeMacroTab === 'guzheng' && (
+                <>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'tuo'))} className={macroBtnClass} title="Thumb outward {tuo}">∟ 托</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'pi'))} className={macroBtnClass} title="Thumb inward {pi}">┐ 劈</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'mo'))} className={macroBtnClass} title="Index inward {mo}">╲ 抹</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'tiao'))} className={macroBtnClass} title="Index outward {tiao}">╱ 挑</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'gou'))} className={macroBtnClass} title="Middle inward {gou}">⌒ 勾</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'ti'))} className={macroBtnClass} title="Middle outward {ti}">剔</button>
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'cuo'))} className={macroBtnClass} title="Octave pinch {cuo}">大撮</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'xiaocuo'))} className={macroBtnClass} title="Small pinch {xiaocuo}">小撮</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'yao'))} className={macroBtnClass} title="Thumb rapid tremolo {yao}">彡 摇指</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'arp'))} className={macroBtnClass} title="Arpeggio rolled chord {arp}">〰 琶音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'gua'))} className={macroBtnClass} title="Upward glissando sweep {gua}">↗ 刮奏</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'guadown'))} className={macroBtnClass} title="Downward glissando sweep {guadown}">↘ 下刮</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'huazhi'))} className={macroBtnClass} title="Ornamental flourish {huazhi}">花指</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'an'))} className={macroBtnClass} title="Left-hand pitch press {an}">按音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'dian'))} className={macroBtnClass} title="Left-hand quick press-release {dian}">点音</button>
+                </>
+              )}
+
+              {activeMacroTab === 'dizi' && (
+                <>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'breath'))} className={macroBtnClass} title="Breath mark 换气 {breath}">
+                    <span className="font-bold text-[#E05A2B]">V</span> 换气
+                  </button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'circ'))} className={macroBtnClass} title="Circular breathing 循环换气 {circ}">↻ 循环</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'tu'))} className={macroBtnClass} title="Single tonguing 单吐 {tu}">
+                    <span className="font-bold">T</span> 单吐
+                  </button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'dtu'))} className={macroBtnClass} title="Double tonguing 双吐 {dtu}">
+                    <span className="font-bold">TK</span> 双吐
+                  </button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'ttu'))} className={macroBtnClass} title="Triple tonguing 三吐 {ttu}">
+                    <span className="font-bold">TTK</span> 三吐
+                  </button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'huashe'))} className={macroBtnClass} title="Flutter-tongue 花舌 {huashe}">※ 花舌</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'qizhen'))} className={macroBtnClass} title="Breath vibrato 气震音 {qizhen}">气震音</button>
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'die'))} className={macroBtnClass} title="Upper-neighbor fleeting grace 叠音 {die}">又 叠音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'da'))} className={macroBtnClass} title="Finger tap 打音 {da}">丁 打音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'zeng'))} className={macroBtnClass} title="Trailing grace ornament 赠音 {zeng}">赠 赠音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'li'))} className={macroBtnClass} title="Upward rapid scale run 历音 {li}">↗ 历音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'lidown'))} className={macroBtnClass} title="Downward rapid scale run 下历音 {lidown}">↘ 下历</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'duo'))} className={macroBtnClass} title="Percussive chop 剁音 {duo}">剁 剁音</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'feizhi'))} className={macroBtnClass} title="Flying-finger rapid sweep 飞指 {feizhi}">飞 飞指</button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'bo'))} className={macroBtnClass} title="Mordent 波音 {bo}">〰 波音</button>
                 </>
               )}
 
@@ -883,6 +1026,13 @@ ${collectedCss}
 
               {activeMacroTab === 'rhythm' && (
                 <>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroWrapChord(t, f, e))} className={macroBtnClass} title="Wrap selected notes as Chord <1 3 5> (or insert sample chord)">
+                    <span className="font-mono font-bold text-[#E05A2B]">&lt;1 3 5&gt;</span> Chord
+                  </button>
+                  <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleSlur(t, f, e))} className={macroBtnClass} title="Wrap / Nest Slur (Alt+S)">
+                    <span>⌒</span> Slur ( )
+                  </button>
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroShiftOctave(t, f, e, 1))} className={macroBtnClass} title="Raise Octave Dot (Alt+↑)">
                     <ArrowUp className="w-3 h-3" /> Octave +
                   </button>

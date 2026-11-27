@@ -4,13 +4,14 @@
  */
 
 import * as Tone from 'tone';
-import { MusoJianpuDocument, MusoJianpuMeasure, MusoJianpuNote } from './types.ts';
+import { InstrumentType, MusoJianpuDocument, MusoJianpuMeasure, MusoJianpuNote } from './types.ts';
 import { jianpuToMidi } from './erhuKeys.ts';
 
 export interface ScheduledErhuEvent {
   noteId: string;
   measureIndex: number;
-  midi: number | null; // null = rest
+  midi: number | null; // null = rest (primary/top pitch for chords)
+  chordMidis?: number[]; // All simultaneous MIDI pitches (sorted low -> high) when chord
   startBeat: number;
   durationBeats: number;
   slideTargetMidi?: number;
@@ -18,6 +19,10 @@ export interface ScheduledErhuEvent {
   isStaccato: boolean;
   isTremolo: boolean;
   isPizzicato: boolean;
+  isMuted?: boolean;
+  isFlutter?: boolean;
+  arpeggio?: 'up' | 'down' | 'roll';
+  glissMidis?: number[];
   velocity: number;
 }
 
@@ -68,7 +73,6 @@ export function expandMeasurePlaybackOrder(
   const segnoIndex = measures.findIndex(m => m.startMarkers?.includes('segno'));
   const codaIndex = measures.findIndex(m => m.startMarkers?.includes('coda'));
 
-  // Track repeat pass counts per repeat-end bar index, and one-shot navigation jump tracking
   const repeatPassCount = new Map<number, number>();
   const usedNavJumps = new Set<number>();
 
@@ -90,10 +94,8 @@ export function expandMeasurePlaybackOrder(
       }
     }
 
-    // Check volta ending eligibility (skip ending if current pass doesn't match)
     const voltaPasses = parseVoltaPasses(m.volta);
     if (voltaPasses && !voltaPasses.includes(currentPass)) {
-      // Advance past this volta section until a matching volta or non-volta measure
       let skipIdx = idx + 1;
       while (skipIdx < measures.length) {
         const nextVolta = parseVoltaPasses(measures[skipIdx].volta);
@@ -107,12 +109,10 @@ export function expandMeasurePlaybackOrder(
       continue;
     }
 
-    // Play this measure
     result.push({ measure: m, measureIndex: idx });
 
     const endMarks = m.endMarkers || [];
 
-    // 1. After a D.C./D.S. jump, honor Fine or To Coda
     if (activeJumpGoal === 'fine' && endMarks.includes('fine')) {
       break;
     }
@@ -122,9 +122,7 @@ export function expandMeasurePlaybackOrder(
       continue;
     }
 
-    // 2. Check repeat end barlines (:| or :||:)
     if (m.endBarline === ':|' || m.endBarline === ':||:') {
-      // Determine how many times this repeat should trigger (based on highest volta in section, default 2 passes)
       let maxPasses = 2;
       for (let k = currentRepeatStart; k < measures.length; k++) {
         const vp = parseVoltaPasses(measures[k].volta);
@@ -136,7 +134,6 @@ export function expandMeasurePlaybackOrder(
         }
       }
       const timesTaken = repeatPassCount.get(idx) || 0;
-      // Standard convention: skip inner repeats after a D.C./D.S. jump unless explicitly needed
       if (activeJumpGoal === 'none' && timesTaken < maxPasses - 1) {
         repeatPassCount.set(idx, timesTaken + 1);
         currentPass = timesTaken + 2;
@@ -150,7 +147,6 @@ export function expandMeasurePlaybackOrder(
       }
     }
 
-    // 3. Check D.C. / D.S. jumps (fire once each to avoid infinite loops)
     if (!usedNavJumps.has(idx)) {
       if (endMarks.includes('dcAlFine')) {
         usedNavJumps.add(idx);
@@ -212,8 +208,34 @@ export function expandMeasurePlaybackOrder(
 }
 
 /**
+ * Generates a 5-note Chinese pentatonic glissando lead-in (刮奏 / 花指) leading into `targetMidi`.
+ */
+function buildPentatonicGlissMidis(targetMidi: number, direction: 'up' | 'down', count: number = 6): number[] {
+  const pentatonicSteps = [0, 2, 4, 7, 9]; // Major pentatonic intervals (1 2 3 5 6)
+  const notes: number[] = [];
+  const baseOct = Math.floor(targetMidi / 12) * 12;
+  const tonicClass = targetMidi % 12;
+  // Build a pool around targetMidi
+  const pool: number[] = [];
+  for (let oct = -2; oct <= 1; oct++) {
+    for (const st of pentatonicSteps) {
+      pool.push(baseOct + tonicClass + oct * 12 + st);
+    }
+  }
+  const uniquePool = Array.from(new Set(pool)).sort((a, b) => a - b);
+  if (direction === 'up') {
+    const below = uniquePool.filter(m => m < targetMidi && m >= targetMidi - 17);
+    notes.push(...below.slice(-count));
+  } else {
+    const above = uniquePool.filter(m => m > targetMidi && m <= targetMidi + 17).reverse();
+    notes.push(...above.slice(-count));
+  }
+  return notes;
+}
+
+/**
  * Flattens a parsed MusoJianpuDocument into sequential timed musical events,
- * obeying repeats, voltas, Segno, Coda, D.C./D.S., Fine, dashes ('-'), ties ('~'), and hairpins.
+ * obeying repeats, voltas, Segno, Coda, D.C./D.S., Fine, chords, Pipa/Guzheng techniques, dashes ('-'), ties ('~'), and hairpins.
  */
 export function buildErhuPlaybackTimeline(
   doc: MusoJianpuDocument,
@@ -311,12 +333,27 @@ export function buildErhuPlaybackTimeline(
       }
     }
 
-    const midi = note.degree === 0
-      ? null
-      : jianpuToMidi(note.degree, note.octave, note.accidental, doc.header.key, transposeSemitones);
+    // Compute chord or single-note MIDI pitches
+    let chordMidis: number[] | undefined;
+    let midi: number | null = null;
+    if (note.chordPitches && note.chordPitches.length >= 2) {
+      const mapped = note.chordPitches
+        .map(p => jianpuToMidi(p.degree, p.octave, p.accidental, doc.header.key, transposeSemitones))
+        .filter((m): m is number => m !== null)
+        .sort((a, b) => a - b); // Low-to-high for natural arpeggio/strum ordering
+      if (mapped.length > 0) {
+        chordMidis = mapped;
+        midi = mapped[mapped.length - 1];
+      }
+    } else {
+      midi = note.degree === 0
+        ? null
+        : jianpuToMidi(note.degree, note.octave, note.accidental, doc.header.key, transposeSemitones);
+    }
 
-    const hasSu = note.markings.ornaments.includes('su');
-    const hasSd = note.markings.ornaments.includes('sd');
+    const techs = note.markings.techniques || [];
+    const hasSu = note.markings.ornaments.includes('su') || techs.includes('tuixian') || techs.includes('an');
+    const hasSd = note.markings.ornaments.includes('sd') || techs.includes('laxian');
     const slideTargetMidi = midi !== null
       ? (hasSu ? midi + 2 : hasSd ? midi - 2 : undefined)
       : undefined;
@@ -324,20 +361,67 @@ export function buildErhuPlaybackTimeline(
     const isFermata = note.markings.ornaments.includes('fermata');
     let effectiveBeats = isFermata ? beats * 1.45 : beats;
 
-    // Reserve a short tail for optional trailing post-grace notes (后倚音)
+    // Dizi/Xiao 叠音 (die) & 波音 (bo): inject a fleeting upper-neighbor ornament at attack
+    if (midi !== null && (techs.includes('die') || techs.includes('bo')) && note.graceNotes.length === 0) {
+      const ornDur = Math.min(0.08, effectiveBeats * 0.18);
+      events.push({
+        noteId: note.id,
+        measureIndex,
+        midi: midi + 2,
+        startBeat: currentBeat,
+        durationBeats: ornDur,
+        hasVibrato: false,
+        isStaccato: false,
+        isTremolo: false,
+        isPizzicato: false,
+        velocity: noteVelocity * 0.86
+      });
+      currentBeat += ornDur;
+      effectiveBeats = Math.max(0.12, effectiveBeats - ornDur);
+    }
+
+    // Reserve a short tail for optional trailing post-grace notes (后倚音) or Dizi/Xiao 赠音 (zeng)
     const postGraces = note.postGraceNotes || [];
-    const postGraceDur = postGraces.length > 0
-      ? Math.min(0.12, (effectiveBeats * 0.25) / postGraces.length)
+    const hasImplicitZeng = midi !== null && techs.includes('zeng') && postGraces.length === 0;
+    const totalPostCount = postGraces.length + (hasImplicitZeng ? 1 : 0);
+    const postGraceDur = totalPostCount > 0
+      ? Math.min(0.11, (effectiveBeats * 0.22) / totalPostCount)
       : 0;
-    const totalPostDur = postGraceDur * postGraces.length;
+    const totalPostDur = postGraceDur * totalPostCount;
     if (totalPostDur > 0) {
       effectiveBeats = Math.max(0.15, effectiveBeats - totalPostDur);
     }
 
-    // Check if previous event was tied to this exact same pitch
+    const arpeggio: 'up' | 'down' | 'roll' | undefined =
+      techs.includes('arp') ? 'roll'
+        : techs.includes('sao') ? 'up'
+          : techs.includes('fu') ? 'down'
+            : undefined;
+
+    const glissMidis = midi !== null
+      ? techs.includes('gua') || techs.includes('li') || techs.includes('feizhi')
+        ? buildPentatonicGlissMidis(midi, 'up', techs.includes('li') ? 4 : 6)
+        : techs.includes('guadown') || techs.includes('huazhi') || techs.includes('lidown')
+          ? buildPentatonicGlissMidis(midi, 'down', techs.includes('huazhi') || techs.includes('lidown') ? 4 : 6)
+          : undefined
+      : undefined;
+
+    const isFlutter = techs.includes('huashe');
+    const isTremolo =
+      note.markings.bowing === 'trem' ||
+      techs.includes('lun') ||
+      techs.includes('banlun') ||
+      techs.includes('gun') ||
+      techs.includes('yao') ||
+      isFlutter;
+
+    const isMuted = techs.includes('sha');
+    const isDuo = techs.includes('duo');
+
+    // Check if previous event was tied to this exact same pitch (and non-chord)
     const prev = events[events.length - 1];
     const prevFlat = i > 0 ? flatNotes[i - 1]?.note : null;
-    if (prev && prevFlat?.tiedToNext && prev.midi !== null && prev.midi === midi) {
+    if (prev && prevFlat?.tiedToNext && prev.midi !== null && prev.midi === midi && !chordMidis && !prev.chordMidis) {
       prev.durationBeats += effectiveBeats;
       currentBeat += effectiveBeats;
     } else {
@@ -345,16 +429,29 @@ export function buildErhuPlaybackTimeline(
         noteId: note.id,
         measureIndex,
         midi,
+        chordMidis,
         startBeat: currentBeat,
         durationBeats: effectiveBeats,
         slideTargetMidi,
-        hasVibrato: note.markings.ornaments.includes('vib') || note.markings.ornaments.includes('pvib'),
-        isStaccato: note.markings.bowing === 'stacc' || note.markings.bowing === 'spicc',
-        isTremolo: note.markings.bowing === 'trem',
+        hasVibrato:
+          note.markings.ornaments.includes('vib') ||
+          note.markings.ornaments.includes('pvib') ||
+          techs.includes('qizhen'),
+        isStaccato:
+          note.markings.bowing === 'stacc' ||
+          note.markings.bowing === 'spicc' ||
+          isMuted ||
+          isDuo,
+        isTremolo,
         isPizzicato: note.markings.bowing === 'pizz',
-        velocity: note.markings.ornaments.includes('accent')
-          ? Math.min(1.0, noteVelocity * 1.18)
-          : noteVelocity
+        isMuted,
+        isFlutter,
+        arpeggio,
+        glissMidis,
+        velocity:
+          note.markings.ornaments.includes('accent') || techs.includes('sao') || isDuo
+            ? Math.min(1.0, noteVelocity * 1.18)
+            : noteVelocity
       });
       currentBeat += effectiveBeats;
     }
@@ -378,6 +475,20 @@ export function buildErhuPlaybackTimeline(
           currentBeat += postGraceDur;
         }
       }
+    } else if (hasImplicitZeng && midi !== null) {
+      events.push({
+        noteId: note.id,
+        measureIndex,
+        midi: midi + 2,
+        startBeat: currentBeat,
+        durationBeats: postGraceDur,
+        hasVibrato: false,
+        isStaccato: false,
+        isTremolo: false,
+        isPizzicato: false,
+        velocity: noteVelocity * 0.72
+      });
+      currentBeat += postGraceDur;
     }
   }
 
@@ -385,12 +496,32 @@ export function buildErhuPlaybackTimeline(
 }
 
 /**
- * Expressive Tone.js Erhu Synthesizer Player (bowed resonator tone + vibrato + portamento slides)
+ * Multi-Instrument Tone.js Chinese Ensemble Synthesizer Player:
+ * - Uses a 25ms lookahead Web Audio scheduler + instant output gate silencing so Stop is immediate (<15ms).
+ * - Erhu (二胡): Expressive bowed resonator + vibrato + portamento + polyphonic double-stop support
+ * - Pipa (琵琶): Woody pear-body plucked lute with zero sustain & rapid pluck-to-wood filter decay
+ * - Guzheng (古筝): Shimmering silk-steel zither with long acoustic decay, 刮奏 glissando & 琶音 arpeggios
+ * - Dizi (笛子): Pure singing bamboo flute with subtle dimo harmonic warmth, soft breath chiff & smooth 花舌 flutter tremolo
+ * - Xiao (箫): Deep, mellow, hollow end-blown bamboo flute with gentle breathy swell & 气震音 vibrato
  */
 export class MusoJianpuPlayer {
   private isPlayingState = false;
+  private playSessionId = 0;
+  private schedulerInterval: number | null = null;
   private timeouts: number[] = [];
+
   private bowedSynth: Tone.MonoSynth | null = null;
+  private bowedPolySynth: Tone.PolySynth | null = null;
+  private pipaSynth: Tone.PolySynth | null = null;
+  private pipaBodyFilter: Tone.Filter | null = null;
+  private guzhengSynth: Tone.PolySynth | null = null;
+  private diziSynth: Tone.MonoSynth | null = null;
+  private diziFlutter: Tone.Tremolo | null = null;
+  private xiaoSynth: Tone.MonoSynth | null = null;
+  private breathNoise: Tone.NoiseSynth | null = null;
+  private breathFilter: Tone.Filter | null = null;
+  private windVibrato: Tone.Vibrato | null = null;
+  private windFilter: Tone.Filter | null = null;
   private pizzSynth: Tone.PluckSynth | null = null;
   private vibrato: Tone.Vibrato | null = null;
   private filter: Tone.Filter | null = null;
@@ -400,9 +531,10 @@ export class MusoJianpuPlayer {
   private ensureAudioGraph() {
     if (this.bowedSynth) return;
 
-    this.gain = new Tone.Gain(0.55).toDestination();
-    this.reverb = new Tone.Reverb({ decay: 1.8, wet: 0.22 }).connect(this.gain);
-    // Wooden soundbox formant emphasis (~1.1kHz nasal Erhu warmth)
+    this.gain = new Tone.Gain(0.58).toDestination();
+    this.reverb = new Tone.Reverb({ decay: 2.0, wet: 0.22 }).connect(this.gain);
+
+    // Erhu wooden soundbox formant emphasis (~1.15kHz nasal warmth)
     this.filter = new Tone.Filter({
       type: 'peaking',
       frequency: 1150,
@@ -418,17 +550,8 @@ export class MusoJianpuPlayer {
 
     this.bowedSynth = new Tone.MonoSynth({
       oscillator: { type: 'sawtooth' },
-      filter: {
-        Q: 2.2,
-        type: 'lowpass',
-        rolloff: -12
-      },
-      envelope: {
-        attack: 0.065,
-        decay: 0.12,
-        sustain: 0.85,
-        release: 0.22
-      },
+      filter: { Q: 2.2, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.065, decay: 0.12, sustain: 0.85, release: 0.22 },
       filterEnvelope: {
         attack: 0.06,
         decay: 0.15,
@@ -439,11 +562,279 @@ export class MusoJianpuPlayer {
       }
     }).connect(this.vibrato);
 
+    // Polyphonic bowed voice for chords & double-stops on Erhu
+    this.bowedPolySynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.06, decay: 0.15, sustain: 0.72, release: 0.24 }
+    }).connect(this.vibrato);
+    this.bowedPolySynth.volume.value = -5;
+
+    // Pipa (琵琶): crisp nail-pluck attack decaying naturally into woody pear-body resonance (zero sustain!)
+    this.pipaBodyFilter = new Tone.Filter({
+      type: 'peaking',
+      frequency: 460,
+      Q: 1.2,
+      gain: 4.5
+    }).connect(this.reverb);
+
+    this.pipaSynth = new Tone.PolySynth(Tone.MonoSynth, {
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.82, 0.52, 0.35, 0.22, 0.13, 0.07, 0.04]
+      },
+      filter: { Q: 1.2, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.003, decay: 0.52, sustain: 0.0, release: 0.22 },
+      filterEnvelope: {
+        attack: 0.002,
+        decay: 0.11,
+        sustain: 0.05,
+        release: 0.14,
+        baseFrequency: 460,
+        octaves: 3.1
+      }
+    }).connect(this.pipaBodyFilter);
+    this.pipaSynth.volume.value = -2;
+
+    // Guzheng (古筝): warm, singing plucked zither with zero sustain & long resonant ring
+    this.guzhengSynth = new Tone.PolySynth(Tone.MonoSynth, {
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.64, 0.34, 0.18, 0.1, 0.05, 0.02]
+      },
+      filter: { Q: 1.0, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.005, decay: 1.9, sustain: 0.0, release: 1.1 },
+      filterEnvelope: {
+        attack: 0.004,
+        decay: 0.26,
+        sustain: 0.1,
+        release: 0.35,
+        baseFrequency: 480,
+        octaves: 3.0
+      }
+    }).connect(this.reverb);
+    this.guzhengSynth.volume.value = -2;
+
+    // Wind chain for Dizi (笛子) & Xiao (箫): warm lowpass (preserves strong fundamental!), subtle vibrato & flutter tremolo
+    this.windFilter = new Tone.Filter({
+      type: 'lowpass',
+      frequency: 3400,
+      Q: 0.7
+    }).connect(this.reverb);
+
+    this.windVibrato = new Tone.Vibrato({
+      frequency: 5.1,
+      depth: 0.065,
+      wet: 0.22
+    }).connect(this.windFilter);
+
+    this.diziFlutter = new Tone.Tremolo({
+      frequency: 17,
+      depth: 0.58,
+      wet: 0
+    }).connect(this.windVibrato).start();
+
+    // Dizi (笛子): pure bamboo fundamental + delicate dimo reed-membrane upper harmonics (never harsh FM/bandpass!)
+    this.diziSynth = new Tone.MonoSynth({
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.42, 0.24, 0.12, 0.06, 0.03]
+      },
+      filter: { Q: 0.8, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.036, decay: 0.1, sustain: 0.86, release: 0.2 },
+      filterEnvelope: {
+        attack: 0.03,
+        decay: 0.12,
+        sustain: 0.8,
+        release: 0.18,
+        baseFrequency: 1350,
+        octaves: 1.6
+      }
+    }).connect(this.diziFlutter);
+    this.diziSynth.volume.value = -3;
+
+    // Xiao (箫): warm, hollow, contemplative vertical bamboo flute
+    this.xiaoSynth = new Tone.MonoSynth({
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.2, 0.06, 0.02]
+      },
+      filter: { Q: 0.7, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.08, decay: 0.16, sustain: 0.82, release: 0.34 },
+      filterEnvelope: {
+        attack: 0.08,
+        decay: 0.18,
+        sustain: 0.68,
+        release: 0.28,
+        baseFrequency: 620,
+        octaves: 1.4
+      }
+    }).connect(this.windVibrato);
+    this.xiaoSynth.volume.value = -2;
+
+    // Delicate airy breath chiff for Dizi / Xiao attacks
+    this.breathFilter = new Tone.Filter({
+      type: 'bandpass',
+      frequency: 2400,
+      Q: 1.4
+    }).connect(this.reverb);
+
+    this.breathNoise = new Tone.NoiseSynth({
+      noise: { type: 'pink' },
+      envelope: { attack: 0.015, decay: 0.055, sustain: 0.0, release: 0.03 }
+    }).connect(this.breathFilter);
+    this.breathNoise.volume.value = -26;
+
     this.pizzSynth = new Tone.PluckSynth({
       attackNoise: 1.2,
       dampening: 3200,
       resonance: 0.92
     }).connect(this.reverb);
+  }
+
+  private triggerEvent(
+    ev: ScheduledErhuEvent,
+    instrument: InstrumentType,
+    toneTime: number,
+    durSec: number
+  ) {
+    if (ev.midi === null) return;
+    const playDur = ev.isStaccato ? Math.min(durSec * 0.42, 0.16) : Math.max(0.05, durSec * 0.94);
+
+    // Dizi (笛子) & Xiao (箫) Wind Playback
+    if (instrument === 'dizi' || instrument === 'xiao') {
+      const windVoice = instrument === 'dizi' ? this.diziSynth : this.xiaoSynth;
+      if (!windVoice) return;
+
+      if (this.windFilter) {
+        this.windFilter.frequency.setValueAtTime(instrument === 'dizi' ? 3500 : 1700, toneTime);
+      }
+
+      // Rapid 历音 / 飞指 scale run lead-in on bamboo flute
+      let mainStart = toneTime;
+      let mainDur = playDur;
+      if (ev.glissMidis && ev.glissMidis.length > 0) {
+        const stepSec = Math.min(0.036, (playDur * 0.32) / ev.glissMidis.length);
+        ev.glissMidis.forEach((gm, gIdx) => {
+          const gFreq = Tone.Frequency(gm, 'midi').toFrequency();
+          windVoice.triggerAttackRelease(gFreq, stepSec * 0.95, toneTime + gIdx * stepSec, ev.velocity * 0.72);
+        });
+        const runTotal = ev.glissMidis.length * stepSec;
+        mainStart = toneTime + runTotal;
+        mainDur = Math.max(0.05, playDur - runTotal);
+      }
+
+      const freq = Tone.Frequency(ev.midi, 'midi').toFrequency();
+
+      // Smooth flutter-tongue tremolo on Dizi (花舌) instead of harsh clicky retriggers
+      if (this.diziFlutter) {
+        this.diziFlutter.wet.setValueAtTime(ev.isFlutter || ev.isTremolo ? 0.95 : 0, mainStart);
+      }
+      if (this.windVibrato) {
+        this.windVibrato.wet.setValueAtTime(
+          ev.hasVibrato ? 0.78 : (instrument === 'xiao' ? 0.24 : 0.18),
+          mainStart
+        );
+      }
+      if (this.breathNoise && mainDur >= 0.12) {
+        if (this.breathFilter) {
+          this.breathFilter.frequency.setValueAtTime(instrument === 'dizi' ? 2600 : 1500, mainStart);
+        }
+        this.breathNoise.triggerAttackRelease(0.05, mainStart, ev.velocity * (instrument === 'dizi' ? 0.65 : 0.45));
+      }
+
+      windVoice.portamento = ev.slideTargetMidi !== undefined ? 0.085 : 0.012;
+      windVoice.triggerAttackRelease(freq, mainDur, mainStart, ev.velocity);
+      if (ev.slideTargetMidi !== undefined) {
+        const slideFreq = Tone.Frequency(ev.slideTargetMidi, 'midi').toFrequency();
+        windVoice.frequency.exponentialRampToValueAtTime(slideFreq, mainStart + mainDur * 0.75);
+      }
+      return;
+    }
+
+    // Optional Guzheng/Pipa glissando lead-in (刮奏 / 花指)
+    if (ev.glissMidis && ev.glissMidis.length > 0) {
+      const glissVoice = instrument === 'pipa' ? this.pipaSynth : this.guzhengSynth;
+      if (glissVoice) {
+        const stepSec = Math.min(0.032, (durSec * 0.35) / ev.glissMidis.length);
+        ev.glissMidis.forEach((gm, gIdx) => {
+          const gFreq = Tone.Frequency(gm, 'midi').toFrequency();
+          glissVoice.triggerAttackRelease(gFreq, 0.28, toneTime + gIdx * stepSec, ev.velocity * 0.65);
+        });
+      }
+    }
+
+    // Plucked instruments (Pipa & Guzheng)
+    if (instrument === 'pipa' || instrument === 'guzheng') {
+      const voice = instrument === 'pipa' ? this.pipaSynth : this.guzhengSynth;
+      if (!voice) return;
+
+      const pitchList = ev.chordMidis && ev.chordMidis.length > 0 ? [...ev.chordMidis] : [ev.midi];
+      if (ev.arpeggio === 'down') pitchList.reverse();
+      const staggerSec = ev.arpeggio === 'roll' ? 0.042 : ev.arpeggio ? 0.022 : 0;
+
+      if (ev.isTremolo) {
+        // Rapid 轮指 / 滚 (Pipa) or 摇指 (Guzheng)
+        const subDur = instrument === 'pipa' ? 0.072 : 0.082;
+        const count = Math.max(2, Math.floor(playDur / subDur));
+        const freqs = pitchList.map(m => Tone.Frequency(m, 'midi').toFrequency());
+        for (let k = 0; k < count; k++) {
+          const t = toneTime + k * subDur;
+          voice.triggerAttackRelease(freqs, subDur * 0.85, t, ev.velocity * (k % 2 === 0 ? 0.85 : 0.72));
+        }
+      } else if (staggerSec > 0 && pitchList.length > 1) {
+        pitchList.forEach((m, pIdx) => {
+          const f = Tone.Frequency(m, 'midi').toFrequency();
+          const noteDur = ev.isMuted ? 0.045 : Math.max(0.2, playDur - pIdx * staggerSec);
+          voice.triggerAttackRelease(f, noteDur, toneTime + pIdx * staggerSec, ev.velocity * 0.88);
+        });
+      } else {
+        const freqs = pitchList.map(m => Tone.Frequency(m, 'midi').toFrequency());
+        const noteDur = ev.isMuted ? 0.045 : (instrument === 'guzheng' ? Math.max(0.32, playDur) : Math.max(0.18, playDur));
+        voice.triggerAttackRelease(freqs, noteDur, toneTime, ev.velocity);
+      }
+      return;
+    }
+
+    // Erhu playback (mono expressive voice for single notes, polyphonic bowed voice for chords/double-stops)
+    if (ev.chordMidis && ev.chordMidis.length >= 2) {
+      if (this.bowedPolySynth) {
+        const ordered = ev.arpeggio === 'down' ? [...ev.chordMidis].reverse() : ev.chordMidis;
+        const staggerSec = ev.arpeggio ? 0.035 : 0;
+        if (staggerSec > 0) {
+          ordered.forEach((m, pIdx) => {
+            const f = Tone.Frequency(m, 'midi').toFrequency();
+            this.bowedPolySynth!.triggerAttackRelease(f, Math.max(0.1, playDur - pIdx * staggerSec), toneTime + pIdx * staggerSec, ev.velocity * 0.85);
+          });
+        } else {
+          const freqs = ordered.map(m => Tone.Frequency(m, 'midi').toFrequency());
+          this.bowedPolySynth.triggerAttackRelease(freqs, playDur, toneTime, ev.velocity * 0.85);
+        }
+      }
+      return;
+    }
+
+    const freq = Tone.Frequency(ev.midi, 'midi').toFrequency();
+    if (ev.isPizzicato && this.pizzSynth) {
+      this.pizzSynth.triggerAttack(freq, toneTime);
+    } else if (this.bowedSynth) {
+      if (ev.isTremolo) {
+        const subDur = 0.09;
+        const count = Math.max(2, Math.floor(playDur / subDur));
+        for (let k = 0; k < count; k++) {
+          this.bowedSynth.triggerAttackRelease(freq, subDur * 0.85, toneTime + k * subDur, ev.velocity * (k % 2 === 0 ? 1 : 0.82));
+        }
+      } else {
+        this.bowedSynth.portamento = ev.slideTargetMidi !== undefined ? 0.08 : 0.015;
+        if (this.vibrato) {
+          this.vibrato.wet.setValueAtTime(ev.hasVibrato ? 0.85 : 0.22, toneTime);
+        }
+        this.bowedSynth.triggerAttackRelease(freq, playDur, toneTime, ev.velocity);
+        if (ev.slideTargetMidi !== undefined) {
+          const slideFreq = Tone.Frequency(ev.slideTargetMidi, 'midi').toFrequency();
+          this.bowedSynth.frequency.exponentialRampToValueAtTime(slideFreq, toneTime + playDur * 0.78);
+        }
+      }
+    }
   }
 
   async play(
@@ -456,9 +847,18 @@ export class MusoJianpuPlayer {
     } = {}
   ) {
     this.stop();
+    const sessionId = ++this.playSessionId;
     await Tone.start();
-    this.ensureAudioGraph();
+    if (sessionId !== this.playSessionId) return;
 
+    this.ensureAudioGraph();
+    if (this.gain) {
+      const now = Tone.now();
+      this.gain.gain.cancelScheduledValues(now);
+      this.gain.gain.setValueAtTime(0.58, now);
+    }
+
+    const instrument: InstrumentType = doc.header.instrument || 'erhu';
     const bpm = options.tempoOverride || doc.header.tempo || 80;
     const secPerBeat = 60 / bpm;
     const { events, totalBeats } = buildErhuPlaybackTimeline(doc, options.transposeSemitones || 0);
@@ -469,67 +869,84 @@ export class MusoJianpuPlayer {
     }
 
     this.isPlayingState = true;
-    const baseNow = Tone.now() + 0.08;
+    const baseNow = Tone.now() + 0.06;
+    const LOOKAHEAD_SEC = 0.095;
+    let nextIdx = 0;
 
-    for (const ev of events) {
-      const startSec = ev.startBeat * secPerBeat;
-      const durSec = Math.max(0.06, ev.durationBeats * secPerBeat);
+    const pump = () => {
+      if (!this.isPlayingState || sessionId !== this.playSessionId) return;
+      const now = Tone.now();
+      const horizon = now + LOOKAHEAD_SEC;
 
-      // Schedule UI playhead highlight
-      const uiTimer = window.setTimeout(() => {
-        if (!this.isPlayingState) return;
-        options.onNoteActive?.(ev.noteId, ev.measureIndex);
-      }, Math.max(0, startSec * 1000));
-      this.timeouts.push(uiTimer);
+      while (nextIdx < events.length) {
+        const ev = events[nextIdx];
+        const eventToneTime = baseNow + ev.startBeat * secPerBeat;
+        if (eventToneTime > horizon) break;
 
-      if (ev.midi === null) continue;
+        const durSec = Math.max(0.06, ev.durationBeats * secPerBeat);
+        const safeToneTime = Math.max(now + 0.004, eventToneTime);
+        this.triggerEvent(ev, instrument, safeToneTime, durSec);
 
-      const freq = Tone.Frequency(ev.midi, 'midi').toFrequency();
-      const toneTime = baseNow + startSec;
+        const uiDelayMs = Math.max(0, (safeToneTime - now) * 1000);
+        const uiTimer = window.setTimeout(() => {
+          if (!this.isPlayingState || sessionId !== this.playSessionId) return;
+          options.onNoteActive?.(ev.noteId, ev.measureIndex);
+        }, uiDelayMs);
+        this.timeouts.push(uiTimer);
 
-      if (ev.isPizzicato && this.pizzSynth) {
-        this.pizzSynth.triggerAttack(freq, toneTime);
-      } else if (this.bowedSynth) {
-        const playDur = ev.isStaccato ? Math.min(durSec * 0.45, 0.18) : Math.max(0.05, durSec * 0.94);
-
-        if (ev.isTremolo) {
-          // Rapid bowed tremolo subdivisions
-          const subDur = 0.09;
-          const count = Math.max(2, Math.floor(playDur / subDur));
-          for (let k = 0; k < count; k++) {
-            this.bowedSynth.triggerAttackRelease(freq, subDur * 0.85, toneTime + k * subDur, ev.velocity * (k % 2 === 0 ? 1 : 0.82));
-          }
-        } else {
-          this.bowedSynth.portamento = ev.slideTargetMidi !== undefined ? 0.08 : 0.015;
-          if (this.vibrato) {
-            this.vibrato.wet.setValueAtTime(ev.hasVibrato ? 0.85 : 0.22, toneTime);
-          }
-          this.bowedSynth.triggerAttackRelease(freq, playDur, toneTime, ev.velocity);
-          if (ev.slideTargetMidi !== undefined) {
-            const slideFreq = Tone.Frequency(ev.slideTargetMidi, 'midi').toFrequency();
-            this.bowedSynth.frequency.exponentialRampToValueAtTime(slideFreq, toneTime + playDur * 0.78);
-          }
-        }
+        nextIdx++;
       }
-    }
 
-    const endTimer = window.setTimeout(() => {
-      if (!this.isPlayingState) return;
-      this.isPlayingState = false;
-      options.onNoteActive?.(null, null);
-      options.onComplete?.();
-    }, (totalBeats * secPerBeat + 0.35) * 1000);
-    this.timeouts.push(endTimer);
+      if (nextIdx >= events.length) {
+        if (this.schedulerInterval !== null) {
+          window.clearInterval(this.schedulerInterval);
+          this.schedulerInterval = null;
+        }
+        const remainingMs = Math.max(80, (baseNow + totalBeats * secPerBeat - Tone.now() + 0.35) * 1000);
+        const endTimer = window.setTimeout(() => {
+          if (!this.isPlayingState || sessionId !== this.playSessionId) return;
+          this.isPlayingState = false;
+          options.onNoteActive?.(null, null);
+          options.onComplete?.();
+        }, remainingMs);
+        this.timeouts.push(endTimer);
+      }
+    };
+
+    pump();
+    if (nextIdx < events.length) {
+      this.schedulerInterval = window.setInterval(pump, 25);
+    }
   }
 
   stop() {
     this.isPlayingState = false;
+    this.playSessionId++;
+    if (this.schedulerInterval !== null) {
+      window.clearInterval(this.schedulerInterval);
+      this.schedulerInterval = null;
+    }
     for (const id of this.timeouts) {
       window.clearTimeout(id);
     }
     this.timeouts = [];
     try {
-      this.bowedSynth?.triggerRelease();
+      const now = Tone.now();
+      // Instant click-free mute so no lingering lookahead note (<95ms) or release tail plays after Stop
+      if (this.gain) {
+        this.gain.gain.cancelScheduledValues(now);
+        this.gain.gain.setTargetAtTime(0, now, 0.005);
+      }
+      this.bowedSynth?.frequency.cancelScheduledValues(now);
+      this.diziSynth?.frequency.cancelScheduledValues(now);
+      this.xiaoSynth?.frequency.cancelScheduledValues(now);
+      this.bowedSynth?.triggerRelease(now);
+      this.bowedPolySynth?.releaseAll(now);
+      this.pipaSynth?.releaseAll(now);
+      this.guzhengSynth?.releaseAll(now);
+      this.diziSynth?.triggerRelease(now);
+      this.xiaoSynth?.triggerRelease(now);
+      this.breathNoise?.triggerRelease(now);
     } catch {
       // ignore if not triggered
     }
@@ -539,6 +956,17 @@ export class MusoJianpuPlayer {
     this.stop();
     try {
       this.bowedSynth?.dispose();
+      this.bowedPolySynth?.dispose();
+      this.pipaSynth?.dispose();
+      this.pipaBodyFilter?.dispose();
+      this.guzhengSynth?.dispose();
+      this.diziSynth?.dispose();
+      this.diziFlutter?.dispose();
+      this.xiaoSynth?.dispose();
+      this.breathNoise?.dispose();
+      this.breathFilter?.dispose();
+      this.windVibrato?.dispose();
+      this.windFilter?.dispose();
       this.pizzSynth?.dispose();
       this.vibrato?.dispose();
       this.filter?.dispose();
@@ -548,6 +976,17 @@ export class MusoJianpuPlayer {
       // ignore
     }
     this.bowedSynth = null;
+    this.bowedPolySynth = null;
+    this.pipaSynth = null;
+    this.pipaBodyFilter = null;
+    this.guzhengSynth = null;
+    this.diziSynth = null;
+    this.diziFlutter = null;
+    this.xiaoSynth = null;
+    this.breathNoise = null;
+    this.breathFilter = null;
+    this.windVibrato = null;
+    this.windFilter = null;
     this.pizzSynth = null;
     this.vibrato = null;
     this.filter = null;
@@ -572,7 +1011,8 @@ function encodeVLQ(value: number): number[] {
 
 /**
  * Generates a real binary Standard MIDI File (.mid) Blob URL from a parsed MusoJianpuDocument,
- * using General MIDI Program 110 (Fiddle / Erhu) so MusoBuddy's ScoreAudioPlayer plays it seamlessly!
+ * supporting polyphonic chords, arpeggios, repeats/navigation, and instrument GM programs
+ * (110 = Erhu/Fiddle, 105 = Pipa, 107 = Guzheng/Koto).
  */
 export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemitones: number = 0): string | null {
   try {
@@ -585,7 +1025,6 @@ export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemi
 
     const track: number[] = [];
 
-    // Tempo Meta Event: FF 51 03 tt tt tt
     track.push(
       0x00, 0xff, 0x51, 0x03,
       (microsecPerBeat >> 16) & 0xff,
@@ -593,17 +1032,24 @@ export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemi
       microsecPerBeat & 0xff
     );
 
-    // Time Signature Meta Event
     const [numStr, denStr] = (doc.header.time || '4/4').split('/');
     const num = Math.max(1, parseInt(numStr, 10) || 4);
     const den = Math.max(1, parseInt(denStr, 10) || 4);
     const denPow = Math.round(Math.log2(den));
     track.push(0x00, 0xff, 0x58, 0x04, num, denPow, 24, 8);
 
-    // Program Change on Channel 0 -> 110 (GM Fiddle / Erhu)
-    track.push(0x00, 0xc0, 110);
+    // Program Change on Channel 0 based on instrument
+    const gmProgram = doc.header.instrument === 'pipa'
+      ? 105
+      : doc.header.instrument === 'guzheng'
+        ? 107
+        : doc.header.instrument === 'dizi'
+          ? 73
+          : doc.header.instrument === 'xiao'
+            ? 77
+            : 110;
+    track.push(0x00, 0xc0, gmProgram);
 
-    // Flatten into tick-sorted Note On / Note Off messages
     interface RawMsg {
       tick: number;
       bytes: number[];
@@ -617,8 +1063,16 @@ export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemi
       const endTick = Math.max(startTick + 20, Math.round((ev.startBeat + ev.durationBeats * durRatio) * tpq));
       const vel = Math.max(20, Math.min(127, Math.round(ev.velocity * 115)));
 
-      msgs.push({ tick: startTick, bytes: [0x90, ev.midi, vel] });
-      msgs.push({ tick: endTick, bytes: [0x80, ev.midi, 0] });
+      const pitchList = ev.chordMidis && ev.chordMidis.length > 0 ? [...ev.chordMidis] : [ev.midi];
+      if (ev.arpeggio === 'down') pitchList.reverse();
+      const staggerTicks = ev.arpeggio === 'roll' ? 32 : ev.arpeggio ? 18 : 0;
+
+      pitchList.forEach((m, idx) => {
+        const noteStart = startTick + idx * staggerTicks;
+        const noteEnd = Math.max(noteStart + 20, endTick);
+        msgs.push({ tick: noteStart, bytes: [0x90, m, vel] });
+        msgs.push({ tick: noteEnd, bytes: [0x80, m, 0] });
+      });
     }
 
     msgs.sort((a, b) => a.tick - b.tick);
@@ -630,21 +1084,19 @@ export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemi
       lastTick = msg.tick;
     }
 
-    // End of track
     track.push(0x00, 0xff, 0x2f, 0x00);
 
-    // Build MThd + MTrk
     const header = [
-      0x4d, 0x54, 0x68, 0x64, // MThd
-      0x00, 0x00, 0x00, 0x06, // length 6
-      0x00, 0x00,             // format 0
-      0x00, 0x01,             // 1 track
+      0x4d, 0x54, 0x68, 0x64,
+      0x00, 0x00, 0x00, 0x06,
+      0x00, 0x00,
+      0x00, 0x01,
       (tpq >> 8) & 0xff, tpq & 0xff
     ];
 
     const trackLen = track.length;
     const trackHeader = [
-      0x4d, 0x54, 0x72, 0x6b, // MTrk
+      0x4d, 0x54, 0x72, 0x6b,
       (trackLen >>> 24) & 0xff,
       (trackLen >>> 16) & 0xff,
       (trackLen >>> 8) & 0xff,

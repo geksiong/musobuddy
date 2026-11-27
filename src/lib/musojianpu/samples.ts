@@ -99,6 +99,71 @@ S: 主旋律 (Main Theme)
 
 T: 演奏提示：G调（5-2弦）换弦与分弓练习；注意3与4（半音）的指距紧密靠拢。`;
 
+export const MUSOJIANPU_PIPA_SAMPLE = `@title: 琵琶技巧练习曲 (示例)
+@subtitle: Pipa Technique Etude · 弹挑、扫拂、轮指与和弦
+@composer: MusoJianpu 示范谱
+@instrument: pipa
+@key: 1=D
+@strings: A-d-e-a
+@time: 2/4
+@tempo: 100
+@expression: 清新明快地 Allegretto
+
+S: 示范段落 (弹挑、扫拂和弦、轮指与嵌套连线)
+|: <1 5 1'>{sao,f} (5/{tan,s1} 6/{tiao}) | ((1'/{tan} 2'/{tiao}) (1'/{tan} 6/{tiao})) | <5, 5>{fen,mf} (3/{tan,s2} 5/{tiao}) | 6{lun,vib} - |
+| <1 3 5>{sao,s1} <2 5 6>{fu} | (5/{tan} 3/{tiao} 2/{tan} 1/{tiao}) | [1. 2{banlun} (3/{tan} 5/{tiao}) :| [2. <1, 5, 1>{sao,fermata} - |]
+
+T: 示范说明：本曲为原创琵琶记谱示例（非古曲原谱），采用标准定弦 A-d-e-a，演示和弦扫拂、弹挑、半轮/轮指与嵌套连音线。`;
+
+export const MUSOJIANPU_GUZHENG_SAMPLE = `@title: 古筝技巧练习曲 (示例)
+@subtitle: Guzheng Technique Etude · 大撮、琶音、刮奏与摇指
+@composer: MusoJianpu 示范谱
+@instrument: guzheng
+@key: 1=D
+@time: 4/4
+@tempo: 68
+@expression: 悠然恬静地 Andante espressivo
+
+S: 示范段落 (撮弦、琶音、刮奏与摇指)
+| <5, 5>{cuo,mp} (6/{mo} 5/{tuo}) <3 3'>{arp} 2{mo,an} | ((1/{gou} 2/{mo}) (3/{tuo} 5/{tuo})) 6{yao,mf} - |
+| <1 3 5 1'>{arp,gua} 6{mo,vib} <5 5'>{cuo} (3/{mo} 2/{tuo}) | <1, 5, 1>{arp,guadown,dim} 1{tuo,fermata} - - |]
+
+T: 示范说明：本曲为原创古筝记谱示例（非古曲原谱），采用 D 调五声音阶定弦，演示大撮、托抹勾、琶音、上下刮奏与摇指。`;
+
+export const MUSOJIANPU_DIZI_SAMPLE = `@title: 笛子技巧练习曲 (示例)
+@subtitle: Dizi Technique Etude · 叠音、打音、历音与花舌
+@composer: MusoJianpu 示范谱
+@instrument: dizi
+@key: 1=C
+@flute: 曲笛 C调
+@fingering: 筒音作5
+@time: 4/4
+@tempo: 72
+@expression: 宁静优美地 Andante cantabile
+
+S: 示范段落 (曲笛叠音、打音、历音、吐音与花舌)
+| (5{die,mp} 6/ 5/) (3{da} 2/) 1{vib,zeng} 2{breath} | ((3/{li} 5/) (6/ 1'/)) 6{qizhen,mf} - |
+| (5/{tu} 6/{dtu} 5/{tu} 3/{da}) (2/{die} 3/) 5{huashe,f} - | (6/{lidown} 5/ 3/{bo} 2/) 1{qizhen,fermata} - - |]
+
+T: 示范说明：本曲为原创笛子记谱示例（非古曲原谱）；C 调曲笛筒音作 5 即为 1=C，演示叠音（又）、打音（丁）、历音、单双吐、波音与花舌（※）。`;
+
+export const MUSOJIANPU_XIAO_SAMPLE = `@title: 洞箫技巧练习曲 (示例)
+@subtitle: Xiao Technique Etude · 气震音、叠音、赠音与气口
+@composer: MusoJianpu 示范谱
+@instrument: xiao
+@key: 1=G
+@flute: G调洞箫
+@fingering: 筒音作5
+@time: 4/4
+@tempo: 60
+@expression: 婉转深沉地 Lento espressivo
+
+S: 示范段落 (洞箫气震音、叠音、打音、赠音与滑音)
+| 5,{qizhen,p} - (1{die} 2/{da} 3/) | (5{su,mp} 3/ 2/) 1{qizhen,zeng,breath} - |
+| ((6,{die} 1/) (2/ 3/)) (2{sd} 1/) 6,{qizhen,mp} - | (5,{da} 6,/ 1/{bo} 2/) 5,{qizhen,dim,fermata} - - |]
+
+T: 示范说明：本曲为原创洞箫记谱示例（非古曲原谱）；G 调洞箫筒音作 5 即为 1=G，演示气震音、叠音（又）、打音（丁）、赠音、波音与气口（V）。`;
+
 export const MUSOJIANPU_BLANK_TEMPLATE = `@title: 未命名二胡曲
 @subtitle: Untitled Erhu Piece
 @composer: 作曲
@@ -115,28 +180,56 @@ export const MUSOJIANPU_TEMPLATES: MusoJianpuTemplate[] = [
   {
     id: 'jasmine',
     title: '茉莉花 (带歌词)',
-    subtitle: 'Jasmine Flower · 1=G (5-2弦)',
+    subtitle: 'Jasmine Flower · 二胡 1=G (5-2弦)',
     key: 'G',
     content: MUSOJIANPU_JASMINE_SAMPLE
   },
   {
     id: 'songbie',
     title: '送别 (带歌词)',
-    subtitle: 'Farewell (长亭外) · 1=G (5-2弦)',
+    subtitle: 'Farewell (长亭外) · 二胡 1=G (5-2弦)',
     key: 'G',
     content: MUSOJIANPU_SONGBIE_SAMPLE
   },
   {
+    id: 'dizi-etude',
+    title: '笛子技巧示例 (Etude)',
+    subtitle: 'Dizi Notation Demo · C调曲笛 筒音作5 (1=C)',
+    key: 'C',
+    content: MUSOJIANPU_DIZI_SAMPLE
+  },
+  {
+    id: 'xiao-etude',
+    title: '洞箫技巧示例 (Etude)',
+    subtitle: 'Xiao Notation Demo · G调洞箫 筒音作5 (1=G)',
+    key: 'G',
+    content: MUSOJIANPU_XIAO_SAMPLE
+  },
+  {
+    id: 'pipa-etude',
+    title: '琵琶技巧示例 (Etude)',
+    subtitle: 'Pipa Notation Demo · 和弦 / 扫拂 / 轮指 / 嵌套连线',
+    key: 'D',
+    content: MUSOJIANPU_PIPA_SAMPLE
+  },
+  {
+    id: 'guzheng-etude',
+    title: '古筝技巧示例 (Etude)',
+    subtitle: 'Guzheng Notation Demo · 大撮 / 琶音 / 刮奏 / 摇指',
+    key: 'D',
+    content: MUSOJIANPU_GUZHENG_SAMPLE
+  },
+  {
     id: 'auld-lang-syne',
     title: '友谊地久天长',
-    subtitle: 'Auld Lang Syne · 1=G (5-2弦)',
+    subtitle: 'Auld Lang Syne · 二胡 1=G (5-2弦)',
     key: 'G',
     content: MUSOJIANPU_AULD_LANG_SYNE_SAMPLE
   },
   {
     id: 'ode-to-joy',
     title: '欢乐颂 (练习曲)',
-    subtitle: 'Ode to Joy · 1=G (5-2弦)',
+    subtitle: 'Ode to Joy · 二胡 1=G (5-2弦)',
     key: 'G',
     content: MUSOJIANPU_ODE_TO_JOY_SAMPLE
   },

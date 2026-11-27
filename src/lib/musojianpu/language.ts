@@ -58,6 +58,11 @@ const musoJianpuParser: StreamParser<unknown> = {
       return 'bracket';
     }
 
+    // Angle-bracket chords (<1 3 5>/) and plus-joined chords (1+3+5/)
+    if (stream.match(/^<[^<>()]+>[_/]*\.*~?/) || stream.match(/^[#b=]?[1-7][',]*(?:\+[#b=]?[1-7][',]*)+[_/]*\.*~?/)) {
+      return 'number';
+    }
+
     // Jianpu notes with accidentals, octaves, underlines (_ or /), dots
     if (stream.match(/^[#b=]?[0-7][',]*[_/]*\.*~?/)) {
       return 'number';

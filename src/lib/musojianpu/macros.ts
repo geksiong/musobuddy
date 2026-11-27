@@ -4,6 +4,7 @@
  */
 
 import { getErhuKeyInfo, transposeKeyName } from './erhuKeys.ts';
+import { InstrumentType } from './types.ts';
 
 export interface TextEditResult {
   text: string;
@@ -11,9 +12,13 @@ export interface TextEditResult {
   selectionEnd: number;
 }
 
-const NOTE_REGEX = /([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)/g;
 const GRACE_PREFIX_REGEX = /\^\/?(?:\{[^}]*\}|[#b=]?[1-7][',]*[_/]*)/;
-const LINE_TOKEN_REGEX = /(\^\/?(?:\{[^}]*\}|[#b=]?[1-7][',]*[_/]*))|(\{[^}]*\})|(\[(?:\d+(?:[,\-]\d+)*\.\]?|[^\[\]]+\]))|(([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*))/g;
+const NOTE_OR_CHORD_CORE = '(?:<[^<>()]+>|[#b=]?[1-7][\',]*(?:\\+[#b=]?[1-7][\',]*)+|[#b=]?[0-7][\',]*)';
+const NOTE_OR_CHORD_FULL_REGEX = new RegExp(`^(${NOTE_OR_CHORD_CORE})([_/]*)(\\.*)(~?)((?:\\{[^}]*\\})*)$`);
+const LINE_TOKEN_REGEX = new RegExp(
+  `(${GRACE_PREFIX_REGEX.source})|(\\{[^}]*\\})|(\\[(?:\\d+(?:[,\\-]\\d+)*\\.]?|[^\\[\\]]+\\]))|(${NOTE_OR_CHORD_CORE}[_/]*\\.*~?(?:\\{[^}]*\\})*)`,
+  'g'
+);
 
 interface NoteSpan {
   start: number;
@@ -22,7 +27,7 @@ interface NoteSpan {
 }
 
 /**
- * Finds all main note spans in a single music line, ignoring grace-note prefixes (^5/, ^{5/6/}),
+ * Finds all main note & chord spans in a single music line, ignoring grace-note prefixes (^5/, ^{5/6/}),
  * bracket navigation/volta tags ([1., [segno], [coda]), and standalone marking blocks ({...}).
  */
 function findMainNotesInLine(line: string, lineStart: number): NoteSpan[] {
@@ -42,8 +47,8 @@ function findMainNotesInLine(line: string, lineStart: number): NoteSpan[] {
 }
 
 /**
- * Locates the main note token covering the cursor position (or immediately before/after it),
- * skipping grace note prefixes (^5/, ^{5/6/}) so Erhu markings & rhythm edits never corrupt them.
+ * Locates the main note or chord token covering the cursor position (or immediately before/after it),
+ * skipping grace note prefixes (^5/, ^{5/6/}) so markings & rhythm edits never corrupt them.
  */
 function findNoteAtCursor(text: string, pos: number): NoteSpan | null {
   const lineStart = text.lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
@@ -82,67 +87,84 @@ function findNoteAtCursor(text: string, pos: number): NoteSpan | null {
   return null;
 }
 
-function transformNoteOctave(noteStr: string, delta: 1 | -1): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
-  if (!m) return noteStr;
-  const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
-  if (digit === '0') return noteStr; // Rest has no octave
+function splitNoteOrChord(noteStr: string) {
+  const m = noteStr.match(NOTE_OR_CHORD_FULL_REGEX);
+  if (!m) return null;
+  return {
+    head: m[1],
+    underlines: m[2],
+    dots: m[3],
+    tie: m[4],
+    markings: m[5]
+  };
+}
 
-  let oct = 0;
-  for (const ch of octStr) {
-    if (ch === "'") oct++;
-    else if (ch === ',') oct--;
-  }
-  oct = Math.max(-2, Math.min(2, oct + delta));
-  const newOctStr = oct > 0 ? "'".repeat(oct) : oct < 0 ? ','.repeat(-oct) : '';
-  return `${acc}${digit}${newOctStr}${underlines}${dots}${tie}${markings}`;
+function transformNoteOctave(noteStr: string, delta: 1 | -1): string {
+  const parts = splitNoteOrChord(noteStr);
+  if (!parts) return noteStr;
+  const nextHead = parts.head.replace(/([#b=]?)([0-7])([',]*)/g, (full, acc, digit, octStr) => {
+    if (digit === '0') return full;
+    let oct = 0;
+    for (const ch of octStr) {
+      if (ch === "'") oct++;
+      else if (ch === ',') oct--;
+    }
+    oct = Math.max(-2, Math.min(2, oct + delta));
+    const newOctStr = oct > 0 ? "'".repeat(oct) : oct < 0 ? ','.repeat(-oct) : '';
+    return `${acc}${digit}${newOctStr}`;
+  });
+  return `${nextHead}${parts.underlines}${parts.dots}${parts.tie}${parts.markings}`;
 }
 
 function transformNoteUnderlines(noteStr: string, delta: 1 | -1, defaultBeamChar: '/' | '_' = '/'): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
-  if (!m) return noteStr;
-  const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
-  const nextCount = Math.max(0, Math.min(3, underlines.length + delta));
-  const beamChar = underlines.includes('/') ? '/' : underlines.includes('_') ? '_' : defaultBeamChar;
-  return `${acc}${digit}${octStr}${beamChar.repeat(nextCount)}${dots}${tie}${markings}`;
+  const parts = splitNoteOrChord(noteStr);
+  if (!parts) return noteStr;
+  const nextCount = Math.max(0, Math.min(3, parts.underlines.length + delta));
+  const beamChar = parts.underlines.includes('/') ? '/' : parts.underlines.includes('_') ? '_' : defaultBeamChar;
+  return `${parts.head}${beamChar.repeat(nextCount)}${parts.dots}${parts.tie}${parts.markings}`;
 }
 
 function transformNoteDot(noteStr: string): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
-  if (!m) return noteStr;
-  const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
-  const nextDots = dots.length === 0 ? '.' : dots.length === 1 ? '' : '.';
-  return `${acc}${digit}${octStr}${underlines}${nextDots}${tie}${markings}`;
+  const parts = splitNoteOrChord(noteStr);
+  if (!parts) return noteStr;
+  const nextDots = parts.dots.length === 0 ? '.' : parts.dots.length === 1 ? '' : '.';
+  return `${parts.head}${parts.underlines}${nextDots}${parts.tie}${parts.markings}`;
 }
 
 function transformNoteAccidental(noteStr: string, accTarget: '#' | 'b' | '='): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
-  if (!m) return noteStr;
-  const [, acc, digit, octStr, underlines, dots, tie, markings] = m;
-  if (digit === '0') return noteStr;
-  const nextAcc = acc === accTarget ? '' : accTarget;
-  return `${nextAcc}${digit}${octStr}${underlines}${dots}${tie}${markings}`;
+  const parts = splitNoteOrChord(noteStr);
+  if (!parts) return noteStr;
+  // For single notes, toggle accidental directly; for chords, toggle on first pitch
+  let done = false;
+  const nextHead = parts.head.replace(/([#b=]?)([0-7])([',]*)/g, (full, acc, digit, octStr) => {
+    if (done || digit === '0') return full;
+    done = true;
+    const nextAcc = acc === accTarget ? '' : accTarget;
+    return `${nextAcc}${digit}${octStr}`;
+  });
+  return `${nextHead}${parts.underlines}${parts.dots}${parts.tie}${parts.markings}`;
 }
 
 const EXCLUSIVE_GROUPS: string[][] = [
   ['pull', 'push', '拉', '推', 'pizz', '拨'],
-  ['in', 'out', '内', '外'],
+  ['in', 'out', '内', '外', 's1', 's2', 's3', 's4', '一弦', '二弦', '三弦', '四弦', '子弦', '中弦', '老弦', '缠弦'],
   ['0', '1', '2', '3', '4', '一', '二', '三', '四'],
   ['pos1', 'pos2', 'pos3', 'pos4', 'pos5', 'p1', 'p2', 'p3', 'p4', 'p5', '一把', '二把', '三把', '四把', '五把', '上把', '中把', '下把', '次下把'],
-  ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sfz']
+  ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sfz'],
+  ['tu', 'ktu', 'dtu', 'ttu', 't', 'k', 'tk', 'ttk', '单吐', '双吐', '三吐'],
+  ['li', 'lidown', '历音', '上历音', '下历音']
 ];
 
 function transformNoteMarking(noteStr: string, tag: string): string {
-  const m = noteStr.match(/^([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*)$/);
-  if (!m) return noteStr;
-  const [, acc, digit, octStr, underlines, dots, tie, markingsStr] = m;
+  const parts = splitNoteOrChord(noteStr);
+  if (!parts) return noteStr;
 
   const existingTags: string[] = [];
   const blockRegex = /\{([^}]*)\}/g;
   let bm: RegExpExecArray | null;
-  while ((bm = blockRegex.exec(markingsStr)) !== null) {
-    const parts = bm[1].split(/[,，;\s]+/).map(s => s.trim()).filter(Boolean);
-    existingTags.push(...parts);
+  while ((bm = blockRegex.exec(parts.markings)) !== null) {
+    const items = bm[1].split(/[,，;\s]+/).map(s => s.trim()).filter(Boolean);
+    existingTags.push(...items);
   }
 
   const idx = existingTags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
@@ -160,7 +182,7 @@ function transformNoteMarking(noteStr: string, tag: string): string {
   }
 
   const newMarkings = nextTags.length > 0 ? `{${nextTags.join(',')}}` : '';
-  return `${acc}${digit}${octStr}${underlines}${dots}${tie}${newMarkings}`;
+  return `${parts.head}${parts.underlines}${parts.dots}${parts.tie}${newMarkings}`;
 }
 
 function applyNoteTransform(
@@ -198,7 +220,7 @@ function applyNoteTransform(
 }
 
 /**
- * Raise / Lower Octave Dots on cursor note or selection
+ * Raise / Lower Octave Dots on cursor note/chord or selection
  */
 export function macroShiftOctave(text: string, selStart: number, selEnd: number, delta: 1 | -1): TextEditResult | null {
   return applyNoteTransform(text, selStart, selEnd, n => transformNoteOctave(n, delta));
@@ -208,8 +230,8 @@ export function macroShiftOctave(text: string, selStart: number, selEnd: number,
  * Add / Remove Duration Underline (Beam)
  */
 export function macroAdjustUnderlines(text: string, selStart: number, selEnd: number, delta: 1 | -1): TextEditResult | null {
-  const hasSlashBeams = /[0-7][',]*\//.test(text);
-  const hasUnderscoreBeams = /[0-7][',]*_/.test(text);
+  const hasSlashBeams = /[0-7>][',]*\//.test(text);
+  const hasUnderscoreBeams = /[0-7>][',]*_/.test(text);
   const defaultBeamChar: '/' | '_' = hasUnderscoreBeams && !hasSlashBeams ? '_' : '/';
   return applyNoteTransform(text, selStart, selEnd, n => transformNoteUnderlines(n, delta, defaultBeamChar));
 }
@@ -229,7 +251,7 @@ export function macroToggleAccidental(text: string, selStart: number, selEnd: nu
 }
 
 /**
- * Attach / Toggle Erhu Marking (Bowing, Finger, String, Slide, Vibrato, Dynamic)
+ * Attach / Toggle Marking (Bowing, Pipa/Guzheng Technique, Finger, String, Slide, Vibrato, Dynamic)
  */
 export function macroToggleMarking(text: string, selStart: number, selEnd: number, tag: string): TextEditResult {
   const res = applyNoteTransform(text, selStart, selEnd, n => transformNoteMarking(n, tag));
@@ -244,13 +266,31 @@ export function macroToggleMarking(text: string, selStart: number, selEnd: numbe
 }
 
 /**
- * Wrap / Unwrap Slur (连弓线)
+ * Checks whether `str` is wrapped by a single matching pair of outer parentheses `( ... )`
+ * so selecting `(1/ 2/) (3/ 5/)` wraps into a nested phrasing slur `((1/ 2/) (3/ 5/))`
+ * rather than erroneously stripping the first `(` and last `)`.
+ */
+function isWrappedBySingleOuterParen(str: string): boolean {
+  if (!str.startsWith('(') || !str.endsWith(')')) return false;
+  let depth = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === '(') depth++;
+    else if (str[i] === ')') {
+      depth--;
+      if (depth === 0 && i < str.length - 1) return false;
+    }
+  }
+  return depth === 0;
+}
+
+/**
+ * Wrap / Unwrap Slur (连音线 / 连弓线) — supports nested phrasing slurs!
  */
 export function macroToggleSlur(text: string, selStart: number, selEnd: number): TextEditResult {
   if (selStart !== selEnd) {
     const selected = text.slice(selStart, selEnd);
     const trimmed = selected.trim();
-    if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+    if (isWrappedBySingleOuterParen(trimmed)) {
       const unwrapped = trimmed.slice(1, -1);
       const next = text.slice(0, selStart) + unwrapped + text.slice(selEnd);
       return { text: next, selectionStart: selStart, selectionEnd: selStart + unwrapped.length };
@@ -262,6 +302,27 @@ export function macroToggleSlur(text: string, selStart: number, selEnd: number):
   const snippet = '( )';
   const next = text.slice(0, selStart) + snippet + text.slice(selEnd);
   return { text: next, selectionStart: selStart + 1, selectionEnd: selStart + 2 };
+}
+
+/**
+ * Wrap selected notes into a Chord (<1 3 5>) or insert a sample chord at cursor
+ */
+export function macroWrapChord(text: string, selStart: number, selEnd: number): TextEditResult {
+  if (selStart !== selEnd) {
+    const selected = text.slice(selStart, selEnd);
+    const trimmed = selected.trim();
+    if (trimmed.startsWith('<') && trimmed.endsWith('>') && !trimmed.slice(1, -1).includes('>')) {
+      const unwrapped = trimmed.slice(1, -1).trim();
+      const next = text.slice(0, selStart) + unwrapped + text.slice(selEnd);
+      return { text: next, selectionStart: selStart, selectionEnd: selStart + unwrapped.length };
+    }
+    const wrapped = `<${trimmed}>`;
+    const next = text.slice(0, selStart) + wrapped + text.slice(selEnd);
+    return { text: next, selectionStart: selStart, selectionEnd: selStart + wrapped.length };
+  }
+  const snippet = '<1 3 5>';
+  const next = text.slice(0, selStart) + snippet + text.slice(selEnd);
+  return { text: next, selectionStart: selStart + 1, selectionEnd: selStart + snippet.length - 1 };
 }
 
 /**
@@ -347,12 +408,11 @@ export function macroInsertGraceNote(
   selEnd: number,
   defaultPitch: string = '5'
 ): TextEditResult {
-  const hasSlashBeams = /[0-7][',]*\//.test(text);
-  const hasUnderscoreBeams = /[0-7][',]*_/.test(text);
+  const hasSlashBeams = /[0-7>][',]*\//.test(text);
+  const hasUnderscoreBeams = /[0-7>][',]*_/.test(text);
   const beamChar = hasUnderscoreBeams && !hasSlashBeams ? '_' : '/';
   const snippet = `^${defaultPitch}${beamChar}`;
 
-  // Determine the target main note using the full line so selecting the pitch inside ^5/ never nests ^
   let insertAt: number | null = null;
   const lineStart = text.lastIndexOf('\n', Math.max(0, selStart - 1)) + 1;
   const rawLineEnd = text.indexOf('\n', selStart);
@@ -362,7 +422,6 @@ export function macroInsertGraceNote(
   if (!/^\s*(@|S:|L:|T:|#|\/\/)/i.test(line)) {
     const lineSpans = findMainNotesInLine(line, lineStart);
     if (selStart !== selEnd) {
-      // Find first main note overlapping the selection, or immediately following a selected grace pitch
       const overlapping = lineSpans.find(s => s.end > selStart && s.start < selEnd);
       if (overlapping) {
         insertAt = overlapping.start;
@@ -384,36 +443,26 @@ export function macroInsertGraceNote(
   }
 
   if (insertAt !== null) {
-    // Check if there is already an existing single grace note right before insertAt (e.g. ^5/6 -> ^{5/5/}6)
-    const before = text.slice(0, insertAt);
-    const existingSingle = before.match(/(\^\/?)([#b=]?[1-7][',]*[_/]*)(\s*)$/);
-    if (existingSingle) {
-      const prefix = existingSingle[1];
-      const existingGrace = existingSingle[2];
-      const trailingSpace = existingSingle[3];
-      const replaceStart = insertAt - existingSingle[0].length;
-      const newGrace = `${defaultPitch}${beamChar}`;
-      const combined = `${prefix}{${existingGrace}${newGrace}}${trailingSpace}`;
-      const next = text.slice(0, replaceStart) + combined + text.slice(insertAt);
-      const pitchStart = replaceStart + prefix.length + 1 + existingGrace.length;
-      return {
-        text: next,
-        selectionStart: pitchStart,
-        selectionEnd: pitchStart + defaultPitch.length
-      };
-    }
-
-    const existingMulti = before.match(/(\^\/?\{)([^}]*)(\})(\s*)$/);
-    if (existingMulti) {
-      const open = existingMulti[1];
-      const inner = existingMulti[2];
-      const close = existingMulti[3];
-      const trailingSpace = existingMulti[4];
-      const replaceStart = insertAt - existingMulti[0].length;
-      const newGrace = `${defaultPitch}${beamChar}`;
-      const combined = `${open}${inner}${newGrace}${close}${trailingSpace}`;
-      const next = text.slice(0, replaceStart) + combined + text.slice(insertAt);
-      const pitchStart = replaceStart + open.length + inner.length;
+    const beforeTarget = text.slice(lineStart, insertAt);
+    const existingGraceMatch = beforeTarget.match(new RegExp(`(${GRACE_PREFIX_REGEX.source})$`));
+    if (existingGraceMatch) {
+      const graceStart = insertAt - existingGraceMatch[0].length;
+      const graceBody = existingGraceMatch[0];
+      if (graceBody.startsWith('^{') || graceBody.startsWith('^/{')) {
+        const closeBrace = insertAt - 1;
+        const innerAdd = ` ${defaultPitch}${beamChar}`;
+        const next = text.slice(0, closeBrace) + innerAdd + text.slice(closeBrace);
+        return {
+          text: next,
+          selectionStart: closeBrace + 1,
+          selectionEnd: closeBrace + 1 + defaultPitch.length
+        };
+      }
+      const slashed = graceBody.startsWith('^/');
+      const existingSingle = graceBody.slice(slashed ? 2 : 1);
+      const multi = `${slashed ? '^/' : '^'}{${existingSingle} ${defaultPitch}${beamChar}}`;
+      const next = text.slice(0, graceStart) + multi + text.slice(insertAt);
+      const pitchStart = graceStart + (slashed ? 3 : 2) + existingSingle.length + 1;
       return {
         text: next,
         selectionStart: pitchStart,
@@ -429,7 +478,6 @@ export function macroInsertGraceNote(
     };
   }
 
-  // Fallback when cursor is not near any note: insert at cursor and highlight pitch digit
   const next = text.slice(0, selStart) + snippet + text.slice(selEnd);
   return {
     text: next,
@@ -465,7 +513,69 @@ export function macroSetTempo(text: string, bpm: number, expression?: string): s
 }
 
 /**
- * Set or transpose score Key (@key and auto-update Erhu @strings)
+ * Set score @instrument directive (erhu | pipa | guzheng | dizi | xiao)
+ */
+export function macroSetInstrument(text: string, instrument: InstrumentType): string {
+  let result = text;
+  if (/^@instrument\s*[:：].*$/im.test(result)) {
+    result = result.replace(/^@instrument\s*[:：].*$/im, `@instrument: ${instrument}`);
+  } else if (/^@title\s*[:：].*$/im.test(result)) {
+    result = result.replace(/^(@title\s*[:：].*)$/im, `$1\n@instrument: ${instrument}`);
+  } else {
+    result = `@instrument: ${instrument}\n${result}`;
+  }
+
+  // Update @strings / @fingering to match the selected instrument's conventions
+  if (instrument === 'pipa') {
+    result = result.replace(/^@(?:fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+    if (/^@strings\s*[:：].*$/im.test(result)) {
+      result = result.replace(/^@strings\s*[:：].*$/im, '@strings: A-d-e-a');
+    }
+  } else if (instrument === 'guzheng') {
+    result = result.replace(/^@(?:strings|fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+  } else if (instrument === 'dizi' || instrument === 'xiao') {
+    result = result.replace(/^@strings\s*[:：].*\r?\n?/im, '');
+    if (!/^@(?:fingering|tongyin)\s*[:：]/im.test(result)) {
+      if (/^@key\s*[:：].*$/im.test(result)) {
+        result = result.replace(/^(@key\s*[:：].*)$/im, '$1\n@fingering: 筒音作5');
+      } else {
+        result = result.replace(/^(@instrument\s*[:：].*)$/im, '$1\n@fingering: 筒音作5');
+      }
+    }
+  } else {
+    result = result.replace(/^@(?:fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+    const keyMatch = result.match(/^@key\s*[:：]\s*(.+)$/im);
+    const keyInfo = getErhuKeyInfo(keyMatch ? keyMatch[1].trim() : 'D');
+    if (/^@strings\s*[:：].*$/im.test(result)) {
+      result = result.replace(/^@strings\s*[:：].*$/im, `@strings: ${keyInfo.strings}`);
+    } else if (/^@key\s*[:：].*$/im.test(result)) {
+      result = result.replace(/^(@key\s*[:：].*)$/im, `$1\n@strings: ${keyInfo.strings}`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Set Dizi / Xiao fingering system (@fingering: 筒音作5, 筒音作2, 筒音作1, 筒音作6, 筒音作3)
+ */
+export function macroSetFingering(text: string, fingering: string): string {
+  const clean = fingering.trim();
+  if (!clean) return text;
+  if (/^@(?:fingering|tongyin)\s*[:：].*$/im.test(text)) {
+    return text.replace(/^@(?:fingering|tongyin)\s*[:：].*$/im, `@fingering: ${clean}`);
+  }
+  if (/^@key\s*[:：].*$/im.test(text)) {
+    return text.replace(/^(@key\s*[:：].*)$/im, `$1\n@fingering: ${clean}`);
+  }
+  if (/^@instrument\s*[:：].*$/im.test(text)) {
+    return text.replace(/^(@instrument\s*[:：].*)$/im, `$1\n@fingering: ${clean}`);
+  }
+  return `@fingering: ${clean}\n${text}`;
+}
+
+/**
+ * Set or transpose score Key (@key and auto-update Erhu @strings when Erhu is active)
  */
 export function macroSetKey(text: string, targetKey: string): string {
   const keyInfo = getErhuKeyInfo(targetKey);
@@ -477,10 +587,14 @@ export function macroSetKey(text: string, targetKey: string): string {
     result = `@key: ${keyInfo.label}\n${result}`;
   }
 
-  if (/^@strings\s*[:：].*$/im.test(result)) {
-    result = result.replace(/^@strings\s*[:：].*$/im, `@strings: ${keyInfo.strings}`);
-  } else {
-    result = result.replace(/^(@key\s*[:：].*)$/im, `$1\n@strings: ${keyInfo.strings}`);
+  const instMatch = result.match(/^@instrument\s*[:：]\s*(.+)$/im);
+  const inst = instMatch ? instMatch[1].trim().toLowerCase() : 'erhu';
+  if (!inst || inst.includes('erhu') || inst.includes('二胡')) {
+    if (/^@strings\s*[:：].*$/im.test(result)) {
+      result = result.replace(/^@strings\s*[:：].*$/im, `@strings: ${keyInfo.strings}`);
+    } else {
+      result = result.replace(/^(@key\s*[:：].*)$/im, `$1\n@strings: ${keyInfo.strings}`);
+    }
   }
 
   return result;
@@ -494,33 +608,42 @@ export function macroTransposeKey(text: string, semitones: number): string {
 }
 
 /**
- * Diatonic Scale-Degree Shift (shifts all 1-7 notes + octave dots)
+ * Diatonic Scale-Degree Shift (shifts all 1-7 notes + chord pitches + octave dots)
  */
 export function macroShiftScaleDegrees(text: string, steps: number): string {
   if (steps === 0) return text;
   const lines = text.split('\n');
+  const shiftPitchHead = (head: string) =>
+    head.replace(/([#b=]?)([0-7])([',]*)/g, (full, acc, digit, octStr) => {
+      const deg = parseInt(digit, 10);
+      if (deg === 0) return full;
+      let oct = 0;
+      for (const ch of octStr) {
+        if (ch === "'") oct++;
+        else if (ch === ',') oct--;
+      }
+      const totalStep = oct * 7 + (deg - 1) + steps;
+      const newOct = Math.max(-2, Math.min(2, Math.floor(totalStep / 7)));
+      const newDeg = ((totalStep % 7) + 7) % 7 + 1;
+      const newOctStr = newOct > 0 ? "'".repeat(newOct) : newOct < 0 ? ','.repeat(-newOct) : '';
+      return `${acc}${newDeg}${newOctStr}`;
+    });
+
   const transformed = lines.map(line => {
     const t = line.trim();
     if (!t || /^(@|S:|L:|T:|#|\/\/)/i.test(t)) return line;
 
-    return line.replace(
-      /(\[(?:\d+(?:[,\-]\d+)*\.\]?|[^\[\]]+\]))|(\{[^}]*\})|(([#b=]?)([0-7])([',]*)([_/]*)(\.*)(~?)((?:\{[^}]*\})*))/g,
-      (full, bracketTok, braceTok, noteTok, acc, digit, octStr, underlines, dots, tie, markings) => {
-        if (bracketTok || braceTok || !noteTok) return full;
-        const deg = parseInt(digit, 10);
-        if (deg === 0) return full;
-        let oct = 0;
-        for (const ch of octStr) {
-          if (ch === "'") oct++;
-          else if (ch === ',') oct--;
-        }
-        const totalStep = oct * 7 + (deg - 1) + steps;
-        const newOct = Math.max(-2, Math.min(2, Math.floor(totalStep / 7)));
-        const newDeg = ((totalStep % 7) + 7) % 7 + 1;
-        const newOctStr = newOct > 0 ? "'".repeat(newOct) : newOct < 0 ? ','.repeat(-newOct) : '';
-        return `${acc}${newDeg}${newOctStr}${underlines}${dots}${tie}${markings}`;
+    return line.replace(LINE_TOKEN_REGEX, (full, graceTok, braceTok, bracketTok, noteTok) => {
+      if (bracketTok || braceTok) return full;
+      if (graceTok) {
+        // Shift pitches inside grace notes too
+        return shiftPitchHead(graceTok);
       }
-    );
+      if (!noteTok) return full;
+      const parts = splitNoteOrChord(noteTok);
+      if (!parts) return full;
+      return `${shiftPitchHead(parts.head)}${parts.underlines}${parts.dots}${parts.tie}${parts.markings}`;
+    });
   });
   return transformed.join('\n');
 }
@@ -534,11 +657,9 @@ export function macroTidyFormatting(text: string): string {
     const t = line.trim();
     if (!t || /^(@|S:|L:|T:|#|\/\/)/i.test(t)) return line;
 
-    // Normalize spaces around barlines without touching double/repeat barlines
     let cleaned = t.replace(/\s+/g, ' ');
     cleaned = cleaned.replace(/\s*(:?\|\|:?|\|\]|\|:|:\||\|)\s*/g, ' $1 ');
     cleaned = cleaned.trim();
-    // Clean trailing/leading spaces inside parentheses
     cleaned = cleaned.replace(/\(\s+/g, '(').replace(/\s+\)/g, ')');
     return cleaned;
   }).join('\n');
