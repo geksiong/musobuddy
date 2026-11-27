@@ -27,6 +27,7 @@ import {
   StringType
 } from './types.ts';
 import { getErhuKeyInfo, normalizeKeyName } from './erhuKeys.ts';
+import { mergeGuqinJianzi, parseGuqinToken } from './guqin.ts';
 
 const BOWING_ALIASES: Record<string, BowingType> = {
   pull: 'pull', down: 'pull', la: 'pull', '拉': 'pull', '拉弓': 'pull', 'π': 'pull',
@@ -137,6 +138,7 @@ const DYNAMIC_ALIASES: Record<string, DynamicType> = {
 
 function normalizeInstrumentName(raw: string): InstrumentType {
   const lower = raw.trim().toLowerCase();
+  if (lower.includes('guqin') || lower.includes('qin') || lower.includes('古琴') || lower === '琴') return 'guqin';
   if (lower.includes('pipa') || lower.includes('琵琶')) return 'pipa';
   if (lower.includes('guzheng') || lower.includes('zheng') || lower.includes('古筝') || lower.includes('古箏') || lower === '筝') {
     return 'guzheng';
@@ -225,7 +227,11 @@ function parseMarkingsBlock(raw: string, target: ErhuMarkings) {
     }
 
     const lower = part.toLowerCase();
-    if (BOWING_ALIASES[lower] || BOWING_ALIASES[part]) {
+    // Check Guqin Jianzipu compound tokens & left-hand actions first (unambiguous multi-char or gq: prefix)
+    const guqinPatch = parseGuqinToken(part);
+    if (guqinPatch) {
+      target.jianzi = mergeGuqinJianzi(target.jianzi, guqinPatch);
+    } else if (BOWING_ALIASES[lower] || BOWING_ALIASES[part]) {
       target.bowing = BOWING_ALIASES[lower] || BOWING_ALIASES[part];
     } else if (PLUCK_TECHNIQUE_ALIASES[lower] || PLUCK_TECHNIQUE_ALIASES[part]) {
       const tech = PLUCK_TECHNIQUE_ALIASES[lower] || PLUCK_TECHNIQUE_ALIASES[part];
@@ -785,8 +791,71 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
       if (ch === '{') {
         const closeIdx = rawLine.indexOf('}', i + 1);
         if (closeIdx !== -1) {
+          const blockStart = lineStart + i;
+          const blockInner = rawLine.slice(i + 1, closeIdx);
+          const probe = createEmptyMarkings();
+          parseMarkingsBlock(blockInner, probe);
+
+          // Pure Jianzipu standalone token (e.g. `{散勾一}` or `{名九勾六,绰,吟}` without a preceding/attached digit)
+          const nextChar = rawLine[closeIdx + 1] || '';
+          const attachedToNote = /^[#b=0-7<]/.test(nextChar);
+          if (probe.jianzi && !attachedToNote) {
+            ensureMeasure(blockStart);
+            i = closeIdx + 1;
+            // Consume optional duration suffixes (/ _ .) after pure Jianzipu block
+            let underlines = 0;
+            while (i < len && (rawLine[i] === '_' || rawLine[i] === '/')) {
+              underlines = Math.min(3, underlines + 1);
+              i++;
+            }
+            let dots = 0;
+            while (i < len && rawLine[i] === '.') {
+              dots = Math.min(2, dots + 1);
+              i++;
+            }
+            if (pendingMarkings) {
+              if (pendingMarkings.dynamic && !probe.dynamic) probe.dynamic = pendingMarkings.dynamic;
+              if (pendingMarkings.customText && !probe.customText) probe.customText = pendingMarkings.customText;
+              pendingMarkings = null;
+            }
+            totalNotes++;
+            const jzNote: MusoJianpuNote = {
+              kind: 'note',
+              id: `n-${totalNotes}`,
+              degree: -2, // Pure Jianzipu node (pitch computed from Guqin string/hui physics)
+              octave: 0,
+              accidental: null,
+              underlines,
+              dots,
+              graceNotes: pendingGraceNotes,
+              markings: probe,
+              startOffset: blockStart,
+              endOffset: lineStart + i,
+              lineNumber
+            };
+            pendingGraceNotes = [];
+            attachActiveSlurs(jzNote);
+            if (inHairpin && activeHairpinId !== undefined && activeHairpinType) {
+              jzNote.hairpinId = activeHairpinId;
+              jzNote.hairpinType = activeHairpinType;
+              if (pendingHairpinStart) {
+                jzNote.hairpinStart = true;
+                pendingHairpinStart = false;
+              }
+              lastNoteInHairpin = jzNote;
+            }
+            flushGroup();
+            currentMeasure!.groups.push({
+              kind: 'group',
+              id: `g-${totalNotes}`,
+              notes: [jzNote]
+            });
+            lastPitchedNote = jzNote;
+            continue;
+          }
+
           if (!pendingMarkings) pendingMarkings = createEmptyMarkings();
-          parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), pendingMarkings);
+          parseMarkingsBlock(blockInner, pendingMarkings);
           i = closeIdx + 1;
           continue;
         }

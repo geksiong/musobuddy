@@ -13,6 +13,28 @@
   --color-surface-elevated: #22252B;
 }
 
+/* Authentic Guqin Jianzipu OpenType Font (JianZiPu.ttf, SIL Open Font License 1.1) */
+@font-face {
+  font-family: "JianZiPu";
+  src: url("/fonts/JianZiPu.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.jzp-glyph {
+  font-family: "JianZiPu", "Noto Serif SC", "Songti SC", serif;
+  font-weight: 400;
+  font-style: normal;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1, "calt" 1;
+  font-variant-ligatures: common-ligatures contextual;
+  display: inline-block;
+  line-height: 1.25;
+  white-space: pre;
+  letter-spacing: 0;
+  text-rendering: optimizeLegibility;
+}
+
 @layer base {
   body {
     @apply antialiased transition-colors duration-200 select-none;

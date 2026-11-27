@@ -51,12 +51,20 @@ import {
 import { ERHU_KEYS, getErhuKeyInfo } from '../../lib/musojianpu/erhuKeys.ts';
 import { MUSOJIANPU_TEMPLATES } from '../../lib/musojianpu/samples.ts';
 import { MusoJianpuPlayer } from '../../lib/musojianpu/audioEngine.ts';
-import { InstrumentType, MusoJianpuNote } from '../../lib/musojianpu/types.ts';
+import {
+  GuqinDisplayMode,
+  GuqinLeftFinger,
+  GuqinRightStroke,
+  GuqinSoundType,
+  InstrumentType,
+  MusoJianpuNote
+} from '../../lib/musojianpu/types.ts';
+import { composeGuqinTokenText, GUQIN_STRING_CHINESE } from '../../lib/musojianpu/guqin.ts';
 import { MusoJianpuRenderer } from './MusoJianpuRenderer.tsx';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 
-type MacroTab = 'bowing' | 'pipa' | 'guzheng' | 'dizi' | 'fingering' | 'ornaments' | 'rhythm' | 'structure';
+type MacroTab = 'bowing' | 'pipa' | 'guzheng' | 'guqin' | 'dizi' | 'fingering' | 'ornaments' | 'rhythm' | 'structure';
 
 export interface MusoJianpuWorkbenchProps {
   content: string;
@@ -95,10 +103,18 @@ export function MusoJianpuWorkbench({
   const sheetPaneRef = useRef<HTMLDivElement>(null);
 
   const [activeMacroTab, setActiveMacroTab] = useState<MacroTab>('bowing');
+  const [guqinDisplayMode, setGuqinDisplayMode] = useState<GuqinDisplayMode>('dual');
   const [showMarkings, setShowMarkings] = useState(true);
   const [showLyrics, setShowLyrics] = useState(true);
   const [highlightMarkings, setHighlightMarkings] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
+
+  // Inline Guqin Jianzi Builder state
+  const [jzMode, setJzMode] = useState<'san' | 'fan' | GuqinLeftFinger>('ming');
+  const [jzHui, setJzHui] = useState<string>('9');
+  const [jzStroke, setJzStroke] = useState<GuqinRightStroke>('gou');
+  const [jzString1, setJzString1] = useState<number>(6);
+  const [jzString2, setJzString2] = useState<number>(1);
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -126,16 +142,41 @@ export function MusoJianpuWorkbench({
   const keyInfo = useMemo(() => getErhuKeyInfo(parsedDoc.header.key), [parsedDoc.header.key]);
   const activeInstrument: InstrumentType = parsedDoc.header.instrument || 'erhu';
   const isWindInstrument = activeInstrument === 'dizi' || activeInstrument === 'xiao';
+  const hasJianziInDoc = useMemo(
+    () =>
+      parsedDoc.lines.some(
+        l => l.kind === 'music' && l.measures.some(m => m.groups.some(g => g.notes.some(n => Boolean(n.markings.jianzi))))
+      ),
+    [parsedDoc]
+  );
+  const showGuqinViews = activeInstrument === 'guqin' || hasJianziInDoc;
+
+  const builtJianziToken = useMemo(() => {
+    const soundType: GuqinSoundType = jzMode === 'san' ? 'san' : jzMode === 'fan' ? 'fan' : 'an';
+    const leftFinger: GuqinLeftFinger | undefined =
+      soundType === 'an' ? (jzMode as GuqinLeftFinger) : undefined;
+    return composeGuqinTokenText({
+      soundType,
+      leftFinger,
+      hui: soundType === 'san' ? undefined : jzHui,
+      rightStroke: jzStroke,
+      stringNum: jzString1,
+      secondStringNum: jzStroke === 'cuo' || jzStroke === 'fancuo' ? jzString2 : undefined
+    });
+  }, [jzMode, jzHui, jzStroke, jzString1, jzString2]);
+
   const instrumentPlayLabel =
     activeInstrument === 'pipa'
       ? 'Pipa'
       : activeInstrument === 'guzheng'
         ? 'Guzheng'
-        : activeInstrument === 'dizi'
-          ? 'Dizi'
-          : activeInstrument === 'xiao'
-            ? 'Xiao'
-            : 'Erhu';
+        : activeInstrument === 'guqin'
+          ? 'Guqin'
+          : activeInstrument === 'dizi'
+            ? 'Dizi'
+            : activeInstrument === 'xiao'
+              ? 'Xiao'
+              : 'Erhu';
 
   // Cleanup player on unmount
   useEffect(() => {
@@ -511,10 +552,15 @@ ${collectedCss}
                   ? 'pipa'
                   : nextInst === 'guzheng'
                     ? 'guzheng'
-                    : nextInst === 'dizi' || nextInst === 'xiao'
-                      ? 'dizi'
-                      : 'bowing'
+                    : nextInst === 'guqin'
+                      ? 'guqin'
+                      : nextInst === 'dizi' || nextInst === 'xiao'
+                        ? 'dizi'
+                        : 'bowing'
               );
+              if (nextInst !== 'guqin') {
+                setGuqinDisplayMode('dual');
+              }
             }}
             className={cn(
               'h-7 px-2 rounded-md border text-xs font-semibold outline-none cursor-pointer',
@@ -525,9 +571,43 @@ ${collectedCss}
             <option value="erhu" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>二胡 Erhu</option>
             <option value="pipa" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>琵琶 Pipa</option>
             <option value="guzheng" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>古筝 Guzheng</option>
+            <option value="guqin" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>古琴 Guqin</option>
             <option value="dizi" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>笛子 Dizi</option>
             <option value="xiao" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>洞箫 Xiao</option>
           </select>
+
+          {/* Guqin Display Mode Switcher: Dual (简谱+减字) | Pure Horizontal (横排) | Pure Vertical Scroll (竖排) */}
+          {showGuqinViews && (
+            <div
+              className={cn(
+                'flex items-center p-0.5 rounded-lg border text-[11px] font-medium',
+                isDark ? 'bg-white/[0.04] border-white/[0.08]' : 'bg-neutral-100 border-neutral-200'
+              )}
+              title="Switch Guqin view between Dual (Jianpu + Jianzipu), Pure Horizontal, and Traditional Vertical Scroll"
+            >
+              {(
+                [
+                  { id: 'dual', label: '双行 Dual' },
+                  { id: 'pure-horizontal', label: '横排 Pure' },
+                  { id: 'pure-vertical', label: '竖排 Scroll' }
+                ] as const
+              ).map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setGuqinDisplayMode(opt.id)}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md transition-colors cursor-pointer whitespace-nowrap',
+                    guqinDisplayMode === opt.id
+                      ? (isDark ? 'bg-[#E05A2B] text-white' : 'bg-white text-neutral-900 shadow-xs')
+                      : (isDark ? 'text-neutral-400 hover:text-neutral-200' : 'text-neutral-600 hover:text-neutral-900')
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Key & String / Fingering Macro Picker */}
           <div className="flex items-center gap-1.5">
@@ -649,10 +729,22 @@ ${collectedCss}
                         onChangeContent(tpl.content);
                         onChangeTitle?.(tpl.title);
                       }
-                      if (/^@instrument\s*:\s*pipa/im.test(tpl.content)) setActiveMacroTab('pipa');
-                      else if (/^@instrument\s*:\s*guzheng/im.test(tpl.content)) setActiveMacroTab('guzheng');
-                      else if (/^@instrument\s*:\s*(?:dizi|xiao)/im.test(tpl.content)) setActiveMacroTab('dizi');
-                      else setActiveMacroTab('bowing');
+                      if (/^@instrument\s*:\s*pipa/im.test(tpl.content)) {
+                        setActiveMacroTab('pipa');
+                        setGuqinDisplayMode('dual');
+                      } else if (/^@instrument\s*:\s*guzheng/im.test(tpl.content)) {
+                        setActiveMacroTab('guzheng');
+                        setGuqinDisplayMode('dual');
+                      } else if (/^@instrument\s*:\s*guqin/im.test(tpl.content)) {
+                        setActiveMacroTab('guqin');
+                        setGuqinDisplayMode(tpl.id === 'guqin-pure' ? 'pure-vertical' : 'dual');
+                      } else if (/^@instrument\s*:\s*(?:dizi|xiao)/im.test(tpl.content)) {
+                        setActiveMacroTab('dizi');
+                        setGuqinDisplayMode('dual');
+                      } else {
+                        setActiveMacroTab('bowing');
+                        setGuqinDisplayMode('dual');
+                      }
                       setCursorOffset(null);
                       setIsTemplateMenuOpen(false);
                     }}
@@ -811,9 +903,9 @@ ${collectedCss}
             </div>
             <div className="space-y-1">
               <div className="font-semibold text-neutral-900 dark:text-neutral-100">Chinese Instrument Markings</div>
-              <div><code className="font-mono text-[#E05A2B]">@instrument:</code> <code className="font-mono">erhu</code> · <code className="font-mono">pipa</code> · <code className="font-mono">guzheng</code> · <code className="font-mono">dizi</code> · <code className="font-mono">xiao</code></div>
-              <div><span className="font-semibold">Erhu:</span> <code className="font-mono text-[#E05A2B]">{'{pull,push,in,out,一..四,su,sd,vib}'}</code></div>
-              <div><span className="font-semibold">Pipa / Guzheng:</span> <code className="font-mono text-[#E05A2B]">{'{tan,tiao,lun,sao,fu}'}</code> · <code className="font-mono text-[#E05A2B]">{'{tuo,mo,cuo,yao,gua,arp}'}</code></div>
+              <div><code className="font-mono text-[#E05A2B]">@instrument:</code> <code className="font-mono">erhu</code> · <code className="font-mono">pipa</code> · <code className="font-mono">guzheng</code> · <code className="font-mono">guqin</code> · <code className="font-mono">dizi</code> · <code className="font-mono">xiao</code></div>
+              <div><span className="font-semibold">Erhu / Pipa / Guzheng:</span> <code className="font-mono text-[#E05A2B]">{'{pull,push,vib}'}</code> · <code className="font-mono text-[#E05A2B]">{'{tan,lun,sao}'}</code> · <code className="font-mono text-[#E05A2B]">{'{tuo,cuo,yao,gua}'}</code></div>
+              <div><span className="font-semibold">Guqin 减字谱:</span> <code className="font-mono text-[#E05A2B]">{'{散勾一}'}</code> · <code className="font-mono text-[#E05A2B]">{'{名九勾六,绰,吟}'}</code> · <code className="font-mono text-[#E05A2B]">{'{泛七挑五}'}</code> · <code className="font-mono text-[#E05A2B]">{'{散撮一六}'}</code></div>
               <div><span className="font-semibold">Dizi / Xiao:</span> <code className="font-mono text-[#E05A2B]">@fingering: 筒音作5</code> · <code className="font-mono text-[#E05A2B]">{'{breath,tu,dtu,huashe,qizhen,die,da,zeng,li,duo,bo}'}</code></div>
             </div>
             <div className="space-y-1">
@@ -853,6 +945,7 @@ ${collectedCss}
                     { id: 'bowing', label: 'Erhu 弓法' },
                     { id: 'pipa', label: 'Pipa 琵琶' },
                     { id: 'guzheng', label: 'Guzheng 古筝' },
+                    { id: 'guqin', label: 'Guqin 古琴' },
                     { id: 'dizi', label: 'Dizi/Xiao 笛箫' },
                     { id: 'fingering', label: 'Fingers 指法' },
                     { id: 'ornaments', label: 'Ornaments 技巧' },
@@ -953,6 +1046,182 @@ ${collectedCss}
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'huazhi'))} className={macroBtnClass} title="Ornamental flourish {huazhi}">花指</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'an'))} className={macroBtnClass} title="Left-hand pitch press {an}">按音</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'dian'))} className={macroBtnClass} title="Left-hand quick press-release {dian}">点音</button>
+                </>
+              )}
+
+              {activeMacroTab === 'guqin' && (
+                <>
+                  {/* Compact Inline Jianzi Character Builder */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <select
+                      value={jzMode}
+                      onChange={e => setJzMode(e.target.value as 'san' | 'fan' | GuqinLeftFinger)}
+                      className={cn(
+                        'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                        isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                      )}
+                      title="Sound type or left-hand finger (散音 / 泛音 / 大食中名跪)"
+                    >
+                      <option value="san" className={isDark ? 'bg-neutral-900' : 'bg-white'}>散音 (Open)</option>
+                      <option value="da" className={isDark ? 'bg-neutral-900' : 'bg-white'}>大指</option>
+                      <option value="shi" className={isDark ? 'bg-neutral-900' : 'bg-white'}>食指</option>
+                      <option value="zhong" className={isDark ? 'bg-neutral-900' : 'bg-white'}>中指</option>
+                      <option value="ming" className={isDark ? 'bg-neutral-900' : 'bg-white'}>名指</option>
+                      <option value="gui" className={isDark ? 'bg-neutral-900' : 'bg-white'}>跪指</option>
+                      <option value="fan" className={isDark ? 'bg-neutral-900' : 'bg-white'}>泛音 (Harm)</option>
+                    </select>
+
+                    {jzMode !== 'san' && (
+                      <select
+                        value={jzHui}
+                        onChange={e => setJzHui(e.target.value)}
+                        className={cn(
+                          'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                          isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                        )}
+                        title="Hui position (徽位)"
+                      >
+                        {[
+                          { v: '5', l: '五徽' },
+                          { v: '6.2', l: '六二' },
+                          { v: '7', l: '七徽' },
+                          { v: '7.6', l: '七六' },
+                          { v: '7.9', l: '七九' },
+                          { v: '8', l: '八徽' },
+                          { v: '9', l: '九徽' },
+                          { v: '10', l: '十徽' },
+                          { v: '10.8', l: '十八' },
+                          { v: '11', l: '十一' },
+                          { v: '12', l: '十二' },
+                          { v: '13', l: '十三' },
+                          { v: '外', l: '徽外' }
+                        ].map(h => (
+                          <option key={h.v} value={h.v} className={isDark ? 'bg-neutral-900' : 'bg-white'}>
+                            {h.l}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    <select
+                      value={jzStroke}
+                      onChange={e => setJzStroke(e.target.value as GuqinRightStroke)}
+                      className={cn(
+                        'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                        isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                      )}
+                      title="Right-hand plucking stroke (指法)"
+                    >
+                      {(
+                        [
+                          { v: 'gou', l: '勾' },
+                          { v: 'tiao', l: '挑' },
+                          { v: 'mo', l: '抹' },
+                          { v: 'ti', l: '剔' },
+                          { v: 'da', l: '打' },
+                          { v: 'zhai', l: '摘' },
+                          { v: 'tuo', l: '托' },
+                          { v: 'pi', l: '劈' },
+                          { v: 'cuo', l: '撮' },
+                          { v: 'fancuo', l: '反撮' },
+                          { v: 'li', l: '历' },
+                          { v: 'lun', l: '轮' },
+                          { v: 'gun', l: '滚' },
+                          { v: 'fu', l: '拂' }
+                        ] as const
+                      ).map(st => (
+                        <option key={st.v} value={st.v} className={isDark ? 'bg-neutral-900' : 'bg-white'}>
+                          {st.l}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={jzString1}
+                      onChange={e => setJzString1(parseInt(e.target.value, 10))}
+                      className={cn(
+                        'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                        isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                      )}
+                      title="String number (一至七弦)"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                        <option key={n} value={n} className={isDark ? 'bg-neutral-900' : 'bg-white'}>
+                          {GUQIN_STRING_CHINESE[n]}弦
+                        </option>
+                      ))}
+                    </select>
+
+                    {(jzStroke === 'cuo' || jzStroke === 'fancuo') && (
+                      <select
+                        value={jzString2}
+                        onChange={e => setJzString2(parseInt(e.target.value, 10))}
+                        className={cn(
+                          'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                          isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                        )}
+                        title="Second string for 撮 pinch"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                          <option key={n} value={n} className={isDark ? 'bg-neutral-900' : 'bg-white'}>
+                            +{GUQIN_STRING_CHINESE[n]}弦
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (guqinDisplayMode === 'dual') {
+                          runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, builtJianziToken));
+                        } else {
+                          runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, `{${builtJianziToken}} `));
+                        }
+                      }}
+                      className={cn(
+                        'h-7 px-2.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap',
+                        'bg-[#E05A2B] hover:bg-[#c8491c] text-white'
+                      )}
+                      title={
+                        guqinDisplayMode === 'dual'
+                          ? `Attach {${builtJianziToken}} to the note under cursor`
+                          : `Insert standalone pure Jianzipu glyph {${builtJianziToken}}`
+                      }
+                    >
+                      + {builtJianziToken}
+                    </button>
+                  </div>
+
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+
+                  {/* Left-hand Guqin expression modifiers */}
+                  {(
+                    [
+                      { k: '绰', t: 'Slide in from below {绰}' },
+                      { k: '注', t: 'Slide in from above {注}' },
+                      { k: '吟', t: 'Gentle vibrato {吟}' },
+                      { k: '猱', t: 'Wide slow vibrato {猱}' },
+                      { k: '上七六', t: 'Slide up to 7.6 hui {上七六}' },
+                      { k: '下九', t: 'Slide down to 9th hui {下九}' },
+                      { k: '撞', t: 'Quick pitch bump {撞}' },
+                      { k: '掐起', t: 'Left-hand pull-off {掐起}' },
+                      { k: '进复', t: 'Advance & return {进复}' },
+                      { k: '退复', t: 'Retreat & return {退复}' },
+                      { k: '泛起', t: 'Harmonics begin {泛起}' },
+                      { k: '泛止', t: 'Harmonics end {泛止}' }
+                    ] as const
+                  ).map(act => (
+                    <button
+                      key={act.k}
+                      type="button"
+                      onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, act.k))}
+                      className={macroBtnClass}
+                      title={act.t}
+                    >
+                      {act.k}
+                    </button>
+                  ))}
                 </>
               )}
 
@@ -1191,6 +1460,7 @@ ${collectedCss}
             paperTheme={paperTheme}
             resolvedTheme={resolvedTheme}
             fingeringStyle={fingeringStyle}
+            guqinDisplayMode={showGuqinViews ? guqinDisplayMode : 'dual'}
             showMarkings={showMarkings}
             showLyrics={showLyrics}
             highlightMarkings={highlightMarkings}

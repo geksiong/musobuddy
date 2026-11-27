@@ -513,7 +513,7 @@ export function macroSetTempo(text: string, bpm: number, expression?: string): s
 }
 
 /**
- * Set score @instrument directive (erhu | pipa | guzheng | dizi | xiao)
+ * Set score @instrument directive (erhu | pipa | guzheng | dizi | xiao | guqin)
  */
 export function macroSetInstrument(text: string, instrument: InstrumentType): string {
   let result = text;
@@ -526,7 +526,14 @@ export function macroSetInstrument(text: string, instrument: InstrumentType): st
   }
 
   // Update @strings / @fingering to match the selected instrument's conventions
-  if (instrument === 'pipa') {
+  if (instrument === 'guqin') {
+    result = result.replace(/^@(?:fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+    if (/^@strings\s*[:：].*$/im.test(result)) {
+      result = result.replace(/^@strings\s*[:：].*$/im, '@strings: 正调 5-6-1-2-3-5-6');
+    } else if (/^@key\s*[:：].*$/im.test(result)) {
+      result = result.replace(/^(@key\s*[:：].*)$/im, '$1\n@strings: 正调 5-6-1-2-3-5-6');
+    }
+  } else if (instrument === 'pipa') {
     result = result.replace(/^@(?:fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
     if (/^@strings\s*[:：].*$/im.test(result)) {
       result = result.replace(/^@strings\s*[:：].*$/im, '@strings: A-d-e-a');

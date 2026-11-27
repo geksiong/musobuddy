@@ -164,6 +164,43 @@ S: 示范段落 (洞箫气震音、叠音、打音、赠音与滑音)
 
 T: 示范说明：本曲为原创洞箫记谱示例（非古曲原谱）；G 调洞箫筒音作 5 即为 1=G，演示气震音、叠音（又）、打音（丁）、赠音、波音与气口（V）。`;
 
+export const MUSOJIANPU_GUQIN_SAMPLE = `@title: 古琴减字谱示例 · 散按泛合
+@subtitle: Guqin Jianzipu Etude · 正调 (双行简谱+减字谱 / 支持纯减字竖排切换)
+@composer: MusoJianpu 示范谱
+@instrument: guqin
+@key: 1=F
+@strings: 正调 5-6-1-2-3-5-6
+@time: 4/4
+@tempo: 56
+@expression: 静谧清远地 Lento tranquillo
+
+S: 一、散音起调与撮弦 (Open Strings & Cuo Pinch)
+| 5,{散勾一,mp} 6,{散挑二} 1{散勾三} 2{散挑四} | 3{散抹五} 5{散挑六} <5, 5>{散撮一六} - |
+
+S: 二、按音绰注与吟猱 (Stopped Strings, Slides & Vibrato)
+| 6{名十勾五,绰,吟} 1'{名十挑六,注} 2'{名九挑六,吟} 3'{大九挑七,上七六} | 6{大十抹七,猱} 5{名九勾三,吟} <6, 6>{散撮二七,mp} - |
+
+S: 三、泛音清响 (Harmonic Bell Tones)
+| 5{泛七挑一,泛起,p} 1'{泛七抹三} 2'{泛七挑四} 5'{泛七挑六} | 6'{泛七挑七} 2'{泛九抹一} 5{泛七勾一,泛止,fermata} - |]
+
+T: 示范说明：本曲为原创古琴正调（1=F，七弦定音 5-6-1-2-3-5-6）减字谱示例，所有徽位与简谱音高均严格对应真实十三徽声学位置；点击工具栏可在「双行对照 / 纯减字横排 / 纯减字竖排」间切换。`;
+
+export const MUSOJIANPU_GUQIN_PURE_SAMPLE = `@title: 纯减字谱示例 · 清微淡远
+@subtitle: Pure Guqin Jianzipu Scroll · 无需简谱数字，按徽位自动计算音高
+@composer: MusoJianpu 示范谱
+@instrument: guqin
+@key: 1=F
+@strings: 正调 5-6-1-2-3-5-6
+@time: 4/4
+@tempo: 52
+@expression: 散板从容 Freely
+
+S: 散按泛纯减字谱 (可直接播放并切换竖排乌丝栏)
+| {散勾一} {散挑三} {名九勾三,绰,吟} {名十挑六,注} | {大九挑七,吟} {散撮一六} {散撮二七} - |
+| {泛七挑一,泛起} {泛七抹三} {泛七挑六} {泛七挑七} | {泛九抹一} {泛七勾一,泛止} {散勾三,fermata} |]
+
+T: 纯减字谱语法：直接输入 {散勾一} {名九勾六,绰,吟} {泛七挑五} 等减字记号即可独立排版与发声，无需填写简谱音符。`;
+
 export const MUSOJIANPU_BLANK_TEMPLATE = `@title: 未命名二胡曲
 @subtitle: Untitled Erhu Piece
 @composer: 作曲
@@ -190,6 +227,20 @@ export const MUSOJIANPU_TEMPLATES: MusoJianpuTemplate[] = [
     subtitle: 'Farewell (长亭外) · 二胡 1=G (5-2弦)',
     key: 'G',
     content: MUSOJIANPU_SONGBIE_SAMPLE
+  },
+  {
+    id: 'guqin-dual',
+    title: '古琴减字谱示例 (双行/竖排)',
+    subtitle: 'Guqin Jianzipu · 正调 散/按/泛/撮 声学对照',
+    key: 'F',
+    content: MUSOJIANPU_GUQIN_SAMPLE
+  },
+  {
+    id: 'guqin-pure',
+    title: '古琴纯减字谱 (竖排卷轴)',
+    subtitle: 'Pure Guqin Jianzipu · 无简谱数字，按徽位发声',
+    key: 'F',
+    content: MUSOJIANPU_GUQIN_PURE_SAMPLE
   },
   {
     id: 'dizi-etude',

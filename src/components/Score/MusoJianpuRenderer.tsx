@@ -10,6 +10,7 @@ import {
   BowingType,
   ChordPitch,
   GraceNote,
+  GuqinDisplayMode,
   HairpinType,
   InstrumentType,
   MusicLineNode,
@@ -21,6 +22,7 @@ import {
   MusoJianpuNote
 } from '../../lib/musojianpu/types.ts';
 import { CHINESE_FINGERS, formatJianpuKeyLabel, getErhuKeyInfo } from '../../lib/musojianpu/erhuKeys.ts';
+import { GuqinJianziGlyph } from './GuqinJianziGlyph.tsx';
 import { cn } from '../../lib/utils.ts';
 
 export interface MusoJianpuRendererProps {
@@ -29,6 +31,7 @@ export interface MusoJianpuRendererProps {
   paperTheme?: 'paper' | 'adaptive';
   resolvedTheme: string;
   fingeringStyle?: 'chinese' | 'arabic';
+  guqinDisplayMode?: GuqinDisplayMode;
   showMarkings?: boolean;
   showLyrics?: boolean;
   highlightMarkings?: boolean;
@@ -816,6 +819,13 @@ function MusicLineView({
     );
   }, [line, showMarkings]);
 
+  const hasAnyJianzi = useMemo(() => {
+    if (!showMarkings) return false;
+    return line.measures.some(m =>
+      m.groups.some(g => g.notes.some(n => Boolean(n.markings.jianzi)))
+    );
+  }, [line, showMarkings]);
+
   const hasTopNavMarkers = useMemo(() => {
     return line.measures.some(m =>
       Boolean(m.volta || (m.startMarkers && m.startMarkers.length > 0) || (m.endMarkers && m.endMarkers.length > 0))
@@ -846,8 +856,8 @@ function MusicLineView({
 
   const slurLaneHeight = 16 + maxSlurTier * 11;
 
-  const barlineBottomOffset = 25 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
-  const measureNumberBottomOffset = 31 + (hasAnyDynamics ? 16 : 0) + (hasAnyLyrics ? 24 : 0);
+  const barlineBottomOffset = 25 + (hasAnyDynamics ? 16 : 0) + (hasAnyJianzi ? 58 : 0) + (hasAnyLyrics ? 24 : 0);
+  const measureNumberBottomOffset = 31 + (hasAnyDynamics ? 16 : 0) + (hasAnyJianzi ? 58 : 0) + (hasAnyLyrics ? 24 : 0);
 
   const measureOverlays = () => {
     const container = lineContainerRef.current;
@@ -1103,6 +1113,7 @@ function MusicLineView({
             </div>
             <div className="h-[11px] mt-[1px]" aria-hidden="true" />
             {hasAnyDynamics && <div className="h-[15px] mt-[1px]" aria-hidden="true" />}
+            {hasAnyJianzi && <div className="h-[56px] mt-[2px]" aria-hidden="true" />}
             {hasAnyLyrics && <div className="h-[20px] mt-1" aria-hidden="true" />}
           </div>
         )}
@@ -1326,7 +1337,7 @@ function MusicLineView({
                     </span>
                   )}
 
-                  {note.degree === -1 ? '–' : note.degree}
+                  {note.degree === -1 ? '–' : note.degree === -2 ? <span className="opacity-35 text-sm">·</span> : note.degree}
 
                   {/* Low Octave Dots anchored directly below the digit & duration underlines */}
                   {note.octave <= -1 && (
@@ -1408,6 +1419,20 @@ function MusicLineView({
             </div>
           )}
 
+          {/* Dual-Line Guqin Jianzipu (减字谱) Character aligned directly beneath the Jianpu note */}
+          {hasAnyJianzi && (
+            <div className="h-[56px] mt-[2px] pb-[4px] flex items-end justify-center select-none">
+              {note.markings.jianzi && (
+                <GuqinJianziGlyph
+                  jianzi={note.markings.jianzi}
+                  size="sm"
+                  orientation="horizontal"
+                  inkClass={noteColorClass}
+                />
+              )}
+            </div>
+          )}
+
           {/* Aligned Lyric Syllable */}
           {hasAnyLyrics && (
             <div className={cn('h-[20px] mt-1 text-[13px] font-medium leading-tight whitespace-nowrap', isDarkSurface ? 'text-neutral-200' : 'text-neutral-800')}>
@@ -1437,6 +1462,7 @@ function MusicLineView({
             </div>
             <div className="h-[11px] mt-[1px]" aria-hidden="true" />
             {hasAnyDynamics && <div className="h-[15px] mt-[1px]" aria-hidden="true" />}
+            {hasAnyJianzi && <div className="h-[56px] mt-[2px]" aria-hidden="true" />}
             {hasAnyLyrics && <div className="h-[20px] mt-1" aria-hidden="true" />}
           </div>
         )}
@@ -1590,12 +1616,357 @@ function MusicLineView({
   );
 }
 
+const CLASSICAL_SERIF_FONT =
+  '"Noto Serif SC", "Songti SC", "STSong", "Source Han Serif SC", "SimSun", serif';
+
+type ScrollCell =
+  | { kind: 'section'; id: string; text: string }
+  | { kind: 'note'; note: MusoJianpuNote; phraseEnd?: 'pause' | 'period' };
+
+/**
+ * Pure Jianzipu (纯减字谱) Renderer — supports both:
+ * 1. `pure-horizontal` (横排): Flowing horizontal calligraphic Jianzipu glyphs grouped by phrase without Jianpu digits
+ * 2. `pure-vertical` (竖排 · 乌丝栏): Traditional right-to-left vertical scroll columns with classical double border & colophon
+ */
+function PureJianzipuView({
+  document,
+  mode,
+  isDarkSurface,
+  highlightMarkings,
+  activeNoteId,
+  selectedOffset,
+  onNoteClick
+}: {
+  document: MusoJianpuDocument;
+  mode: 'pure-horizontal' | 'pure-vertical';
+  isDarkSurface: boolean;
+  highlightMarkings: boolean;
+  activeNoteId?: string | null;
+  selectedOffset?: number | null;
+  onNoteClick?: (note: MusoJianpuNote) => void;
+}) {
+  const inkClass = isDarkSurface ? 'text-neutral-100' : 'text-[#181614]';
+  const accentClass = highlightMarkings
+    ? (isDarkSurface ? 'text-[#FF6B3D]' : 'text-[#B8321A]')
+    : (isDarkSurface ? 'text-neutral-300' : 'text-[#3A3530]');
+  const ruleBorderClass = isDarkSurface ? 'border-amber-200/15' : 'border-[#8C6D46]/35';
+
+  // Extract flat vertical scroll columns (right-to-left) for pure-vertical mode
+  const verticalColumns = useMemo(() => {
+    const cols: ScrollCell[][] = [];
+    const MAX_PER_COL = 7;
+    let currentCol: ScrollCell[] = [];
+
+    const pushCol = () => {
+      if (currentCol.length > 0) {
+        cols.push(currentCol);
+        currentCol = [];
+      }
+    };
+
+    for (const line of document.lines) {
+      if (line.kind === 'section') {
+        pushCol();
+        currentCol.push({ kind: 'section', id: line.id, text: line.text });
+        continue;
+      }
+      if (line.kind !== 'music') continue;
+
+      const lineNotes: { note: MusoJianpuNote; phraseEnd?: 'pause' | 'period' }[] = [];
+      line.measures.forEach((m, mIdx) => {
+        const mNotes = m.groups.flatMap(g => g.notes).filter(n => Boolean(n.markings.jianzi));
+        mNotes.forEach((n, nIdx) => {
+          const isLastInMeasure = nIdx === mNotes.length - 1;
+          const isLastInLine = mIdx === line.measures.length - 1;
+          lineNotes.push({
+            note: n,
+            phraseEnd: isLastInMeasure ? (isLastInLine ? 'period' : 'pause') : undefined
+          });
+        });
+      });
+
+      for (const item of lineNotes) {
+        if (currentCol.length >= MAX_PER_COL) {
+          pushCol();
+        }
+        currentCol.push({ kind: 'note', note: item.note, phraseEnd: item.phraseEnd });
+      }
+      pushCol();
+    }
+    pushCol();
+    return cols;
+  }, [document]);
+
+  const textNotes = useMemo(
+    () => document.lines.filter(l => l.kind === 'text'),
+    [document]
+  );
+
+  const hasAnyJianziInDoc = useMemo(() => {
+    return document.lines.some(
+      l => l.kind === 'music' && l.measures.some(m => m.groups.some(g => g.notes.some(n => Boolean(n.markings.jianzi))))
+    );
+  }, [document]);
+
+  if (!hasAnyJianziInDoc) {
+    return (
+      <div className={cn('py-14 text-center text-sm', isDarkSurface ? 'text-neutral-400' : 'text-neutral-500')}>
+        No Jianzipu (减字谱) glyphs found yet. Add tokens like{' '}
+        <code className="font-mono text-[#E05A2B]">{'{散勾一}'}</code> or{' '}
+        <code className="font-mono text-[#E05A2B]">{'{名九勾六,绰,吟}'}</code> using the Guqin tab, or load a Guqin template.
+      </div>
+    );
+  }
+
+  // Traditional Right-to-Left Vertical Woodblock Scroll (纯减字竖排 · 乌丝栏)
+  if (mode === 'pure-vertical') {
+    return (
+      <div className="flex flex-col gap-5">
+        <div
+          className={cn(
+            'overflow-x-auto pb-2 rounded-xl border-2 p-2',
+            isDarkSurface
+              ? 'border-amber-200/20 bg-[#141519]'
+              : 'border-[#8C6D46]/45 bg-[#FBF7EE]'
+          )}
+        >
+          <div
+            className={cn(
+              'min-w-max border flex flex-row-reverse items-stretch justify-start',
+              ruleBorderClass
+            )}
+          >
+            {/* Rightmost Traditional Colophon Column (Title, Tuning & Credits in vertical calligraphy) */}
+            <div
+              className={cn(
+                'w-[72px] shrink-0 py-6 px-3 flex flex-col items-center justify-between gap-6 border-l-2 select-none',
+                ruleBorderClass,
+                isDarkSurface ? 'bg-amber-950/15' : 'bg-[#F5ECD9]/55'
+              )}
+            >
+              <div
+                style={{ fontFamily: CLASSICAL_SERIF_FONT, writingMode: 'vertical-rl' }}
+                className={cn('text-xl font-bold tracking-[0.22em] leading-none', inkClass)}
+              >
+                {document.header.title}
+              </div>
+
+              <div className="flex flex-row-reverse items-start gap-2.5">
+                <div
+                  style={{ fontFamily: CLASSICAL_SERIF_FONT, writingMode: 'vertical-rl' }}
+                  className={cn('text-xs font-semibold tracking-[0.16em]', accentClass)}
+                >
+                  {document.header.strings || '正调 五六一二三五六'}
+                </div>
+                {document.header.composer && (
+                  <div
+                    style={{ fontFamily: CLASSICAL_SERIF_FONT, writingMode: 'vertical-rl' }}
+                    className={cn('text-[11px] tracking-[0.14em] opacity-70', inkClass)}
+                  >
+                    {document.header.composer}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right-to-Left Vertical Jianzipu Columns (乌丝栏) */}
+            {verticalColumns.map((col, colIdx) => (
+              <div
+                key={`vcol-${colIdx}`}
+                className={cn(
+                  'w-[66px] shrink-0 py-5 px-1.5 flex flex-col items-center justify-start gap-2.5 border-l',
+                  ruleBorderClass
+                )}
+              >
+                {col.map(cell => {
+                  if (cell.kind === 'section') {
+                    return (
+                      <div
+                        key={cell.id}
+                        style={{ fontFamily: CLASSICAL_SERIF_FONT, writingMode: 'vertical-rl' }}
+                        className={cn(
+                          'py-1.5 text-xs font-bold tracking-[0.18em] select-none',
+                          accentClass
+                        )}
+                      >
+                        {cell.text}
+                      </div>
+                    );
+                  }
+
+                  const { note, phraseEnd } = cell;
+                  const isPlaying = activeNoteId === note.id;
+                  const isSelected =
+                    selectedOffset !== null &&
+                    selectedOffset !== undefined &&
+                    selectedOffset >= note.startOffset &&
+                    selectedOffset <= note.endOffset;
+                  const noteColorClass = isPlaying ? 'text-[#E05A2B]' : inkClass;
+
+                  return (
+                    <div key={note.id} className="relative flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => onNoteClick?.(note)}
+                        className={cn(
+                          'relative p-1 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E05A2B]',
+                          isPlaying && (isDarkSurface ? 'bg-[#E05A2B]/30 ring-1 ring-[#E05A2B]' : 'bg-[#E05A2B]/15 ring-1 ring-[#E05A2B]'),
+                          !isPlaying && isSelected && (isDarkSurface ? 'bg-white/10' : 'bg-amber-200/50'),
+                          !isPlaying && !isSelected && (isDarkSurface ? 'hover:bg-white/[0.06]' : 'hover:bg-amber-900/[0.06]')
+                        )}
+                      >
+                        <GuqinJianziGlyph
+                          jianzi={note.markings.jianzi!}
+                          size="md"
+                          orientation="vertical"
+                          accentClass={accentClass}
+                          inkClass={noteColorClass}
+                        />
+                      </button>
+                      {/* Traditional 句读 vermilion phrase dot */}
+                      {phraseEnd && (
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            'absolute -bottom-1 -left-1.5 text-[11px] font-serif leading-none select-none pointer-events-none',
+                            phraseEnd === 'period' ? accentClass : 'opacity-45 ' + inkClass
+                          )}
+                        >
+                          {phraseEnd === 'period' ? '。' : '、'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {textNotes.length > 0 && (
+          <div className={cn('space-y-1.5 text-xs sm:text-sm pt-2 border-t', isDarkSurface ? 'border-white/[0.08] text-neutral-400' : 'border-neutral-200/80 text-neutral-600')}>
+            {textNotes.map(t => (
+              <p key={t.id}>{t.text}</p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Pure Horizontal Jianzipu View (纯减字横排)
+  return (
+    <div className="flex flex-col gap-6">
+      {document.lines.map(line => {
+        if (line.kind === 'section') {
+          return (
+            <div
+              key={line.id}
+              style={{ fontFamily: CLASSICAL_SERIF_FONT }}
+              className={cn(
+                'pt-2 text-base font-bold tracking-[0.12em]',
+                accentClass
+              )}
+            >
+              {line.text}
+            </div>
+          );
+        }
+
+        if (line.kind === 'text') {
+          return (
+            <p
+              key={line.id}
+              className={cn(
+                'text-xs sm:text-sm leading-relaxed pt-2 border-t',
+                isDarkSurface ? 'text-neutral-400 border-white/[0.06]' : 'text-neutral-600 border-neutral-200/80'
+              )}
+            >
+              {line.text}
+            </p>
+          );
+        }
+
+        const measuresWithJianzi = line.measures
+          .map(m => ({
+            id: m.id,
+            notes: m.groups.flatMap(g => g.notes).filter(n => Boolean(n.markings.jianzi))
+          }))
+          .filter(m => m.notes.length > 0);
+
+        if (measuresWithJianzi.length === 0) return null;
+
+        return (
+          <div
+            key={line.id}
+            className={cn(
+              'flex flex-wrap items-end gap-x-2 gap-y-5 pb-3 border-b border-dashed',
+              isDarkSurface ? 'border-white/[0.08]' : 'border-[#8C6D46]/25'
+            )}
+          >
+            {measuresWithJianzi.map((m, mIdx) => {
+              const isLastMeasure = mIdx === measuresWithJianzi.length - 1;
+              return (
+                <div key={m.id} className="inline-flex items-end gap-1.5">
+                  {m.notes.map(note => {
+                    const isPlaying = activeNoteId === note.id;
+                    const isSelected =
+                      selectedOffset !== null &&
+                      selectedOffset !== undefined &&
+                      selectedOffset >= note.startOffset &&
+                      selectedOffset <= note.endOffset;
+                    const noteColorClass = isPlaying ? 'text-[#E05A2B]' : inkClass;
+
+                    return (
+                      <button
+                        key={note.id}
+                        type="button"
+                        onClick={() => onNoteClick?.(note)}
+                        className={cn(
+                          'px-1.5 py-1 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E05A2B]',
+                          isPlaying && (isDarkSurface ? 'bg-[#E05A2B]/30 ring-1 ring-[#E05A2B]' : 'bg-[#E05A2B]/15 ring-1 ring-[#E05A2B]'),
+                          !isPlaying && isSelected && (isDarkSurface ? 'bg-white/10' : 'bg-amber-100/80'),
+                          !isPlaying && !isSelected && (isDarkSurface ? 'hover:bg-white/[0.06]' : 'hover:bg-neutral-100')
+                        )}
+                      >
+                        <GuqinJianziGlyph
+                          jianzi={note.markings.jianzi!}
+                          size="md"
+                          orientation="horizontal"
+                          accentClass={accentClass}
+                          inkClass={noteColorClass}
+                        />
+                      </button>
+                    );
+                  })}
+                  {/* Phrase breath punctuation */}
+                  <span
+                    aria-hidden="true"
+                    style={{ fontFamily: CLASSICAL_SERIF_FONT }}
+                    className={cn(
+                      'text-sm select-none mr-2',
+                      isLastMeasure ? accentClass : 'opacity-45 ' + inkClass
+                    )}
+                  >
+                    {isLastMeasure ? '。' : '、'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function MusoJianpuRenderer({
   document,
   zoom = 1,
   paperTheme = 'paper',
   resolvedTheme,
   fingeringStyle = 'chinese',
+  guqinDisplayMode = 'dual',
   showMarkings = true,
   showLyrics = true,
   highlightMarkings = true,
@@ -1606,6 +1977,8 @@ export function MusoJianpuRenderer({
   const isDarkSurface = paperTheme === 'adaptive';
   const keyInfo = getErhuKeyInfo(document.header.key);
   const stringsLabel = document.header.strings || keyInfo.strings;
+  const isPureJianzipuMode =
+    guqinDisplayMode === 'pure-horizontal' || guqinDisplayMode === 'pure-vertical';
 
   const [timeNum, timeDen] = (document.header.time || '4/4').split('/');
 
@@ -1626,91 +1999,103 @@ export function MusoJianpuRenderer({
             : 'bg-[#FFFEFA] border-neutral-200/90 text-[#161616] shadow-sm'
         )}
       >
-        {/* Classic Chinese Jianpu Score Header */}
-        <div className="text-center mb-6">
-          <h1 className={cn(
-            'text-2xl sm:text-3xl font-bold tracking-tight text-balance',
-            isDarkSurface ? 'text-white' : 'text-[#121212]'
-          )}>
-            {document.header.title}
-          </h1>
-          {document.header.subtitle && (
-            <p className={cn(
-              'text-sm mt-1 font-medium',
-              isDarkSurface ? 'text-neutral-400' : 'text-neutral-600'
-            )}>
-              {document.header.subtitle}
-            </p>
-          )}
-        </div>
-
-        {/* Metadata Row: Left (1=Key, Strings, Time Signature, Tempo/Mood) | Right (Composer / Arranger) */}
-        <div className={cn(
-          'flex flex-wrap items-end justify-between gap-4 pb-4 mb-6 border-b',
-          isDarkSurface ? 'border-white/[0.08]' : 'border-neutral-200'
-        )}>
-          {/* Left Musical Signature Block */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {/* Key & Instrument Tuning */}
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-base sm:text-lg font-bold tabular-nums tracking-tight">
-                {formatJianpuKeyLabel(document.header.key)}
-              </span>
-              <span className={cn(
-                'text-xs font-semibold',
-                highlightMarkings
-                  ? (isDarkSurface ? 'text-[#FF6B3D]' : 'text-[#C23E1E]')
-                  : (isDarkSurface ? 'text-neutral-400' : 'text-neutral-600')
+        {/* Classic Score Header (omitted in pure-vertical mode because the rightmost colophon column carries it) */}
+        {guqinDisplayMode !== 'pure-vertical' && (
+          <>
+            <div className="text-center mb-6">
+              <h1 className={cn(
+                'text-2xl sm:text-3xl font-bold tracking-tight text-balance',
+                isDarkSurface ? 'text-white' : 'text-[#121212]'
               )}>
-                {document.header.instrument === 'pipa'
-                  ? `琵琶 (${document.header.strings || 'A-d-e-a'})`
-                  : document.header.instrument === 'guzheng'
-                    ? `古筝${document.header.strings ? ` (${document.header.strings})` : ''}`
-                    : document.header.instrument === 'dizi'
-                      ? `${document.header.fluteKey || '笛子'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
-                      : document.header.instrument === 'xiao'
-                        ? `${document.header.fluteKey || '洞箫'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
-                        : `(${stringsLabel}弦)`}
-              </span>
-            </div>
-
-            {/* Stacked Time Signature */}
-            {timeDen ? (
-              <div className="inline-flex flex-col items-center leading-none font-bold tabular-nums text-sm">
-                <span>{timeNum}</span>
-                <span className="w-3.5 h-[1.5px] bg-current my-[1.5px]" />
-                <span>{timeDen}</span>
-              </div>
-            ) : (
-              <span className="text-sm font-bold">{document.header.time}</span>
-            )}
-
-            {/* Tempo & Expression */}
-            <div className="flex items-baseline gap-2 text-sm">
-              <span className="font-mono tabular-nums font-semibold">
-                ♩= {document.header.tempo}
-              </span>
-              {document.header.expression && (
-                <span className={cn('text-xs sm:text-sm font-medium', isDarkSurface ? 'text-neutral-300' : 'text-neutral-700')}>
-                  {document.header.expression}
-                </span>
+                {document.header.title}
+              </h1>
+              {document.header.subtitle && (
+                <p className={cn(
+                  'text-sm mt-1 font-medium',
+                  isDarkSurface ? 'text-neutral-400' : 'text-neutral-600'
+                )}>
+                  {document.header.subtitle}
+                </p>
               )}
             </div>
-          </div>
 
-          {/* Right Credits Block */}
-          <div className={cn(
-            'text-right text-xs sm:text-sm leading-snug',
-            isDarkSurface ? 'text-neutral-400' : 'text-neutral-600'
-          )}>
-            {document.header.composer && (
-              <div className="font-semibold">{document.header.composer}</div>
-            )}
-            {document.header.arranger && (
-              <div className="text-xs opacity-80">{document.header.arranger}</div>
-            )}
-          </div>
-        </div>
+            {/* Metadata Row: Left (1=Key, Strings, Time Signature, Tempo/Mood) | Right (Composer / Arranger) */}
+            <div className={cn(
+              'flex flex-wrap items-end justify-between gap-4 pb-4 mb-6 border-b',
+              isDarkSurface ? 'border-white/[0.08]' : 'border-neutral-200'
+            )}>
+              {/* Left Musical Signature Block */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                {/* Key & Instrument Tuning */}
+                <div className="flex items-baseline gap-1.5">
+                  {!isPureJianzipuMode && (
+                    <span className="text-base sm:text-lg font-bold tabular-nums tracking-tight">
+                      {formatJianpuKeyLabel(document.header.key)}
+                    </span>
+                  )}
+                  <span className={cn(
+                    'text-xs font-semibold',
+                    highlightMarkings
+                      ? (isDarkSurface ? 'text-[#FF6B3D]' : 'text-[#C23E1E]')
+                      : (isDarkSurface ? 'text-neutral-400' : 'text-neutral-600')
+                  )}>
+                    {document.header.instrument === 'pipa'
+                      ? `琵琶 (${document.header.strings || 'A-d-e-a'})`
+                      : document.header.instrument === 'guzheng'
+                        ? `古筝${document.header.strings ? ` (${document.header.strings})` : ''}`
+                        : document.header.instrument === 'guqin'
+                          ? `古琴 (${document.header.strings || '正调 5-6-1-2-3-5-6'})`
+                          : document.header.instrument === 'dizi'
+                            ? `${document.header.fluteKey || '笛子'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
+                            : document.header.instrument === 'xiao'
+                              ? `${document.header.fluteKey || '洞箫'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
+                              : `(${stringsLabel}弦)`}
+                  </span>
+                </div>
+
+                {/* Stacked Time Signature (Dual / Jianpu mode only) */}
+                {!isPureJianzipuMode && (
+                  timeDen ? (
+                    <div className="inline-flex flex-col items-center leading-none font-bold tabular-nums text-sm">
+                      <span>{timeNum}</span>
+                      <span className="w-3.5 h-[1.5px] bg-current my-[1.5px]" />
+                      <span>{timeDen}</span>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-bold">{document.header.time}</span>
+                  )
+                )}
+
+                {/* Tempo & Expression */}
+                <div className="flex items-baseline gap-2 text-sm">
+                  {!isPureJianzipuMode && (
+                    <span className="font-mono tabular-nums font-semibold">
+                      ♩= {document.header.tempo}
+                    </span>
+                  )}
+                  {document.header.expression && (
+                    <span className={cn('text-xs sm:text-sm font-medium', isDarkSurface ? 'text-neutral-300' : 'text-neutral-700')}>
+                      {document.header.expression}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Credits Block */}
+              <div className={cn(
+                'text-right text-xs sm:text-sm leading-snug',
+                isDarkSurface ? 'text-neutral-400' : 'text-neutral-600'
+              )}>
+                {document.header.composer && (
+                  <div className="font-semibold">{document.header.composer}</div>
+                )}
+                {document.header.arranger && (
+                  <div className="text-xs opacity-80">{document.header.arranger}</div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Engraved Score Body */}
         {document.lines.length === 0 ? (
@@ -1718,8 +2103,18 @@ export function MusoJianpuRenderer({
             'py-16 text-center text-sm',
             isDarkSurface ? 'text-neutral-500' : 'text-neutral-400'
           )}>
-            Start typing Jianpu notes in the editor (e.g. <span className="font-mono">| 1 2 3 5 | 6_5_ 3 - |</span>) or pick an Erhu repertoire template above.
+            Start typing Jianpu notes in the editor (e.g. <span className="font-mono">| 1 2 3 5 | 6_5_ 3 - |</span>) or pick a repertoire template above.
           </div>
+        ) : isPureJianzipuMode ? (
+          <PureJianzipuView
+            document={document}
+            mode={guqinDisplayMode}
+            isDarkSurface={isDarkSurface}
+            highlightMarkings={highlightMarkings}
+            activeNoteId={activeNoteId}
+            selectedOffset={selectedOffset}
+            onNoteClick={onNoteClick}
+          />
         ) : (
           <div className="flex flex-col gap-5 pl-4">
             {document.lines.map(line => {

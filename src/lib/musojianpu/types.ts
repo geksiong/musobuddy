@@ -3,7 +3,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type InstrumentType = 'erhu' | 'pipa' | 'guzheng' | 'dizi' | 'xiao';
+export type InstrumentType = 'erhu' | 'pipa' | 'guzheng' | 'dizi' | 'xiao' | 'guqin';
+
+export type GuqinDisplayMode = 'dual' | 'pure-horizontal' | 'pure-vertical';
+
+export type GuqinSoundType = 'san' | 'an' | 'fan';
+
+export type GuqinLeftFinger = 'da' | 'shi' | 'zhong' | 'ming' | 'gui';
+
+export type GuqinRightStroke =
+  | 'gou' | 'ti' | 'mo' | 'tiao' | 'da' | 'zhai' | 'pi' | 'tuo'
+  | 'li' | 'cuo' | 'fancuo' | 'lun' | 'gun' | 'fu' | 'suo' | 'bo' | 'ruyi';
+
+export type GuqinLeftAction =
+  | 'shang' | 'xia' | 'chuo' | 'zhu' | 'yin' | 'nao'
+  | 'zhuang' | 'qiaqi' | 'jinfu' | 'tuifu' | 'yan' | 'daiqi'
+  | 'fanqi' | 'fanzhi';
+
+export interface GuqinJianzi {
+  /** Sound production mode: 散 (open), 按 (stopped), 泛 (harmonic) */
+  soundType?: GuqinSoundType;
+  /** Left-hand stopping/touching finger: 大/食/中/名/跪 */
+  leftFinger?: GuqinLeftFinger;
+  /** Hui position (e.g. "7", "9", "10", "7.6", "外") */
+  hui?: string;
+  /** Target hui for slides (e.g. 上七六) */
+  targetHui?: string;
+  /** Right-hand plucking technique */
+  rightStroke?: GuqinRightStroke;
+  /** Primary string 1–7 */
+  stringNum?: number;
+  /** Secondary string 1–7 for 撮/反撮/历/滚/拂 */
+  secondStringNum?: number;
+  /** Left-hand actions & expressive ornaments */
+  actions?: GuqinLeftAction[];
+}
 
 export type AccidentalType = '#' | 'b' | '=' | null;
 
@@ -97,6 +131,7 @@ export interface ErhuMarkings {
   position?: string;
   ornaments: OrnamentType[];
   techniques?: PluckTechniqueType[];
+  jianzi?: GuqinJianzi;
   dynamic?: DynamicType;
   customText?: string;
 }

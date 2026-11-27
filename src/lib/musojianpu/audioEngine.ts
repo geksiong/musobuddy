@@ -4,8 +4,9 @@
  */
 
 import * as Tone from 'tone';
-import { InstrumentType, MusoJianpuDocument, MusoJianpuMeasure, MusoJianpuNote } from './types.ts';
+import { GuqinSoundType, InstrumentType, MusoJianpuDocument, MusoJianpuMeasure, MusoJianpuNote } from './types.ts';
 import { jianpuToMidi } from './erhuKeys.ts';
+import { computeGuqinMidiFromJianzi } from './guqin.ts';
 
 export interface ScheduledErhuEvent {
   noteId: string;
@@ -14,6 +15,7 @@ export interface ScheduledErhuEvent {
   chordMidis?: number[]; // All simultaneous MIDI pitches (sorted low -> high) when chord
   startBeat: number;
   durationBeats: number;
+  slideFromMidi?: number;
   slideTargetMidi?: number;
   hasVibrato: boolean;
   isStaccato: boolean;
@@ -21,6 +23,7 @@ export interface ScheduledErhuEvent {
   isPizzicato: boolean;
   isMuted?: boolean;
   isFlutter?: boolean;
+  guqinSoundType?: GuqinSoundType;
   arpeggio?: 'up' | 'down' | 'roll';
   glissMidis?: number[];
   velocity: number;
@@ -333,12 +336,26 @@ export function buildErhuPlaybackTimeline(
       }
     }
 
-    // Compute chord or single-note MIDI pitches
+    // Compute chord or single-note MIDI pitches (including standalone pure-Jianzipu degree === -2)
+    const isGuqin = doc.header.instrument === 'guqin';
+    const effectiveTranspose = transposeSemitones + (isGuqin ? -12 : 0);
+    const jianzi = note.markings.jianzi;
+
     let chordMidis: number[] | undefined;
     let midi: number | null = null;
-    if (note.chordPitches && note.chordPitches.length >= 2) {
+    if (note.degree === -2) {
+      if (jianzi) {
+        const computed = computeGuqinMidiFromJianzi(jianzi, transposeSemitones);
+        if (computed.length >= 2) {
+          chordMidis = computed;
+          midi = computed[computed.length - 1];
+        } else if (computed.length === 1) {
+          midi = computed[0];
+        }
+      }
+    } else if (note.chordPitches && note.chordPitches.length >= 2) {
       const mapped = note.chordPitches
-        .map(p => jianpuToMidi(p.degree, p.octave, p.accidental, doc.header.key, transposeSemitones))
+        .map(p => jianpuToMidi(p.degree, p.octave, p.accidental, doc.header.key, effectiveTranspose))
         .filter((m): m is number => m !== null)
         .sort((a, b) => a - b); // Low-to-high for natural arpeggio/strum ordering
       if (mapped.length > 0) {
@@ -348,15 +365,45 @@ export function buildErhuPlaybackTimeline(
     } else {
       midi = note.degree === 0
         ? null
-        : jianpuToMidi(note.degree, note.octave, note.accidental, doc.header.key, transposeSemitones);
+        : jianpuToMidi(note.degree, note.octave, note.accidental, doc.header.key, effectiveTranspose);
     }
 
     const techs = note.markings.techniques || [];
-    const hasSu = note.markings.ornaments.includes('su') || techs.includes('tuixian') || techs.includes('an');
-    const hasSd = note.markings.ornaments.includes('sd') || techs.includes('laxian');
-    const slideTargetMidi = midi !== null
-      ? (hasSu ? midi + 2 : hasSd ? midi - 2 : undefined)
+    const jzActions = jianzi?.actions || [];
+    const hasSu =
+      note.markings.ornaments.includes('su') ||
+      techs.includes('tuixian') ||
+      techs.includes('an') ||
+      jzActions.includes('shang');
+    const hasSd =
+      note.markings.ornaments.includes('sd') ||
+      techs.includes('laxian') ||
+      jzActions.includes('xia');
+
+    const slideFromMidi = midi !== null
+      ? (jzActions.includes('chuo') ? midi - 2 : jzActions.includes('zhu') ? midi + 2 : undefined)
       : undefined;
+
+    let slideTargetMidi: number | undefined;
+    if (midi !== null) {
+      if (jianzi?.targetHui && jianzi.stringNum && (jzActions.includes('shang') || jzActions.includes('xia'))) {
+        const targetComputed = computeGuqinMidiFromJianzi(
+          { ...jianzi, soundType: 'an', hui: jianzi.targetHui, secondStringNum: undefined },
+          transposeSemitones
+        );
+        slideTargetMidi = targetComputed[0] ?? (hasSu ? midi + 2 : midi - 2);
+      } else {
+        slideTargetMidi = hasSu ? midi + 2 : hasSd ? midi - 2 : undefined;
+      }
+    }
+
+    const guqinSoundType: GuqinSoundType | undefined =
+      jianzi?.soundType ||
+      (isGuqin
+        ? (note.markings.ornaments.includes('harm') || note.markings.ornaments.includes('aharm')
+            ? 'fan'
+            : 'san')
+        : undefined);
 
     const isFermata = note.markings.ornaments.includes('fermata');
     let effectiveBeats = isFermata ? beats * 1.45 : beats;
@@ -432,21 +479,27 @@ export function buildErhuPlaybackTimeline(
         chordMidis,
         startBeat: currentBeat,
         durationBeats: effectiveBeats,
+        slideFromMidi,
         slideTargetMidi,
         hasVibrato:
           note.markings.ornaments.includes('vib') ||
           note.markings.ornaments.includes('pvib') ||
-          techs.includes('qizhen'),
+          techs.includes('qizhen') ||
+          jzActions.includes('yin') ||
+          jzActions.includes('nao'),
         isStaccato:
           note.markings.bowing === 'stacc' ||
           note.markings.bowing === 'spicc' ||
           isMuted ||
           isDuo,
-        isTremolo,
+        isTremolo: isTremolo || jianzi?.rightStroke === 'lun' || jianzi?.rightStroke === 'suo',
         isPizzicato: note.markings.bowing === 'pizz',
         isMuted,
         isFlutter,
-        arpeggio,
+        guqinSoundType,
+        arpeggio:
+          arpeggio ||
+          (jianzi?.rightStroke === 'gun' ? 'down' : jianzi?.rightStroke === 'fu' ? 'up' : undefined),
         glissMidis,
         velocity:
           note.markings.ornaments.includes('accent') || techs.includes('sao') || isDuo
@@ -515,6 +568,11 @@ export class MusoJianpuPlayer {
   private pipaSynth: Tone.PolySynth | null = null;
   private pipaBodyFilter: Tone.Filter | null = null;
   private guzhengSynth: Tone.PolySynth | null = null;
+  private guqinOpenSynth: Tone.PolySynth | null = null;
+  private guqinStoppedSynth: Tone.MonoSynth | null = null;
+  private guqinHarmonicSynth: Tone.PolySynth | null = null;
+  private guqinVibrato: Tone.Vibrato | null = null;
+  private guqinBodyFilter: Tone.Filter | null = null;
   private diziSynth: Tone.MonoSynth | null = null;
   private diziFlutter: Tone.Tremolo | null = null;
   private xiaoSynth: Tone.MonoSynth | null = null;
@@ -614,6 +672,68 @@ export class MusoJianpuPlayer {
     }).connect(this.reverb);
     this.guzhengSynth.volume.value = -2;
 
+    // Guqin (古琴) 3-timbre acoustic engine: 散音 (open warm silk), 按音 (stopped expressive glide), 泛音 (crystalline bell)
+    this.guqinBodyFilter = new Tone.Filter({
+      type: 'peaking',
+      frequency: 260,
+      Q: 1.1,
+      gain: 4.5
+    }).connect(this.reverb);
+
+    this.guqinVibrato = new Tone.Vibrato({
+      frequency: 4.1,
+      depth: 0.085,
+      wet: 0
+    }).connect(this.guqinBodyFilter);
+
+    // 散音 (Open string): deep, warm, lingering paulownia soundbox resonance
+    this.guqinOpenSynth = new Tone.PolySynth(Tone.MonoSynth, {
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.48, 0.22, 0.1, 0.04, 0.015]
+      },
+      filter: { Q: 0.9, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.012, decay: 2.8, sustain: 0.0, release: 1.4 },
+      filterEnvelope: {
+        attack: 0.008,
+        decay: 0.35,
+        sustain: 0.08,
+        release: 0.4,
+        baseFrequency: 260,
+        octaves: 2.5
+      }
+    }).connect(this.guqinBodyFilter);
+    this.guqinOpenSynth.volume.value = -1;
+
+    // 按音 (Stopped string): intimate singing fingerboard voice supporting 绰/注/上/下 glides and 吟/猱 vibrato
+    this.guqinStoppedSynth = new Tone.MonoSynth({
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.56, 0.28, 0.12, 0.05]
+      },
+      filter: { Q: 1.1, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.014, decay: 2.2, sustain: 0.02, release: 0.85 },
+      filterEnvelope: {
+        attack: 0.01,
+        decay: 0.28,
+        sustain: 0.12,
+        release: 0.3,
+        baseFrequency: 310,
+        octaves: 2.4
+      }
+    }).connect(this.guqinVibrato);
+    this.guqinStoppedSynth.volume.value = -2;
+
+    // 泛音 (Harmonics): pure crystalline bell overtone
+    this.guqinHarmonicSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.14, 0.03]
+      },
+      envelope: { attack: 0.008, decay: 2.6, sustain: 0.0, release: 1.3 }
+    }).connect(this.reverb);
+    this.guqinHarmonicSynth.volume.value = -3;
+
     // Wind chain for Dizi (笛子) & Xiao (箫): warm lowpass (preserves strong fundamental!), subtle vibrato & flutter tremolo
     this.windFilter = new Tone.Filter({
       type: 'lowpass',
@@ -699,6 +819,55 @@ export class MusoJianpuPlayer {
   ) {
     if (ev.midi === null) return;
     const playDur = ev.isStaccato ? Math.min(durSec * 0.42, 0.16) : Math.max(0.05, durSec * 0.94);
+
+    // Guqin (古琴) 3-Timbre Playback: 散音 (open), 按音 (stopped + 绰/注/上/下/吟/猱), 泛音 (crystalline harmonic)
+    if (instrument === 'guqin') {
+      const pitchList = ev.chordMidis && ev.chordMidis.length > 0 ? [...ev.chordMidis] : [ev.midi];
+      const soundType: GuqinSoundType = ev.guqinSoundType || 'san';
+
+      if (soundType === 'fan' && this.guqinHarmonicSynth) {
+        const freqs = pitchList.map(m => Tone.Frequency(m, 'midi').toFrequency());
+        this.guqinHarmonicSynth.triggerAttackRelease(freqs, Math.max(0.55, playDur), toneTime, ev.velocity * 0.85);
+        return;
+      }
+
+      if (soundType === 'an' && pitchList.length === 1 && this.guqinStoppedSynth) {
+        const targetFreq = Tone.Frequency(ev.midi, 'midi').toFrequency();
+        const startFreq = ev.slideFromMidi !== undefined
+          ? Tone.Frequency(ev.slideFromMidi, 'midi').toFrequency()
+          : targetFreq;
+
+        if (this.guqinVibrato) {
+          this.guqinVibrato.wet.setValueAtTime(ev.hasVibrato ? 0.65 : 0.08, toneTime);
+        }
+        this.guqinStoppedSynth.portamento = 0.015;
+        this.guqinStoppedSynth.triggerAttackRelease(startFreq, Math.max(0.35, playDur), toneTime, ev.velocity);
+
+        if (ev.slideFromMidi !== undefined) {
+          this.guqinStoppedSynth.frequency.exponentialRampToValueAtTime(
+            targetFreq,
+            toneTime + Math.min(0.18, playDur * 0.34)
+          );
+        }
+        if (ev.slideTargetMidi !== undefined) {
+          const slideOutFreq = Tone.Frequency(ev.slideTargetMidi, 'midi').toFrequency();
+          const glideStart = toneTime + Math.min(0.24, playDur * 0.4);
+          this.guqinStoppedSynth.frequency.setValueAtTime(targetFreq, glideStart);
+          this.guqinStoppedSynth.frequency.exponentialRampToValueAtTime(
+            slideOutFreq,
+            toneTime + playDur * 0.85
+          );
+        }
+        return;
+      }
+
+      if (this.guqinOpenSynth) {
+        const ordered = ev.arpeggio === 'down' ? [...pitchList].reverse() : pitchList;
+        const freqs = ordered.map(m => Tone.Frequency(m, 'midi').toFrequency());
+        this.guqinOpenSynth.triggerAttackRelease(freqs, Math.max(0.5, playDur), toneTime, ev.velocity);
+      }
+      return;
+    }
 
     // Dizi (笛子) & Xiao (箫) Wind Playback
     if (instrument === 'dizi' || instrument === 'xiao') {
@@ -938,12 +1107,16 @@ export class MusoJianpuPlayer {
         this.gain.gain.setTargetAtTime(0, now, 0.005);
       }
       this.bowedSynth?.frequency.cancelScheduledValues(now);
+      this.guqinStoppedSynth?.frequency.cancelScheduledValues(now);
       this.diziSynth?.frequency.cancelScheduledValues(now);
       this.xiaoSynth?.frequency.cancelScheduledValues(now);
       this.bowedSynth?.triggerRelease(now);
       this.bowedPolySynth?.releaseAll(now);
       this.pipaSynth?.releaseAll(now);
       this.guzhengSynth?.releaseAll(now);
+      this.guqinOpenSynth?.releaseAll(now);
+      this.guqinStoppedSynth?.triggerRelease(now);
+      this.guqinHarmonicSynth?.releaseAll(now);
       this.diziSynth?.triggerRelease(now);
       this.xiaoSynth?.triggerRelease(now);
       this.breathNoise?.triggerRelease(now);
@@ -960,6 +1133,11 @@ export class MusoJianpuPlayer {
       this.pipaSynth?.dispose();
       this.pipaBodyFilter?.dispose();
       this.guzhengSynth?.dispose();
+      this.guqinOpenSynth?.dispose();
+      this.guqinStoppedSynth?.dispose();
+      this.guqinHarmonicSynth?.dispose();
+      this.guqinVibrato?.dispose();
+      this.guqinBodyFilter?.dispose();
       this.diziSynth?.dispose();
       this.diziFlutter?.dispose();
       this.xiaoSynth?.dispose();
@@ -980,6 +1158,11 @@ export class MusoJianpuPlayer {
     this.pipaSynth = null;
     this.pipaBodyFilter = null;
     this.guzhengSynth = null;
+    this.guqinOpenSynth = null;
+    this.guqinStoppedSynth = null;
+    this.guqinHarmonicSynth = null;
+    this.guqinVibrato = null;
+    this.guqinBodyFilter = null;
     this.diziSynth = null;
     this.diziFlutter = null;
     this.xiaoSynth = null;
@@ -1043,11 +1226,13 @@ export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemi
       ? 105
       : doc.header.instrument === 'guzheng'
         ? 107
-        : doc.header.instrument === 'dizi'
-          ? 73
-          : doc.header.instrument === 'xiao'
-            ? 77
-            : 110;
+        : doc.header.instrument === 'guqin'
+          ? 24
+          : doc.header.instrument === 'dizi'
+            ? 73
+            : doc.header.instrument === 'xiao'
+              ? 77
+              : 110;
     track.push(0x00, 0xc0, gmProgram);
 
     interface RawMsg {
