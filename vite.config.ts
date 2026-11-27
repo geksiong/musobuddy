@@ -10,50 +10,65 @@ function staticAssetsPlugin(): Plugin {
   const alphatabDir = path.resolve(__dirname, 'node_modules/@coderline/alphatab/dist');
   const publicAlphatabDir = path.resolve(__dirname, 'public/alphatab');
 
-  function copyAssets() {
-    // Copy PDF.js assets
-    if (fs.existsSync(pdfjsDir)) {
-      const targets = [
-        { src: 'build/pdf.worker.min.mjs', dest: 'build/pdf.worker.min.mjs' },
-        { src: 'wasm', dest: 'wasm' },
-        { src: 'cmaps', dest: 'cmaps' },
-        { src: 'standard_fonts', dest: 'standard_fonts' },
-        { src: 'iccs', dest: 'iccs' },
-      ];
-
-      for (const target of targets) {
-        const srcPath = path.join(pdfjsDir, target.src);
-        const destPath = path.join(publicPdfjsDir, target.dest);
-        if (fs.existsSync(srcPath)) {
-          fs.mkdirSync(path.dirname(destPath), { recursive: true });
-          if (fs.statSync(srcPath).isDirectory()) {
-            fs.cpSync(srcPath, destPath, { recursive: true });
-          } else {
-            fs.copyFileSync(srcPath, destPath);
-          }
-        }
-      }
+  function isNonEmptyTarget(targetPath: string, isDir: boolean): boolean {
+    if (!fs.existsSync(targetPath)) return false;
+    if (!isDir) return true;
+    try {
+      return fs.readdirSync(targetPath).length > 0;
+    } catch {
+      return false;
     }
+  }
 
-    // Copy AlphaTab font and soundfont assets
-    if (fs.existsSync(alphatabDir)) {
-      const alphatabTargets = [
-        { src: 'font', dest: 'font' },
-        { src: 'soundfont', dest: 'soundfont' },
-      ];
+  function copyTarget(srcPath: string, destPath: string) {
+    if (!fs.existsSync(srcPath)) return;
+    const isDir = fs.statSync(srcPath).isDirectory();
+    if (isNonEmptyTarget(destPath, isDir)) return;
 
-      for (const target of alphatabTargets) {
-        const srcPath = path.join(alphatabDir, target.src);
-        const destPath = path.join(publicAlphatabDir, target.dest);
-        if (fs.existsSync(srcPath)) {
-          fs.mkdirSync(path.dirname(destPath), { recursive: true });
-          if (fs.statSync(srcPath).isDirectory()) {
-            fs.cpSync(srcPath, destPath, { recursive: true });
-          } else {
-            fs.copyFileSync(srcPath, destPath);
-          }
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    if (isDir) {
+      fs.cpSync(srcPath, destPath, { recursive: true });
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+
+  function copyAssets() {
+    try {
+      // Copy PDF.js assets only when missing from public/pdfjs
+      if (fs.existsSync(pdfjsDir)) {
+        const targets = [
+          { src: 'build/pdf.worker.min.mjs', dest: 'build/pdf.worker.min.mjs' },
+          { src: 'wasm', dest: 'wasm' },
+          { src: 'cmaps', dest: 'cmaps' },
+          { src: 'standard_fonts', dest: 'standard_fonts' },
+          { src: 'iccs', dest: 'iccs' },
+        ];
+
+        for (const target of targets) {
+          copyTarget(
+            path.join(pdfjsDir, target.src),
+            path.join(publicPdfjsDir, target.dest),
+          );
         }
       }
+
+      // Copy AlphaTab font and soundfont assets only when missing from public/alphatab
+      if (fs.existsSync(alphatabDir)) {
+        const alphatabTargets = [
+          { src: 'font', dest: 'font' },
+          { src: 'soundfont', dest: 'soundfont' },
+        ];
+
+        for (const target of alphatabTargets) {
+          copyTarget(
+            path.join(alphatabDir, target.src),
+            path.join(publicAlphatabDir, target.dest),
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('[static-assets-plugin] Failed to copy static assets:', err);
     }
   }
 
@@ -118,6 +133,15 @@ function scoreProxyPlugin(): Plugin {
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const alias: Record<string, string> = {
+    '@': path.resolve(__dirname, '.'),
+  };
+  for (const pkg of ['react', 'react-dom', '@codemirror/state', '@codemirror/view', '@codemirror/language']) {
+    const resolved = path.resolve(__dirname, 'node_modules', pkg);
+    if (fs.existsSync(resolved)) {
+      alias[pkg] = resolved;
+    }
+  }
   return {
     base: './',
     plugins: [react(), tailwindcss(), staticAssetsPlugin(), scoreProxyPlugin()],
@@ -126,14 +150,7 @@ export default defineConfig(({mode}) => {
     },
     resolve: {
       dedupe: ['react', 'react-dom', '@codemirror/state', '@codemirror/view', '@codemirror/language'],
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-        'react': path.resolve(__dirname, 'node_modules/react'),
-        'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-        '@codemirror/state': path.resolve(__dirname, 'node_modules/@codemirror/state'),
-        '@codemirror/view': path.resolve(__dirname, 'node_modules/@codemirror/view'),
-        '@codemirror/language': path.resolve(__dirname, 'node_modules/@codemirror/language'),
-      },
+      alias,
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
