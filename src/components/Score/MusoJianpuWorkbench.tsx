@@ -23,6 +23,7 @@ import {
   ArrowDown,
   Gauge,
   Music,
+  Piano,
   Sun,
   Moon
 } from 'lucide-react';
@@ -76,6 +77,12 @@ import {
 import { MusoJianpuRenderer } from './MusoJianpuRenderer.tsx';
 import { GuqinJianziReferenceModal } from './GuqinJianziReferenceModal.tsx';
 import { ShakuhachiReferenceModal } from './ShakuhachiReferenceModal.tsx';
+import { NoteEntryPanel } from './NoteEntryPanel.tsx';
+import {
+  deleteLastScoreToken,
+  getRootOption,
+  insertScoreToken
+} from '../../lib/noteEntryEngine.ts';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 
@@ -147,6 +154,10 @@ export function MusoJianpuWorkbench({
 
   // Cursor / selection sync state
   const [cursorOffset, setCursorOffset] = useState<number | null>(null);
+  const [isNoteEntryOpen, setIsNoteEntryOpen] = useState<boolean>(false);
+  const latestContentRef = useRef<string>(content);
+  const latestCursorRef = useRef<number | null>(null);
+  latestContentRef.current = content;
 
   // Ctrl+J Tempo Macro Dialog state
   const [isTempoModalOpen, setIsTempoModalOpen] = useState(false);
@@ -298,9 +309,84 @@ export function MusoJianpuWorkbench({
       view.focus();
       onChangeContent(res.text);
       setCursorOffset(res.selectionStart);
+      latestCursorRef.current = res.selectionStart;
     },
     [content, onChangeContent]
   );
+
+  // Free-meter note entry insertion & undo for MIDI / Virtual Keyboard / QWERTY shortcuts
+  const handleJianpuInsertToken = useCallback(
+    (token: string) => {
+      const view = editorRef.current?.view;
+      if (view) {
+        const docText = view.state.doc.toString();
+        const cursor = view.state.selection.main.head;
+        const res = insertScoreToken(docText, cursor, token, 'jianpu');
+        view.dispatch({
+          changes: { from: 0, to: docText.length, insert: res.text },
+          selection: { anchor: res.nextCursor, head: res.nextCursor },
+          scrollIntoView: true
+        });
+        latestContentRef.current = res.text;
+        latestCursorRef.current = res.nextCursor;
+        setCursorOffset(res.nextCursor);
+        onChangeContent(res.text);
+        return;
+      }
+
+      const currentText = latestContentRef.current;
+      const res = insertScoreToken(currentText, latestCursorRef.current, token, 'jianpu');
+      latestContentRef.current = res.text;
+      latestCursorRef.current = res.nextCursor;
+      setCursorOffset(res.nextCursor);
+      onChangeContent(res.text);
+    },
+    [onChangeContent]
+  );
+
+  const handleJianpuDeleteLastToken = useCallback(() => {
+    const view = editorRef.current?.view;
+    if (view) {
+      const docText = view.state.doc.toString();
+      const cursor = view.state.selection.main.head;
+      const res = deleteLastScoreToken(docText, cursor, 'jianpu');
+      if (!res) return;
+      view.dispatch({
+        changes: { from: 0, to: docText.length, insert: res.text },
+        selection: { anchor: res.nextCursor, head: res.nextCursor },
+        scrollIntoView: true
+      });
+      latestContentRef.current = res.text;
+      latestCursorRef.current = res.nextCursor;
+      setCursorOffset(res.nextCursor);
+      onChangeContent(res.text);
+      return;
+    }
+
+    const currentText = latestContentRef.current;
+    const res = deleteLastScoreToken(currentText, latestCursorRef.current, 'jianpu');
+    if (!res) return;
+    latestContentRef.current = res.text;
+    latestCursorRef.current = res.nextCursor;
+    setCursorOffset(res.nextCursor);
+    onChangeContent(res.text);
+  }, [onChangeContent]);
+
+  const handleJianpuApplyKey = useCallback(
+    (rootSemitone: number) => {
+      const rootOpt = getRootOption(rootSemitone);
+      const nextText = macroSetKey(latestContentRef.current, rootOpt.jianpuKey);
+      latestContentRef.current = nextText;
+      onChangeContent(nextText);
+    },
+    [onChangeContent]
+  );
+
+  const handleJianpuToggleFreeMeter = useCallback(() => {
+    const nextText = macroSetRhythmMode(latestContentRef.current, isFreeRhythm ? 'metrical' : 'free');
+    latestContentRef.current = nextText;
+    onChangeContent(nextText);
+  }, [isFreeRhythm, onChangeContent]);
 
   // Open Ctrl+J Tempo Macro Dialog
   const openTempoMacroDialog = useCallback(() => {
@@ -1036,6 +1122,20 @@ ${collectedCss}
               <span className="hidden sm:inline">Shakuhachi Ref</span>
             </button>
           )}
+
+          {/* Note Entry (MIDI & Virtual Keyboard) Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsNoteEntryOpen(prev => !prev)}
+            className={cn(
+              macroBtnClass,
+              isNoteEntryOpen && 'bg-[#E05A2B] border-[#E05A2B] text-white hover:bg-[#c8491c] hover:border-[#c8491c]'
+            )}
+            title="Enter Jianpu notes freely via MIDI keyboard, virtual keyboard, or QWERTY shortcuts"
+          >
+            <Piano className="w-3.5 h-3.5" />
+            <span>Note Entry</span>
+          </button>
 
           {/* Syntax & Macro Guide Toggle */}
           <button
@@ -1805,10 +1905,15 @@ ${collectedCss}
                 height={effectiveLayout === 'split' ? '560px' : '260px'}
                 theme={isDark ? vscodeDark : 'light'}
                 extensions={[musoJianpu(), musoJianpuKeymap]}
-                onChange={val => onChangeContent(val)}
+                onChange={val => {
+                  latestContentRef.current = val;
+                  onChangeContent(val);
+                }}
                 onUpdate={update => {
                   if (update.selectionSet) {
-                    setCursorOffset(update.state.selection.main.head);
+                    const head = update.state.selection.main.head;
+                    latestCursorRef.current = head;
+                    setCursorOffset(head);
                   }
                 }}
                 className="text-xs sm:text-sm font-mono"
@@ -1880,6 +1985,22 @@ ${collectedCss}
           />
         </div>
       </div>
+
+      {/* Interactive Note Entry Panel docked below the score */}
+      {isNoteEntryOpen && (
+        <NoteEntryPanel
+          format="jianpu"
+          content={content}
+          jianpuKey={keyInfo.key}
+          isFreeMeter={isFreeRhythm}
+          onInsertToken={handleJianpuInsertToken}
+          onDeleteLastToken={handleJianpuDeleteLastToken}
+          onApplyKeyToScore={handleJianpuApplyKey}
+          onToggleFreeMeter={handleJianpuToggleFreeMeter}
+          onClose={() => setIsNoteEntryOpen(false)}
+          className="sticky bottom-2 z-30"
+        />
+      )}
 
       {/* Ctrl+J Tempo & Expression Macro Modal */}
       {isTempoModalOpen && (

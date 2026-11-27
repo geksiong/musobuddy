@@ -354,7 +354,22 @@ interface ControllerContextType {
 
   // Execute Action programmatically
   executeAction: (actionId: ActionId) => void;
+
+  // Note Entry MIDI & Keyboard Priority Bridge
+  registerNoteEntryMidiHandler: (handler: NoteEntryMidiHandler | null) => void;
+  setKeyboardShortcutsSuspended: (suspended: boolean) => void;
 }
+
+export interface NoteEntryMidiEvent {
+  type: 'noteon' | 'noteoff';
+  note: number;
+  velocity: number;
+  channel: number;
+  deviceId: string;
+  deviceName: string;
+}
+
+export type NoteEntryMidiHandler = (event: NoteEntryMidiEvent) => void;
 
 const STORAGE_KEY = 'musobuddy_controller_mappings_v2';
 
@@ -471,6 +486,16 @@ export function ControllerProvider({ children }: { children: React.ReactNode }) 
   const prevGamepadButtonsRef = useRef<{ [gamepadIndex: number]: boolean[] }>({});
   const animationFrameRef = useRef<number | null>(null);
   const midiAccessRef = useRef<any>(null);
+  const noteEntryMidiHandlerRef = useRef<NoteEntryMidiHandler | null>(null);
+  const keyboardShortcutsSuspendedRef = useRef<boolean>(false);
+
+  const registerNoteEntryMidiHandler = useCallback((handler: NoteEntryMidiHandler | null) => {
+    noteEntryMidiHandlerRef.current = handler;
+  }, []);
+
+  const setKeyboardShortcutsSuspended = useCallback((suspended: boolean) => {
+    keyboardShortcutsSuspendedRef.current = suspended;
+  }, []);
 
   const triggerToast = useCallback((toastData: Omit<ControllerToast, 'id' | 'timestamp'>) => {
     if (toastTimeoutRef.current) {
@@ -776,6 +801,11 @@ export function ControllerProvider({ children }: { children: React.ReactNode }) 
   // Keyboard Event Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Yield to active Note Entry virtual keyboard capture unless learning a controller binding
+      if (keyboardShortcutsSuspendedRef.current && !learningTargetRef.current) {
+        return;
+      }
+
       // Ignore if user is currently typing in an input, textarea, select, or CodeMirror editor
       const activeEl = document.activeElement;
       if (activeEl && (
@@ -960,8 +990,31 @@ export function ControllerProvider({ children }: { children: React.ReactNode }) 
     let number = byte1;
     let display = '';
 
+    // Note On / Note Off routing for active Note Entry mode (unless currently learning MIDI mapping)
+    const isNoteOn = messageType === 0x9 && byte2 > 0;
+    const isNoteOff = messageType === 0x8 || (messageType === 0x9 && byte2 === 0);
+    if ((isNoteOn || isNoteOff) && noteEntryMidiHandlerRef.current && !learningTargetRef.current) {
+      const srcPort = event.currentTarget || event.target;
+      noteEntryMidiHandlerRef.current({
+        type: isNoteOn ? 'noteon' : 'noteoff',
+        note: byte1,
+        velocity: byte2,
+        channel,
+        deviceId: srcPort?.id || 'unknown',
+        deviceName: srcPort?.name || 'MIDI Keyboard',
+      });
+      if (isNoteOn) {
+        setLastActivity({
+          source: 'midi',
+          detail: `Note ${byte1} (Ch ${channel})`,
+          timestamp: Date.now()
+        });
+      }
+      return;
+    }
+
     // Note On (0x9) with velocity > 0
-    if (messageType === 0x9 && byte2 > 0) {
+    if (isNoteOn) {
       isTrigger = true;
       type = 'note';
       number = byte1;
@@ -1088,6 +1141,8 @@ export function ControllerProvider({ children }: { children: React.ReactNode }) 
     setIsControllerModalOpen,
     toggleControllerModal,
     executeAction,
+    registerNoteEntryMidiHandler,
+    setKeyboardShortcutsSuspended,
   };
 
   return (

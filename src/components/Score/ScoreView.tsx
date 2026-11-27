@@ -52,7 +52,7 @@ import ScoreAudioPlayer from './ScoreAudioPlayer.tsx';
 import LoadUrlModal from './LoadUrlModal.tsx';
 import TranscribeMelodyModal from './TranscribeMelodyModal.tsx';
 import * as abcjs from 'abcjs';
-import CodeMirror from '@uiw/react-codemirror';
+import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { abc } from '../../lib/abcLanguage.ts';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { transposeAbc } from '../../lib/abcTransposer.ts';
@@ -65,6 +65,14 @@ import { parseMusoJianpuScore } from '../../lib/musojianpu/parser.ts';
 import { generateMidiForMusoJianpu } from '../../lib/musojianpu/audioEngine.ts';
 import ScoreErrorBoundary from './ScoreErrorBoundary.tsx';
 import { useController } from '../../contexts/ControllerContext.tsx';
+import { NoteEntryPanel } from './NoteEntryPanel.tsx';
+import {
+  applyKeyToAbcText,
+  deleteLastScoreToken,
+  insertScoreToken,
+  ScaleModeId,
+  toggleAbcFreeMeter
+} from '../../lib/noteEntryEngine.ts';
 
 // Lazy load complex components with retry to guard against temporary network drops or cache invalidations
 const lazyWithRetry = <T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) =>
@@ -472,13 +480,84 @@ function ScoreDisplay({
   const [sidebarState, setSidebarState] = useState<{ isOpen: boolean; toggle: () => void } | null>(null);
   const [headerHeight, setHeaderHeight] = useState<number>(112);
   const [scoreViewHeight, setScoreViewHeight] = useState<number>(0);
+  const [isAbcNoteEntryOpen, setIsAbcNoteEntryOpen] = useState<boolean>(false);
   const headerRef = useRef<HTMLDivElement>(null);
   const scoreViewRef = useRef<HTMLDivElement>(null);
+  const abcEditorRef = useRef<ReactCodeMirrorRef>(null);
+  const abcCursorRef = useRef<number | null>(null);
+  const abcContentRef = useRef<string>(typeof score.content === 'string' ? score.content : '');
+
+  if (score.format === ScoreFormat.ABC && typeof score.content === 'string') {
+    abcContentRef.current = score.content;
+  }
 
   useEffect(() => {
     setHeaderExtra(null);
     setSidebarState(null);
+    abcCursorRef.current = null;
   }, [score?.id, score?.format]);
+
+  const handleAbcInsertToken = useCallback((token: string) => {
+    const view = abcEditorRef.current?.view;
+    if (view) {
+      const docText = view.state.doc.toString();
+      const cursor = view.state.selection.main.head;
+      const res = insertScoreToken(docText, cursor, token, 'abc');
+      view.dispatch({
+        changes: { from: 0, to: docText.length, insert: res.text },
+        selection: { anchor: res.nextCursor, head: res.nextCursor },
+        scrollIntoView: true
+      });
+      abcContentRef.current = res.text;
+      abcCursorRef.current = res.nextCursor;
+      onUpdate({ content: res.text });
+      return;
+    }
+
+    const currentText = abcContentRef.current;
+    const res = insertScoreToken(currentText, abcCursorRef.current, token, 'abc');
+    abcContentRef.current = res.text;
+    abcCursorRef.current = res.nextCursor;
+    onUpdate({ content: res.text });
+  }, [onUpdate]);
+
+  const handleAbcDeleteLastToken = useCallback(() => {
+    const view = abcEditorRef.current?.view;
+    if (view) {
+      const docText = view.state.doc.toString();
+      const cursor = view.state.selection.main.head;
+      const res = deleteLastScoreToken(docText, cursor, 'abc');
+      if (!res) return;
+      view.dispatch({
+        changes: { from: 0, to: docText.length, insert: res.text },
+        selection: { anchor: res.nextCursor, head: res.nextCursor },
+        scrollIntoView: true
+      });
+      abcContentRef.current = res.text;
+      abcCursorRef.current = res.nextCursor;
+      onUpdate({ content: res.text });
+      return;
+    }
+
+    const currentText = abcContentRef.current;
+    const res = deleteLastScoreToken(currentText, abcCursorRef.current, 'abc');
+    if (!res) return;
+    abcContentRef.current = res.text;
+    abcCursorRef.current = res.nextCursor;
+    onUpdate({ content: res.text });
+  }, [onUpdate]);
+
+  const handleAbcApplyKey = useCallback((rootSemitone: number, modeId: ScaleModeId) => {
+    const nextText = applyKeyToAbcText(abcContentRef.current, rootSemitone, modeId);
+    abcContentRef.current = nextText;
+    onUpdate({ content: nextText });
+  }, [onUpdate]);
+
+  const handleAbcToggleFreeMeter = useCallback(() => {
+    const res = toggleAbcFreeMeter(abcContentRef.current);
+    abcContentRef.current = res.text;
+    onUpdate({ content: res.text });
+  }, [onUpdate]);
 
   useEffect(() => {
     let animationFrameId: number | null = null;
@@ -1056,6 +1135,23 @@ function ScoreDisplay({
                     <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{score.showEditor ? 'Hide' : 'Code'}</span>
                   </button>
 
+                  {/* Note Entry (MIDI & Virtual Keyboard) Toggle Button */}
+                  <button
+                    onClick={() => setIsAbcNoteEntryOpen(prev => !prev)}
+                    className={cn(
+                      "p-1.5 sm:p-2 rounded-xl border transition-all flex items-center gap-1.5 px-3 shadow-sm group active:scale-95 cursor-pointer shrink-0",
+                      isAbcNoteEntryOpen
+                        ? "bg-[#E05A2B] border-[#E05A2B] text-white font-bold"
+                        : (resolvedTheme === 'dark'
+                            ? "bg-white/[0.04] border-white/10 text-neutral-300 hover:text-white hover:bg-white/[0.08]"
+                            : "bg-white border-black/10 text-slate-600 hover:text-slate-900 hover:bg-neutral-50")
+                    )}
+                    title="Enter notes freely via MIDI keyboard, virtual keyboard, or QWERTY shortcuts"
+                  >
+                    <Piano className="w-4 h-4" />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Note Entry</span>
+                  </button>
+
                   {/* Transcribe Mic Button */}
                   {onOpenTranscribeModal && (
                     <button 
@@ -1315,7 +1411,7 @@ function ScoreDisplay({
                 } : undefined}
               >
                 {score.format === ScoreFormat.ABC && (
-                <div className="flex flex-col gap-8 w-full">
+                <div className="flex flex-col gap-5 w-full">
                   {score.showEditor && (
                     <motion.div 
                       initial={{ opacity: 0, height: 0 }}
@@ -1329,11 +1425,20 @@ function ScoreDisplay({
                         resolvedTheme === 'dark' ? "border-white/10" : "border-black/5"
                       )}>
                         <CodeMirror
+                          ref={abcEditorRef}
                           value={score.content as string}
-                          height="300px"
+                          height={isAbcNoteEntryOpen ? "210px" : "300px"}
                           theme={resolvedTheme === 'dark' ? vscodeDark : 'light'}
                           extensions={[abc()]}
-                          onChange={(value) => onUpdate({ content: value })}
+                          onChange={(value) => {
+                            abcContentRef.current = value;
+                            onUpdate({ content: value });
+                          }}
+                          onUpdate={(update) => {
+                            if (update.selectionSet) {
+                              abcCursorRef.current = update.state.selection.main.head;
+                            }
+                          }}
                           className="text-sm"
                           basicSetup={{
                             lineNumbers: true,
@@ -1358,6 +1463,21 @@ function ScoreDisplay({
                       zoom={score.zoom || 1}
                     />
                   </div>
+
+                  {isAbcNoteEntryOpen && (
+                    <NoteEntryPanel
+                      key={`abc-note-entry-${score.id}-${score.selectedTuneIndex || 0}`}
+                      format="abc"
+                      content={selectedAbcItem?.abc || (score.content as string)}
+                      isFreeMeter={/^M:\s*none\b/im.test(selectedAbcItem?.abc || (score.content as string))}
+                      onInsertToken={handleAbcInsertToken}
+                      onDeleteLastToken={handleAbcDeleteLastToken}
+                      onApplyKeyToScore={handleAbcApplyKey}
+                      onToggleFreeMeter={handleAbcToggleFreeMeter}
+                      onClose={() => setIsAbcNoteEntryOpen(false)}
+                      className="sticky bottom-2 z-30"
+                    />
+                  )}
                 </div>
               )}
               
