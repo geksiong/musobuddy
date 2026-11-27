@@ -4,9 +4,17 @@
  */
 
 import * as Tone from 'tone';
-import { GuqinSoundType, InstrumentType, MusoJianpuDocument, MusoJianpuMeasure, MusoJianpuNote } from './types.ts';
+import {
+  GuqinSoundType,
+  InstrumentType,
+  MusoJianpuDocument,
+  MusoJianpuMeasure,
+  MusoJianpuNote,
+  ShakuhachiBendType
+} from './types.ts';
 import { jianpuToMidi } from './erhuKeys.ts';
 import { computeGuqinMidiFromJianzi } from './guqin.ts';
+import { computeShakuhachiMidi } from './shakuhachi.ts';
 
 export interface ScheduledErhuEvent {
   noteId: string;
@@ -23,6 +31,9 @@ export interface ScheduledErhuEvent {
   isPizzicato: boolean;
   isMuted?: boolean;
   isFlutter?: boolean;
+  isMuraiki?: boolean;
+  isKorokoro?: boolean;
+  shakuhachiBends?: ShakuhachiBendType[];
   guqinSoundType?: GuqinSoundType;
   arpeggio?: 'up' | 'down' | 'roll';
   glissMidis?: number[];
@@ -298,10 +309,17 @@ export function buildErhuPlaybackTimeline(
     }
 
     // Calculate base duration in quarter-note beats
+    const sh = note.markings.shakuhachi;
+    const isFreeRhythm = doc.header.rhythmMode === 'free';
     let beats = 1 / Math.pow(2, note.underlines);
     if (note.dots === 1) beats *= 1.5;
     else if (note.dots === 2) beats *= 1.75;
     if (note.tupletStart === 3) beats *= (2 / 3);
+    if (sh?.holdLength) {
+      beats *= sh.holdLength;
+    } else if (isFreeRhythm && note.underlines === 0 && note.degree !== -1) {
+      beats *= 1.35; // Spacious contemplative Honkyoku base pulse
+    }
 
     // Prolongation dash '-' extends previous pitched event by 1 beat
     if (note.degree === -1) {
@@ -336,7 +354,7 @@ export function buildErhuPlaybackTimeline(
       }
     }
 
-    // Compute chord or single-note MIDI pitches (including standalone pure-Jianzipu degree === -2)
+    // Compute chord or single-note MIDI pitches (including standalone pure Guqin/Shakuhachi degree === -2)
     const isGuqin = doc.header.instrument === 'guqin';
     const effectiveTranspose = transposeSemitones + (isGuqin ? -12 : 0);
     const jianzi = note.markings.jianzi;
@@ -344,7 +362,9 @@ export function buildErhuPlaybackTimeline(
     let chordMidis: number[] | undefined;
     let midi: number | null = null;
     if (note.degree === -2) {
-      if (jianzi) {
+      if (sh && sh.fingering) {
+        midi = computeShakuhachiMidi(sh, doc.header.fluteKey, transposeSemitones);
+      } else if (jianzi) {
         const computed = computeGuqinMidiFromJianzi(jianzi, transposeSemitones);
         if (computed.length >= 2) {
           chordMidis = computed;
@@ -370,28 +390,49 @@ export function buildErhuPlaybackTimeline(
 
     const techs = note.markings.techniques || [];
     const jzActions = jianzi?.actions || [];
+    const shBends = sh?.bends || [];
+    const shTechs = sh?.techniques || [];
     const hasSu =
       note.markings.ornaments.includes('su') ||
       techs.includes('tuixian') ||
       techs.includes('an') ||
-      jzActions.includes('shang');
+      jzActions.includes('shang') ||
+      shBends.includes('suri-up');
     const hasSd =
       note.markings.ornaments.includes('sd') ||
       techs.includes('laxian') ||
-      jzActions.includes('xia');
+      jzActions.includes('xia') ||
+      shBends.includes('suri-down') ||
+      shBends.includes('merikomi') ||
+      shBends.includes('otoshi');
 
     const slideFromMidi = midi !== null
-      ? (jzActions.includes('chuo') ? midi - 2 : jzActions.includes('zhu') ? midi + 2 : undefined)
+      ? (jzActions.includes('chuo') || shBends.includes('nayashi')
+          ? midi - 2
+          : jzActions.includes('zhu')
+            ? midi + 2
+            : undefined)
       : undefined;
 
     let slideTargetMidi: number | undefined;
     if (midi !== null) {
-      if (jianzi?.targetHui && jianzi.stringNum && (jzActions.includes('shang') || jzActions.includes('xia'))) {
+      if (sh?.bendTarget) {
+        const targetComputed = computeShakuhachiMidi(
+          { fingering: sh.bendTarget, register: sh.register },
+          doc.header.fluteKey,
+          transposeSemitones
+        );
+        slideTargetMidi = targetComputed ?? (hasSu ? midi + 2 : midi - 2);
+      } else if (jianzi?.targetHui && jianzi.stringNum && (jzActions.includes('shang') || jzActions.includes('xia'))) {
         const targetComputed = computeGuqinMidiFromJianzi(
           { ...jianzi, soundType: 'an', hui: jianzi.targetHui, secondStringNum: undefined },
           transposeSemitones
         );
         slideTargetMidi = targetComputed[0] ?? (hasSu ? midi + 2 : midi - 2);
+      } else if (shBends.includes('otoshi')) {
+        slideTargetMidi = midi - 3;
+      } else if (shBends.includes('merikomi')) {
+        slideTargetMidi = midi - 1.5;
       } else {
         slideTargetMidi = hasSu ? midi + 2 : hasSd ? midi - 2 : undefined;
       }
@@ -407,6 +448,30 @@ export function buildErhuPlaybackTimeline(
 
     const isFermata = note.markings.ornaments.includes('fermata');
     let effectiveBeats = isFermata ? beats * 1.45 : beats;
+
+    // Shakuhachi Atari / Uchi / Oshi fleeting articulation grace before main pitch
+    if (
+      midi !== null &&
+      (shTechs.includes('atari') || shTechs.includes('uchi') || shTechs.includes('oshi')) &&
+      note.graceNotes.length === 0
+    ) {
+      const ornDur = Math.min(0.06, effectiveBeats * 0.14);
+      const ornOffset = shTechs.includes('oshi') ? 2 : -2;
+      events.push({
+        noteId: note.id,
+        measureIndex,
+        midi: midi + ornOffset,
+        startBeat: currentBeat,
+        durationBeats: ornDur,
+        hasVibrato: false,
+        isStaccato: false,
+        isTremolo: false,
+        isPizzicato: false,
+        velocity: noteVelocity * 0.78
+      });
+      currentBeat += ornDur;
+      effectiveBeats = Math.max(0.14, effectiveBeats - ornDur);
+    }
 
     // Dizi/Xiao 叠音 (die) & 波音 (bo): inject a fleeting upper-neighbor ornament at attack
     if (midi !== null && (techs.includes('die') || techs.includes('bo')) && note.graceNotes.length === 0) {
@@ -453,7 +518,9 @@ export function buildErhuPlaybackTimeline(
           : undefined
       : undefined;
 
-    const isFlutter = techs.includes('huashe');
+    const isFlutter = techs.includes('huashe') || shTechs.includes('tamane');
+    const isMuraiki = shTechs.includes('muraiki');
+    const isKorokoro = shTechs.includes('korokoro') || shTechs.includes('karakara');
     const isTremolo =
       note.markings.bowing === 'trem' ||
       techs.includes('lun') ||
@@ -472,6 +539,11 @@ export function buildErhuPlaybackTimeline(
       prev.durationBeats += effectiveBeats;
       currentBeat += effectiveBeats;
     } else {
+      const hasShYuri =
+        shTechs.includes('yuri') ||
+        shTechs.includes('yokoyuri') ||
+        shTechs.includes('tateyuri') ||
+        shTechs.includes('mawashi');
       events.push({
         noteId: note.id,
         measureIndex,
@@ -486,27 +558,36 @@ export function buildErhuPlaybackTimeline(
           note.markings.ornaments.includes('pvib') ||
           techs.includes('qizhen') ||
           jzActions.includes('yin') ||
-          jzActions.includes('nao'),
+          jzActions.includes('nao') ||
+          hasShYuri,
         isStaccato:
           note.markings.bowing === 'stacc' ||
           note.markings.bowing === 'spicc' ||
           isMuted ||
-          isDuo,
+          isDuo ||
+          shTechs.includes('kiri'),
         isTremolo: isTremolo || jianzi?.rightStroke === 'lun' || jianzi?.rightStroke === 'suo',
         isPizzicato: note.markings.bowing === 'pizz',
         isMuted,
         isFlutter,
+        isMuraiki,
+        isKorokoro,
+        shakuhachiBends: shBends.length > 0 ? [...shBends] : undefined,
         guqinSoundType,
         arpeggio:
           arpeggio ||
           (jianzi?.rightStroke === 'gun' ? 'down' : jianzi?.rightStroke === 'fu' ? 'up' : undefined),
         glissMidis,
         velocity:
-          note.markings.ornaments.includes('accent') || techs.includes('sao') || isDuo
+          note.markings.ornaments.includes('accent') || techs.includes('sao') || isDuo || isMuraiki
             ? Math.min(1.0, noteVelocity * 1.18)
             : noteVelocity
       });
       currentBeat += effectiveBeats;
+      // Add organic breath space after explicit breath intake (息継ぎ) in free-rhythm Honkyoku
+      if (shTechs.includes('breath') && midi !== null) {
+        currentBeat += isFreeRhythm ? 0.55 : 0.15;
+      }
     }
 
     if (postGraces.length > 0) {
@@ -576,6 +657,11 @@ export class MusoJianpuPlayer {
   private diziSynth: Tone.MonoSynth | null = null;
   private diziFlutter: Tone.Tremolo | null = null;
   private xiaoSynth: Tone.MonoSynth | null = null;
+  private shakuhachiSynth: Tone.MonoSynth | null = null;
+  private shakuhachiVibrato: Tone.Vibrato | null = null;
+  private shakuhachiFlutter: Tone.Tremolo | null = null;
+  private shakuhachiBreath: Tone.NoiseSynth | null = null;
+  private shakuhachiBreathFilter: Tone.Filter | null = null;
   private breathNoise: Tone.NoiseSynth | null = null;
   private breathFilter: Tone.Filter | null = null;
   private windVibrato: Tone.Vibrato | null = null;
@@ -804,6 +890,50 @@ export class MusoJianpuPlayer {
     }).connect(this.breathFilter);
     this.breathNoise.volume.value = -26;
 
+    // Shakuhachi (尺八): rich hollow end-blown bamboo flute + expressive yuri vibrato + utaguchi wind rush (ムラ息)
+    this.shakuhachiVibrato = new Tone.Vibrato({
+      frequency: 4.3,
+      depth: 0.11,
+      wet: 0.18
+    }).connect(this.reverb);
+
+    this.shakuhachiFlutter = new Tone.Tremolo({
+      frequency: 15.5,
+      depth: 0.52,
+      wet: 0
+    }).connect(this.shakuhachiVibrato).start();
+
+    this.shakuhachiSynth = new Tone.MonoSynth({
+      oscillator: {
+        type: 'custom',
+        partials: [1, 0.34, 0.15, 0.06, 0.025, 0.01]
+      },
+      filter: { Q: 1.0, type: 'lowpass', rolloff: -12 },
+      envelope: { attack: 0.095, decay: 0.18, sustain: 0.84, release: 0.42 },
+      filterEnvelope: {
+        attack: 0.1,
+        decay: 0.22,
+        sustain: 0.72,
+        release: 0.35,
+        baseFrequency: 560,
+        octaves: 1.85
+      }
+    }).connect(this.shakuhachiFlutter);
+    this.shakuhachiSynth.volume.value = -2;
+
+    // Utaguchi edge-tone bamboo breath layer (gentle normally, dramatic for Muraiki ムラ息)
+    this.shakuhachiBreathFilter = new Tone.Filter({
+      type: 'bandpass',
+      frequency: 1850,
+      Q: 1.25
+    }).connect(this.reverb);
+
+    this.shakuhachiBreath = new Tone.NoiseSynth({
+      noise: { type: 'pink' },
+      envelope: { attack: 0.04, decay: 0.28, sustain: 0.18, release: 0.25 }
+    }).connect(this.shakuhachiBreathFilter);
+    this.shakuhachiBreath.volume.value = -22;
+
     this.pizzSynth = new Tone.PluckSynth({
       attackNoise: 1.2,
       dampening: 3200,
@@ -865,6 +995,80 @@ export class MusoJianpuPlayer {
         const ordered = ev.arpeggio === 'down' ? [...pitchList].reverse() : pitchList;
         const freqs = ordered.map(m => Tone.Frequency(m, 'midi').toFrequency());
         this.guqinOpenSynth.triggerAttackRelease(freqs, Math.max(0.5, playDur), toneTime, ev.velocity);
+      }
+      return;
+    }
+
+    // Shakuhachi (尺八) Expressive Bamboo Playback: Nayashi bloom, Yuri, Muraiki wind rush, Korokoro warble, Merikomi/Otoshi glides
+    if (instrument === 'shakuhachi' && this.shakuhachiSynth) {
+      const targetFreq = Tone.Frequency(ev.midi, 'midi').toFrequency();
+      const startFreq = ev.slideFromMidi !== undefined
+        ? Tone.Frequency(ev.slideFromMidi, 'midi').toFrequency()
+        : targetFreq;
+
+      if (this.shakuhachiVibrato) {
+        this.shakuhachiVibrato.wet.setValueAtTime(ev.hasVibrato ? 0.72 : 0.14, toneTime);
+      }
+      if (this.shakuhachiFlutter) {
+        this.shakuhachiFlutter.wet.setValueAtTime(ev.isFlutter ? 0.92 : 0, toneTime);
+      }
+
+      // Breath / Muraiki utaguchi wind noise burst
+      if (this.shakuhachiBreath) {
+        if (this.shakuhachiBreathFilter) {
+          this.shakuhachiBreathFilter.frequency.setValueAtTime(
+            ev.isMuraiki ? 1450 : 2100,
+            toneTime
+          );
+        }
+        const breathDur = ev.isMuraiki ? Math.min(playDur * 0.85, 0.75) : Math.min(0.18, playDur * 0.4);
+        const breathVel = ev.isMuraiki ? Math.min(1.0, ev.velocity * 1.45) : ev.velocity * 0.38;
+        this.shakuhachiBreath.volume.setValueAtTime(ev.isMuraiki ? -11 : -24, toneTime);
+        this.shakuhachiBreath.triggerAttackRelease(breathDur, toneTime, breathVel);
+      }
+
+      // Korokoro / Karakara characteristic rapid bamboo finger warble
+      if (ev.isKorokoro && playDur >= 0.24) {
+        const subDur = 0.085;
+        const count = Math.min(10, Math.max(3, Math.floor(playDur / subDur)));
+        const altFreq = Tone.Frequency(ev.midi - 2, 'midi').toFrequency();
+        this.shakuhachiSynth.portamento = 0.008;
+        for (let k = 0; k < count; k++) {
+          const t = toneTime + k * subDur;
+          const f = k % 2 === 0 ? targetFreq : altFreq;
+          this.shakuhachiSynth.triggerAttackRelease(f, subDur * 0.92, t, ev.velocity * (k % 2 === 0 ? 0.92 : 0.78));
+        }
+        return;
+      }
+
+      this.shakuhachiSynth.portamento = 0.025;
+      this.shakuhachiSynth.triggerAttackRelease(startFreq, Math.max(0.12, playDur), toneTime, ev.velocity);
+
+      // Nayashi (萎し): bloom smoothly upward from meri into target pitch
+      if (ev.slideFromMidi !== undefined) {
+        this.shakuhachiSynth.frequency.exponentialRampToValueAtTime(
+          targetFreq,
+          toneTime + Math.min(0.42, playDur * 0.36)
+        );
+      }
+
+      // Sori (反り): subtle upward scoop then settle back
+      if (ev.shakuhachiBends?.includes('sori')) {
+        const scoopFreq = Tone.Frequency(ev.midi + 1.5, 'midi').toFrequency();
+        this.shakuhachiSynth.frequency.exponentialRampToValueAtTime(scoopFreq, toneTime + playDur * 0.35);
+        this.shakuhachiSynth.frequency.exponentialRampToValueAtTime(targetFreq, toneTime + playDur * 0.72);
+      }
+
+      // Suri / Merikomi / Otoshi tail glide
+      if (ev.slideTargetMidi !== undefined) {
+        const slideOutFreq = Tone.Frequency(ev.slideTargetMidi, 'midi').toFrequency();
+        const isOtoshi = ev.shakuhachiBends?.includes('otoshi');
+        const glideStart = toneTime + (isOtoshi ? playDur * 0.68 : Math.min(0.45, playDur * 0.48));
+        this.shakuhachiSynth.frequency.setValueAtTime(targetFreq, glideStart);
+        this.shakuhachiSynth.frequency.exponentialRampToValueAtTime(
+          slideOutFreq,
+          toneTime + playDur * 0.94
+        );
       }
       return;
     }
@@ -1110,6 +1314,7 @@ export class MusoJianpuPlayer {
       this.guqinStoppedSynth?.frequency.cancelScheduledValues(now);
       this.diziSynth?.frequency.cancelScheduledValues(now);
       this.xiaoSynth?.frequency.cancelScheduledValues(now);
+      this.shakuhachiSynth?.frequency.cancelScheduledValues(now);
       this.bowedSynth?.triggerRelease(now);
       this.bowedPolySynth?.releaseAll(now);
       this.pipaSynth?.releaseAll(now);
@@ -1119,6 +1324,8 @@ export class MusoJianpuPlayer {
       this.guqinHarmonicSynth?.releaseAll(now);
       this.diziSynth?.triggerRelease(now);
       this.xiaoSynth?.triggerRelease(now);
+      this.shakuhachiSynth?.triggerRelease(now);
+      this.shakuhachiBreath?.triggerRelease(now);
       this.breathNoise?.triggerRelease(now);
     } catch {
       // ignore if not triggered
@@ -1141,6 +1348,11 @@ export class MusoJianpuPlayer {
       this.diziSynth?.dispose();
       this.diziFlutter?.dispose();
       this.xiaoSynth?.dispose();
+      this.shakuhachiSynth?.dispose();
+      this.shakuhachiVibrato?.dispose();
+      this.shakuhachiFlutter?.dispose();
+      this.shakuhachiBreath?.dispose();
+      this.shakuhachiBreathFilter?.dispose();
       this.breathNoise?.dispose();
       this.breathFilter?.dispose();
       this.windVibrato?.dispose();
@@ -1166,6 +1378,11 @@ export class MusoJianpuPlayer {
     this.diziSynth = null;
     this.diziFlutter = null;
     this.xiaoSynth = null;
+    this.shakuhachiSynth = null;
+    this.shakuhachiVibrato = null;
+    this.shakuhachiFlutter = null;
+    this.shakuhachiBreath = null;
+    this.shakuhachiBreathFilter = null;
     this.breathNoise = null;
     this.breathFilter = null;
     this.windVibrato = null;
@@ -1221,7 +1438,7 @@ export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemi
     const denPow = Math.round(Math.log2(den));
     track.push(0x00, 0xff, 0x58, 0x04, num, denPow, 24, 8);
 
-    // Program Change on Channel 0 based on instrument
+    // Program Change on Channel 0 based on instrument (GM 77 = Shakuhachi!)
     const gmProgram = doc.header.instrument === 'pipa'
       ? 105
       : doc.header.instrument === 'guzheng'
@@ -1230,7 +1447,7 @@ export function generateMidiForMusoJianpu(doc: MusoJianpuDocument, transposeSemi
           ? 24
           : doc.header.instrument === 'dizi'
             ? 73
-            : doc.header.instrument === 'xiao'
+            : doc.header.instrument === 'xiao' || doc.header.instrument === 'shakuhachi'
               ? 77
               : 110;
     track.push(0x00, 0xc0, gmProgram);

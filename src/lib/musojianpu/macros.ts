@@ -4,7 +4,7 @@
  */
 
 import { getErhuKeyInfo, transposeKeyName } from './erhuKeys.ts';
-import { InstrumentType } from './types.ts';
+import { InstrumentType, ShakuhachiSchool } from './types.ts';
 
 export interface TextEditResult {
   text: string;
@@ -152,8 +152,65 @@ const EXCLUSIVE_GROUPS: string[][] = [
   ['pos1', 'pos2', 'pos3', 'pos4', 'pos5', 'p1', 'p2', 'p3', 'p4', 'p5', '一把', '二把', '三把', '四把', '五把', '上把', '中把', '下把', '次下把'],
   ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sfz'],
   ['tu', 'ktu', 'dtu', 'ttu', 't', 'k', 'tk', 'ttk', '单吐', '双吐', '三吐'],
-  ['li', 'lidown', '历音', '上历音', '下历音']
+  ['li', 'lidown', '历音', '上历音', '下历音'],
+  ['乙', '甲', '大甲', 'otsu', 'kan', 'daikan'],
+  ['メ', 'メリ', '中メ', '中メリ', '大メ', '大メリ', 'カ', 'カリ', 'meri', 'chumeri', 'daimeri', 'kari'],
+  ['短', '長', '長長', '極長', 'short', 'long', 'xlong']
 ];
+
+/**
+ * Splits the inside of a `{...}` markings block while preserving quoted annotations
+ * (`"..."`, `'...'`, `「...」`, `『...』`, `“...”`) and `jin:...` / `注:...` commentary.
+ * Mid-word apostrophes (e.g. `don't`) or unclosed quotes never swallow following tags.
+ */
+function splitBraceTags(inner: string, splitOnSpace: boolean = false): string[] {
+  const tags: string[] = [];
+  let cur = '';
+  let closeQuote: string | null = null;
+
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (closeQuote) {
+      cur += ch;
+      if (ch === closeQuote) closeQuote = null;
+      continue;
+    }
+
+    const atTokenStart = cur.trim().length === 0 || /[:：]\s*$/.test(cur);
+    if ((ch === '"' || ch === "'") && atTokenStart && inner.indexOf(ch, i + 1) !== -1) {
+      closeQuote = ch;
+      cur += ch;
+      continue;
+    }
+    if (ch === '「' && inner.indexOf('」', i + 1) !== -1) {
+      closeQuote = '」';
+      cur += ch;
+      continue;
+    }
+    if (ch === '『' && inner.indexOf('』', i + 1) !== -1) {
+      closeQuote = '』';
+      cur += ch;
+      continue;
+    }
+    if (ch === '“' && inner.indexOf('”', i + 1) !== -1) {
+      closeQuote = '”';
+      cur += ch;
+      continue;
+    }
+
+    const isJinPrefix = /^(?:jin|nyodo|inst|note|注|傍注|指示)[:：]/i.test(cur.trim());
+    if (ch === ',' || ch === '，' || ch === ';' || ch === '；' || (splitOnSpace && !isJinPrefix && /\s/.test(ch))) {
+      const tr = cur.trim();
+      if (tr) tags.push(tr);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  const trailing = cur.trim();
+  if (trailing) tags.push(trailing);
+  return tags;
+}
 
 function transformNoteMarking(noteStr: string, tag: string): string {
   const parts = splitNoteOrChord(noteStr);
@@ -163,8 +220,7 @@ function transformNoteMarking(noteStr: string, tag: string): string {
   const blockRegex = /\{([^}]*)\}/g;
   let bm: RegExpExecArray | null;
   while ((bm = blockRegex.exec(parts.markings)) !== null) {
-    const items = bm[1].split(/[,，;\s]+/).map(s => s.trim()).filter(Boolean);
-    existingTags.push(...items);
+    existingTags.push(...splitBraceTags(bm[1], true));
   }
 
   const idx = existingTags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
@@ -251,17 +307,127 @@ export function macroToggleAccidental(text: string, selStart: number, selEnd: nu
 }
 
 /**
- * Attach / Toggle Marking (Bowing, Pipa/Guzheng Technique, Finger, String, Slide, Vibrato, Dynamic)
+ * Finds a standalone `{...}` block (Pure Guqin or Pure Shakuhachi note) covering or immediately before cursor.
+ */
+function findStandaloneBraceAtCursor(text: string, pos: number): NoteSpan | null {
+  const lineStart = text.lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
+  const rawLineEnd = text.indexOf('\n', pos);
+  const lineEnd = rawLineEnd === -1 ? text.length : rawLineEnd;
+  const line = text.slice(lineStart, lineEnd);
+  if (/^\s*(@|S:|L:|T:|#|\/\/)/i.test(line)) return null;
+
+  const regex = /\{[^}]*\}[_/]*\.*~?/g;
+  let m: RegExpExecArray | null;
+  let prev: NoteSpan | null = null;
+  while ((m = regex.exec(line)) !== null) {
+    const start = lineStart + m.index;
+    const end = start + m[0].length;
+    if (pos >= start && pos <= end) return { start, end, text: m[0] };
+    if (end <= pos) prev = { start, end, text: m[0] };
+  }
+  if (prev && pos - prev.end <= 1) return prev;
+  return null;
+}
+
+function toggleTagInsideBraceBlock(blockStr: string, tag: string): string {
+  const m = blockStr.match(/^\{([^}]*)\}([_/]*\.*~?)$/);
+  if (!m) return blockStr;
+  const existingTags = splitBraceTags(m[1], false);
+
+  const idx = existingTags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
+  let nextTags: string[];
+  if (idx >= 0) {
+    // Guard: never empty out a standalone `{...}` note block (e.g. toggling `ロ` on `{ロ}`)
+    if (existingTags.length <= 1) return blockStr;
+    nextTags = existingTags.filter((_, i) => i !== idx);
+  } else {
+    const group = EXCLUSIVE_GROUPS.find(g => g.includes(tag) || g.includes(tag.toLowerCase()));
+    const filtered = group
+      ? existingTags.filter((t, i) => i === 0 || (!group.includes(t) && !group.includes(t.toLowerCase())))
+      : existingTags;
+    nextTags = [...filtered, tag];
+  }
+  return nextTags.length > 0 ? `{${nextTags.join(',')}}${m[2]}` : blockStr;
+}
+
+const SELECTION_MARKING_REGEX = new RegExp(
+  `(${GRACE_PREFIX_REGEX.source})|(\\{[^}]*\\}[_/]*\\.*~?)|(\\[(?:\\d+(?:[,\\-]\\d+)*\\.]?|[^\\[\\]]+\\]))|(${NOTE_OR_CHORD_CORE}[_/]*\\.*~?(?:\\{[^}]*\\})*)`,
+  'g'
+);
+
+/**
+ * Attach / Toggle Marking (Bowing, Pipa/Guzheng/Shakuhachi Technique, Finger, String, Slide, Vibrato, Dynamic)
  */
 export function macroToggleMarking(text: string, selStart: number, selEnd: number, tag: string): TextEditResult {
+  // Handle non-empty selections covering Jianpu notes AND/OR standalone `{...}` Guqin/Shakuhachi notes
+  if (selStart !== selEnd) {
+    const selected = text.slice(selStart, selEnd);
+    let foundAnyTarget = false;
+    const replaced = selected.replace(
+      SELECTION_MARKING_REGEX,
+      (full, graceTok, braceTok, bracketTok, noteTok, offset: number) => {
+        if (graceTok || bracketTok) return full;
+        if (noteTok) {
+          foundAnyTarget = true;
+          return transformNoteMarking(noteTok, tag);
+        }
+        if (braceTok) {
+          // If this `{...}` block immediately precedes a Jianpu note digit (e.g. `{pull}5`), leave it attached
+          const afterChar = selected[offset + full.length] || text[selStart + offset + full.length] || '';
+          if (/^[#b=0-7<]/.test(afterChar)) return full;
+          foundAnyTarget = true;
+          return toggleTagInsideBraceBlock(braceTok, tag);
+        }
+        return full;
+      }
+    );
+
+    if (foundAnyTarget) {
+      const nextText = text.slice(0, selStart) + replaced + text.slice(selEnd);
+      return {
+        text: nextText,
+        selectionStart: selStart,
+        selectionEnd: selStart + replaced.length
+      };
+    }
+
+    // Also check if the user selected a sub-range INSIDE a standalone `{...}` note block (e.g. selecting `ロ` inside `{ロ}`)
+    const enclosingBrace = findStandaloneBraceAtCursor(text, selStart);
+    if (enclosingBrace && selStart >= enclosingBrace.start && selEnd <= enclosingBrace.end) {
+      const nextBlock = toggleTagInsideBraceBlock(enclosingBrace.text, tag);
+      const nextText = text.slice(0, enclosingBrace.start) + nextBlock + text.slice(enclosingBrace.end);
+      return {
+        text: nextText,
+        selectionStart: enclosingBrace.start,
+        selectionEnd: enclosingBrace.start + nextBlock.length
+      };
+    }
+  }
+
+  // Collapsed cursor: check standard Jianpu note first, then standalone `{...}` note
   const res = applyNoteTransform(text, selStart, selEnd, n => transformNoteMarking(n, tag));
   if (res) return res;
-  // Fallback: insert marking at cursor
+
+  if (selStart === selEnd) {
+    const braceTarget = findStandaloneBraceAtCursor(text, selStart);
+    if (braceTarget) {
+      const replaced = toggleTagInsideBraceBlock(braceTarget.text, tag);
+      const nextText = text.slice(0, braceTarget.start) + replaced + text.slice(braceTarget.end);
+      return {
+        text: nextText,
+        selectionStart: braceTarget.start + replaced.length,
+        selectionEnd: braceTarget.start + replaced.length
+      };
+    }
+  }
+
+  // Fallback: insert marking at cursor (preserving selected text if it's not meant to be deleted)
   const snippet = `{${tag}}`;
+  const insertPos = selEnd;
   return {
-    text: text.slice(0, selStart) + snippet + text.slice(selEnd),
-    selectionStart: selStart + snippet.length,
-    selectionEnd: selStart + snippet.length
+    text: text.slice(0, insertPos) + snippet + text.slice(insertPos),
+    selectionStart: insertPos + snippet.length,
+    selectionEnd: insertPos + snippet.length
   };
 }
 
@@ -386,10 +552,45 @@ export function macroWrapHairpin(
   };
 }
 
+const SINGLE_STANDALONE_BRACE_REGEX = /^\{[^}]*\}[_/]*\.*~?$/;
+
 /**
- * Insert raw snippet at cursor (barlines, sections, lyrics templates)
+ * Insert raw snippet at cursor (barlines, sections, lyrics templates, standalone notes).
+ * When a single note token is selected (e.g. after clicking a note on the score preview),
+ * inserts cleanly before prefix markers (`[1. `, `[segno] `) or right after the selected note
+ * instead of overwriting and deleting the note.
  */
 export function macroInsertSnippet(text: string, selStart: number, selEnd: number, snippet: string): TextEditResult {
+  if (selStart !== selEnd) {
+    const selected = text.slice(selStart, selEnd);
+    const trimmed = selected.trim();
+    const isSingleSelectedNote =
+      SINGLE_STANDALONE_BRACE_REGEX.test(trimmed) || NOTE_OR_CHORD_FULL_REGEX.test(trimmed);
+
+    if (isSingleSelectedNote) {
+      const isPrefixMarker = /^\[(?:1\.|2\.|segno|coda)/i.test(snippet.trim());
+      if (isPrefixMarker) {
+        const next = text.slice(0, selStart) + snippet + text.slice(selStart);
+        return {
+          text: next,
+          selectionStart: selStart + snippet.length,
+          selectionEnd: selStart + snippet.length
+        };
+      }
+      const needsLeadingSpace =
+        snippet.length > 0 &&
+        !/^[\s\n]/.test(snippet) &&
+        !/[\s\n]$/.test(text.slice(0, selEnd));
+      const insertText = needsLeadingSpace ? ` ${snippet}` : snippet;
+      const next = text.slice(0, selEnd) + insertText + text.slice(selEnd);
+      return {
+        text: next,
+        selectionStart: selEnd + insertText.length,
+        selectionEnd: selEnd + insertText.length
+      };
+    }
+  }
+
   const next = text.slice(0, selStart) + snippet + text.slice(selEnd);
   return {
     text: next,
@@ -513,7 +714,7 @@ export function macroSetTempo(text: string, bpm: number, expression?: string): s
 }
 
 /**
- * Set score @instrument directive (erhu | pipa | guzheng | dizi | xiao | guqin)
+ * Set score @instrument directive (erhu | pipa | guzheng | dizi | xiao | guqin | shakuhachi)
  */
 export function macroSetInstrument(text: string, instrument: InstrumentType): string {
   let result = text;
@@ -525,23 +726,35 @@ export function macroSetInstrument(text: string, instrument: InstrumentType): st
     result = `@instrument: ${instrument}\n${result}`;
   }
 
-  // Update @strings / @fingering to match the selected instrument's conventions
-  if (instrument === 'guqin') {
-    result = result.replace(/^@(?:fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+  // Update @strings / @fingering / @flute / @school to match the selected instrument's conventions
+  if (instrument === 'shakuhachi') {
+    result = result.replace(/^@(?:strings|fingering|tongyin)\s*[:：].*\r?\n?/gim, '');
+    if (!/^@(?:flute|tube|length|shaku)\s*[:：]/im.test(result)) {
+      if (/^@instrument\s*[:：].*$/im.test(result)) {
+        result = result.replace(/^(@instrument\s*[:：].*)$/im, '$1\n@flute: 1.8尺 (D)');
+      }
+    }
+    if (!/^@(?:school|notation|ryu)\s*[:：]/im.test(result)) {
+      if (/^@(?:flute|tube|length|shaku)\s*[:：].*$/im.test(result)) {
+        result = result.replace(/^(@(?:flute|tube|length|shaku)\s*[:：].*)$/im, '$1\n@school: kinko');
+      }
+    }
+  } else if (instrument === 'guqin') {
+    result = result.replace(/^@(?:fingering|tongyin|flute|tube|school|notation|ryu)\s*[:：].*\r?\n?/gim, '');
     if (/^@strings\s*[:：].*$/im.test(result)) {
       result = result.replace(/^@strings\s*[:：].*$/im, '@strings: 正调 5-6-1-2-3-5-6');
     } else if (/^@key\s*[:：].*$/im.test(result)) {
       result = result.replace(/^(@key\s*[:：].*)$/im, '$1\n@strings: 正调 5-6-1-2-3-5-6');
     }
   } else if (instrument === 'pipa') {
-    result = result.replace(/^@(?:fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+    result = result.replace(/^@(?:fingering|tongyin|flute|tube|school|notation|ryu)\s*[:：].*\r?\n?/gim, '');
     if (/^@strings\s*[:：].*$/im.test(result)) {
       result = result.replace(/^@strings\s*[:：].*$/im, '@strings: A-d-e-a');
     }
   } else if (instrument === 'guzheng') {
-    result = result.replace(/^@(?:strings|fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+    result = result.replace(/^@(?:strings|fingering|tongyin|flute|tube|school|notation|ryu)\s*[:：].*\r?\n?/gim, '');
   } else if (instrument === 'dizi' || instrument === 'xiao') {
-    result = result.replace(/^@strings\s*[:：].*\r?\n?/im, '');
+    result = result.replace(/^@(?:strings|school|notation|ryu)\s*[:：].*\r?\n?/gim, '');
     if (!/^@(?:fingering|tongyin)\s*[:：]/im.test(result)) {
       if (/^@key\s*[:：].*$/im.test(result)) {
         result = result.replace(/^(@key\s*[:：].*)$/im, '$1\n@fingering: 筒音作5');
@@ -550,7 +763,7 @@ export function macroSetInstrument(text: string, instrument: InstrumentType): st
       }
     }
   } else {
-    result = result.replace(/^@(?:fingering|tongyin|flute|tube)\s*[:：].*\r?\n?/gim, '');
+    result = result.replace(/^@(?:fingering|tongyin|flute|tube|school|notation|ryu)\s*[:：].*\r?\n?/gim, '');
     const keyMatch = result.match(/^@key\s*[:：]\s*(.+)$/im);
     const keyInfo = getErhuKeyInfo(keyMatch ? keyMatch[1].trim() : 'D');
     if (/^@strings\s*[:：].*$/im.test(result)) {
@@ -560,6 +773,53 @@ export function macroSetInstrument(text: string, instrument: InstrumentType): st
     }
   }
 
+  return result;
+}
+
+/**
+ * Set Shakuhachi tube length (@flute: 1.8尺 (D), 2.0尺 (C), etc.)
+ */
+export function macroSetShakuhachiLength(text: string, fluteLabel: string): string {
+  const clean = fluteLabel.trim();
+  if (!clean) return text;
+  if (/^@(?:flute|tube|length|shaku)\s*[:：].*$/im.test(text)) {
+    return text.replace(/^@(?:flute|tube|length|shaku)\s*[:：].*$/im, `@flute: ${clean}`);
+  }
+  if (/^@instrument\s*[:：].*$/im.test(text)) {
+    return text.replace(/^(@instrument\s*[:：].*)$/im, `$1\n@flute: ${clean}`);
+  }
+  return `@flute: ${clean}\n${text}`;
+}
+
+/**
+ * Set Shakuhachi notation school (@school: kinko | tozan)
+ */
+export function macroSetShakuhachiSchool(text: string, school: ShakuhachiSchool): string {
+  if (/^@(?:school|notation|ryu)\s*[:：].*$/im.test(text)) {
+    return text.replace(/^@(?:school|notation|ryu)\s*[:：].*$/im, `@school: ${school}`);
+  }
+  if (/^@(?:flute|tube|length|shaku)\s*[:：].*$/im.test(text)) {
+    return text.replace(/^(@(?:flute|tube|length|shaku)\s*[:：].*)$/im, `$1\n@school: ${school}`);
+  }
+  if (/^@instrument\s*[:：].*$/im.test(text)) {
+    return text.replace(/^(@instrument\s*[:：].*)$/im, `$1\n@school: ${school}`);
+  }
+  return `@school: ${school}\n${text}`;
+}
+
+/**
+ * Toggle between Free Rhythm (散拍 / Honkyoku) and Metrical Rhythm (e.g. 4/4)
+ */
+export function macroSetRhythmMode(text: string, mode: 'free' | 'metrical'): string {
+  const nextTime = mode === 'free' ? 'free' : '4/4';
+  let result = text.replace(/^@rhythm\s*[:：].*\r?\n?/gim, '');
+  if (/^@(?:time|meter)\s*[:：].*$/im.test(result)) {
+    result = result.replace(/^@(?:time|meter)\s*[:：].*$/im, `@time: ${nextTime}`);
+  } else if (/^@key\s*[:：].*$/im.test(result)) {
+    result = result.replace(/^(@key\s*[:：].*)$/im, `$1\n@time: ${nextTime}`);
+  } else {
+    result = `@time: ${nextTime}\n${result}`;
+  }
   return result;
 }
 

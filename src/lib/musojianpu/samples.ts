@@ -201,6 +201,48 @@ S: 散按泛纯减字谱 (可直接播放并切换竖排乌丝栏)
 
 T: 纯减字谱语法：直接输入 {散勾一} {名九勾六,绰,吟} {泛七挑五} 等减字记号即可独立排版与发声，无需填写简谱音符。`;
 
+export const MUSOJIANPU_SHAKUHACHI_HONKYOKU_SAMPLE = `@title: 空谷吹禅 · 本曲習作
+@subtitle: Shakuhachi Honkyoku Etude · 散拍自由律 · 神如道風傍注 (Kinko / Tozan / Dual)
+@composer: MusoJianpu 示范谱 (神如道風記譜)
+@instrument: shakuhachi
+@flute: 1.8尺 (D)
+@school: kinko
+@key: 1=F
+@time: free
+@tempo: 46
+@expression: 散拍・静寂に Freely, contemplative
+
+S: 一、一音成仏 (Opening Breath · Ro & Meri Bloom)
+| {ロ,萎し,長,p,"静かに息を澄ませて"} - {ロ,ムラ息,コミ,"ムラ息から次第に澄む"} {ツ中メ,スリ上} {ツ,ユリ,長,mp} {レ,当り} {ツ,メリ込み,息} |
+| {レ,萎し,長,"風のように"} {ウ,ユリ,"深くメリ込む"} {ツ,落とし,長,"次第に弱く消えるように"} {間} |
+
+S: 二、甲音遠響 (Upper Kan Resonance & Korokoro)
+| {甲ロ,当り,mf,"澄んだ響きで"} {甲ツ,ユリ,長} {甲レ,反り} {甲チ,長,"遠く響かせる"} {甲レ,擦り下げ} {甲ツ,メリ込み,息} |
+| {チ,当り,mp} {リ,ユリ,長} {チ,コロコロ,"柔らかく転がす"} {レ,擦り下げ} {ツ,ユリ,dim} {ロ,メリ込み,長長,p,"余韻を聴く"} |]
+
+T: 本曲記譜说明：采用散拍（@time: free）与一尺八寸管（1.8尺，筒音ロ=D4，1=F 对应 ロ=6, ツ=1 レ=2 チ=3 リ/ハ=5）；可在顶部工具栏一键切换「双行 Jianpu+指法 / 琴古流縦譜 / 都山流縦譜」，支持神如道式傍注（"..." 或 jin:...）、萎し、ムラ息、ユリ、コロコロ与メリ込み。`;
+
+export const MUSOJIANPU_SHAKUHACHI_MODERN_SAMPLE = `@title: 竹林清風 · 現代尺八小品
+@subtitle: Bamboo Grove Breeze · 現代尺八拍子譜 (4/4 Metrical · Tozan / Kinko / Jianpu)
+@composer: MusoJianpu 示范谱
+@instrument: shakuhachi
+@flute: 1.8尺 (D)
+@school: tozan
+@key: 1=F
+@time: 4/4
+@tempo: 72
+@expression: 清らかに Andante espressivo
+
+S: 主題 (Metrical Theme · Otsu & Kan)
+| 6,{ロ,萎し,mp} - 1{ツ,当り} (2/{レ} 3/{チ}) | 5.{ハ,ユリ,mf} 3/{チ} 2{レ,擦り下げ} - |
+| 1{ツ} (2/{レ,当り} 1/{ツ}) 6,{ロ,ユリ} (1/{ツ} 2/{レ}) | 3{チ,コロコロ} - 2{レ,息} 0 |
+
+S: 展開 (Upper Kan Register & Chromatic Meri)
+| 6{甲ロ,mf} (1'/{甲ツ,当り} 2'/{甲レ}) 3'{甲チ,ユリ} (2'/{甲レ} 1'/{甲ツ}) | 7{ハメ,mp} (6/{甲ロ} 5/{ハ}) 3{チ,ユリ} - |
+| 2{レ} (1/{ツ} 7,/{ツ中メ}) 6,{ロ,ムラ息,mp} (1/{ツ} 2/{レ}) | 1.{ツ,dim} 6,/{ロ} 6,{ロ,メリ込み,fermata,p} - |]
+
+T: 現代曲記譜说明：采用明确拍号（@time: 4/4）与简谱+尺八指法双行记谱；切换至「都山流縦譜」自动渲染都山拍子线与ハ字谱，切换至「琴古流縦譜」自动转换为琴古流拍点（●/○）与リ字谱。`;
+
 export const MUSOJIANPU_BLANK_TEMPLATE = `@title: 未命名二胡曲
 @subtitle: Untitled Erhu Piece
 @composer: 作曲
@@ -241,6 +283,20 @@ export const MUSOJIANPU_TEMPLATES: MusoJianpuTemplate[] = [
     subtitle: 'Pure Guqin Jianzipu · 无简谱数字，按徽位发声',
     key: 'F',
     content: MUSOJIANPU_GUQIN_PURE_SAMPLE
+  },
+  {
+    id: 'shakuhachi-honkyoku',
+    title: '尺八本曲 · 散拍神如道風 (縦譜)',
+    subtitle: 'Shakuhachi Honkyoku · Free Rhythm · Kinko / Tozan / Jin Nyodo',
+    key: 'F',
+    content: MUSOJIANPU_SHAKUHACHI_HONKYOKU_SAMPLE
+  },
+  {
+    id: 'shakuhachi-modern',
+    title: '尺八現代曲 · 拍子譜 (4/4 双行/縦譜)',
+    subtitle: 'Shakuhachi Metrical · 1.8尺 · Jianpu + Tozan / Kinko',
+    key: 'F',
+    content: MUSOJIANPU_SHAKUHACHI_MODERN_SAMPLE
   },
   {
     id: 'dizi-etude',

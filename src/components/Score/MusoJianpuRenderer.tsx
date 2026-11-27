@@ -19,10 +19,24 @@ import {
   PluckTechniqueType,
   MusoJianpuDocument,
   MusoJianpuMeasure,
-  MusoJianpuNote
+  MusoJianpuNote,
+  ShakuhachiDisplayMode,
+  ShakuhachiNoteData,
+  ShakuhachiSchool
 } from '../../lib/musojianpu/types.ts';
 import { CHINESE_FINGERS, formatJianpuKeyLabel, getErhuKeyInfo } from '../../lib/musojianpu/erhuKeys.ts';
+import {
+  computeShakuhachiMidi,
+  getShakuhachiLengthInfo,
+  inferShakuhachiFromMidi,
+  midiToJianpuPitch
+} from '../../lib/musojianpu/shakuhachi.ts';
 import { GuqinJianziGlyph } from './GuqinJianziGlyph.tsx';
+import {
+  SHAKUHACHI_SERIF_FONT,
+  ShakuhachiDualGlyph,
+  ShakuhachiVerticalView
+} from './ShakuhachiGlyph.tsx';
 import { cn } from '../../lib/utils.ts';
 
 export interface MusoJianpuRendererProps {
@@ -32,6 +46,8 @@ export interface MusoJianpuRendererProps {
   resolvedTheme: string;
   fingeringStyle?: 'chinese' | 'arabic';
   guqinDisplayMode?: GuqinDisplayMode;
+  shakuhachiDisplayMode?: ShakuhachiDisplayMode;
+  shakuhachiSchool?: ShakuhachiSchool;
   showMarkings?: boolean;
   showLyrics?: boolean;
   highlightMarkings?: boolean;
@@ -774,12 +790,18 @@ function getMeasureBeatWeight(measure: MusoJianpuMeasure): number {
   return Math.max(1, total);
 }
 
+const JIANPU_SCALE_SEMITONES_RENDERER = [0, 0, 2, 4, 5, 7, 9, 11];
+
 /**
  * Renders one Music Line (system of measures) with accurate SVG slur arcs measured across DOM note boxes.
  */
 function MusicLineView({
   line,
   instrument,
+  keyName,
+  fluteKey,
+  shakuhachiSchool = 'kinko',
+  isFreeRhythm = false,
   fingeringStyle,
   showMarkings,
   showLyrics,
@@ -791,6 +813,10 @@ function MusicLineView({
 }: {
   line: MusicLineNode;
   instrument?: InstrumentType;
+  keyName: string;
+  fluteKey?: string;
+  shakuhachiSchool?: ShakuhachiSchool;
+  isFreeRhythm?: boolean;
   fingeringStyle: 'chinese' | 'arabic';
   showMarkings: boolean;
   showLyrics: boolean;
@@ -826,6 +852,14 @@ function MusicLineView({
     );
   }, [line, showMarkings]);
 
+  const hasAnyShakuhachi = useMemo(() => {
+    if (!showMarkings) return false;
+    if (instrument === 'shakuhachi') return true;
+    return line.measures.some(m =>
+      m.groups.some(g => g.notes.some(n => Boolean(n.markings.shakuhachi)))
+    );
+  }, [line, showMarkings, instrument]);
+
   const hasTopNavMarkers = useMemo(() => {
     return line.measures.some(m =>
       Boolean(m.volta || (m.startMarkers && m.startMarkers.length > 0) || (m.endMarkers && m.endMarkers.length > 0))
@@ -856,8 +890,18 @@ function MusicLineView({
 
   const slurLaneHeight = 16 + maxSlurTier * 11;
 
-  const barlineBottomOffset = 25 + (hasAnyDynamics ? 16 : 0) + (hasAnyJianzi ? 58 : 0) + (hasAnyLyrics ? 24 : 0);
-  const measureNumberBottomOffset = 31 + (hasAnyDynamics ? 16 : 0) + (hasAnyJianzi ? 58 : 0) + (hasAnyLyrics ? 24 : 0);
+  const barlineBottomOffset =
+    25 +
+    (hasAnyDynamics ? 16 : 0) +
+    (hasAnyJianzi ? 58 : 0) +
+    (hasAnyShakuhachi ? 44 : 0) +
+    (hasAnyLyrics ? 24 : 0);
+  const measureNumberBottomOffset =
+    31 +
+    (hasAnyDynamics ? 16 : 0) +
+    (hasAnyJianzi ? 58 : 0) +
+    (hasAnyShakuhachi ? 44 : 0) +
+    (hasAnyLyrics ? 24 : 0);
 
   const measureOverlays = () => {
     const container = lineContainerRef.current;
@@ -1062,6 +1106,42 @@ function MusicLineView({
     const isChord = Boolean(note.chordPitches && note.chordPitches.length >= 2);
     const chordPitches: ChordPitch[] = isChord ? note.chordPitches! : [];
 
+    // Shakuhachi Dual-view pitch & fingering synchronization:
+    // 1. Pure Shakuhachi notes (`{ロ}`) automatically compute Jianpu digits for Dual view
+    // 2. Pitched Jianpu notes under `@instrument: shakuhachi` automatically infer Kinko/Tozan fingerings
+    let displayDegree = note.degree;
+    let displayOctave = note.octave;
+    let displayAccidental = note.accidental;
+    let effectiveShakuhachi: ShakuhachiNoteData | undefined = note.markings.shakuhachi;
+    let isInferredShakuhachi = false;
+
+    if (note.degree === -2 && note.markings.shakuhachi?.fingering) {
+      const shMidi = computeShakuhachiMidi(note.markings.shakuhachi, fluteKey);
+      if (shMidi !== null) {
+        const derived = midiToJianpuPitch(shMidi, keyName);
+        displayDegree = derived.degree;
+        displayOctave = derived.octave;
+        displayAccidental = derived.accidental;
+      }
+    } else if (
+      hasAnyShakuhachi &&
+      instrument === 'shakuhachi' &&
+      !effectiveShakuhachi?.fingering &&
+      note.degree >= 1 &&
+      note.degree <= 7
+    ) {
+      const kInfo = getErhuKeyInfo(keyName);
+      let semi = JIANPU_SCALE_SEMITONES_RENDERER[note.degree] || 0;
+      if (note.accidental === '#') semi += 1;
+      else if (note.accidental === 'b') semi -= 1;
+      const concertMidi = kInfo.tonicMidi + semi + note.octave * 12;
+      const inferred = inferShakuhachiFromMidi(concertMidi, fluteKey, shakuhachiSchool);
+      effectiveShakuhachi = effectiveShakuhachi ? { ...inferred, ...effectiveShakuhachi } : inferred;
+      isInferredShakuhachi = true;
+    }
+
+    const jinInstructions = note.markings.shakuhachi?.instructions || [];
+
     // Continuous beaming logic across adjacent notes in the same BeatGroup
     const prevUnderlines = noteIdxInGroup > 0 ? group.notes[noteIdxInGroup - 1].underlines : 0;
     const nextUnderlines = noteIdxInGroup < group.notes.length - 1 ? group.notes[noteIdxInGroup + 1].underlines : 0;
@@ -1114,6 +1194,7 @@ function MusicLineView({
             <div className="h-[11px] mt-[1px]" aria-hidden="true" />
             {hasAnyDynamics && <div className="h-[15px] mt-[1px]" aria-hidden="true" />}
             {hasAnyJianzi && <div className="h-[56px] mt-[2px]" aria-hidden="true" />}
+            {hasAnyShakuhachi && <div className="h-[42px] mt-[2px]" aria-hidden="true" />}
             {hasAnyLyrics && <div className="h-[20px] mt-1" aria-hidden="true" />}
           </div>
         )}
@@ -1122,10 +1203,20 @@ function MusicLineView({
         <div className="flex flex-col items-center justify-end">
           {/* Top Markings Stack (Conventional bottom-to-top order closest to note upward:
               1. Harmonics → 2. Fingers → 3. String → 4. Position → 5. Accent →
-              6. Vibrato → 7. Melodic Ornaments → 8. Bowing / Pipa & Guzheng Techniques → 9. Fermata → 10. Custom Text) */}
+              6. Vibrato → 7. Melodic Ornaments → 8. Bowing / Pipa & Guzheng Techniques → 9. Fermata → 10. Custom Text / Jin Nyodo) */}
           {showMarkings && (
             <div className="flex flex-col items-center justify-end gap-[2px] min-h-[34px] mb-0.5 select-none">
-              {/* Layer 10 (Topmost): Custom Performance Text */}
+              {/* Layer 10 (Topmost): Jin Nyodo Instructions & Custom Performance Text */}
+              {jinInstructions.length > 0 && (
+                <div className="flex items-center justify-center min-h-[12px] whitespace-nowrap">
+                  <span
+                    style={{ fontFamily: SHAKUHACHI_SERIF_FONT }}
+                    className={cn('text-[9.5px] font-medium leading-none whitespace-nowrap', erhuAccentClass)}
+                  >
+                    「{jinInstructions.join('・')}」
+                  </span>
+                </div>
+              )}
               {note.markings.customText && (
                 <div className="flex items-center justify-center min-h-[12px] whitespace-nowrap">
                   <span className={cn('text-[9.5px] font-medium leading-none whitespace-nowrap', subtleInkClass)}>
@@ -1311,9 +1402,9 @@ function MusicLineView({
             ) : (
               <>
                 {/* Accidental */}
-                {note.accidental && (
+                {displayAccidental && (
                   <span className={cn('text-[11px] font-bold -translate-y-1.5 mr-[0.5px] leading-none', inkClass)}>
-                    {note.accidental === '#' ? '♯' : note.accidental === 'b' ? '♭' : '♮'}
+                    {displayAccidental === '#' ? '♯' : displayAccidental === 'b' ? '♭' : '♮'}
                   </span>
                 )}
 
@@ -1322,25 +1413,26 @@ function MusicLineView({
                   ref={registerNoteRef(note.id)}
                   className={cn(
                     'relative inline-flex items-center justify-center h-[22px] text-[21px] font-bold tabular-nums tracking-tight leading-none select-text',
+                    note.degree === -2 && displayDegree >= 1 && 'opacity-80',
                     noteColorClass
                   )}
                   style={{ fontFamily: '"Plus Jakarta Sans", "Noto Sans SC", system-ui, sans-serif' }}
                 >
                   {/* High Octave Dots anchored directly above the digit */}
-                  {note.octave >= 1 && (
+                  {displayOctave >= 1 && (
                     <span
                       aria-hidden="true"
                       className="absolute bottom-full left-1/2 -translate-x-1/2 pb-[2px] flex flex-col items-center gap-[2px] pointer-events-none"
                     >
-                      {note.octave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                      {displayOctave >= 2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
                       <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
                     </span>
                   )}
 
-                  {note.degree === -1 ? '–' : note.degree === -2 ? <span className="opacity-35 text-sm">·</span> : note.degree}
+                  {displayDegree === -1 ? '–' : displayDegree === -2 ? <span className="opacity-35 text-sm">·</span> : displayDegree}
 
                   {/* Low Octave Dots anchored directly below the digit & duration underlines */}
-                  {note.octave <= -1 && (
+                  {displayOctave <= -1 && (
                     <span
                       aria-hidden="true"
                       className={cn(
@@ -1355,7 +1447,7 @@ function MusicLineView({
                       )}
                     >
                       <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />
-                      {note.octave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
+                      {displayOctave <= -2 && <span className={cn('w-[3.5px] h-[3.5px] rounded-full bg-current', inkClass)} />}
                     </span>
                   )}
                 </span>
@@ -1433,6 +1525,21 @@ function MusicLineView({
             </div>
           )}
 
+          {/* Dual-Line Shakuhachi Fingering (尺八譜 · Kinko / Tozan) aligned directly beneath the Jianpu note */}
+          {hasAnyShakuhachi && (
+            <div className="h-[42px] mt-[2px] pt-[2px] flex items-start justify-center select-none">
+              {effectiveShakuhachi && (
+                <ShakuhachiDualGlyph
+                  data={effectiveShakuhachi}
+                  school={shakuhachiSchool}
+                  inkClass={noteColorClass}
+                  accentClass={erhuAccentClass}
+                  isInferred={isInferredShakuhachi}
+                />
+              )}
+            </div>
+          )}
+
           {/* Aligned Lyric Syllable */}
           {hasAnyLyrics && (
             <div className={cn('h-[20px] mt-1 text-[13px] font-medium leading-tight whitespace-nowrap', isDarkSurface ? 'text-neutral-200' : 'text-neutral-800')}>
@@ -1463,6 +1570,7 @@ function MusicLineView({
             <div className="h-[11px] mt-[1px]" aria-hidden="true" />
             {hasAnyDynamics && <div className="h-[15px] mt-[1px]" aria-hidden="true" />}
             {hasAnyJianzi && <div className="h-[56px] mt-[2px]" aria-hidden="true" />}
+            {hasAnyShakuhachi && <div className="h-[42px] mt-[2px]" aria-hidden="true" />}
             {hasAnyLyrics && <div className="h-[20px] mt-1" aria-hidden="true" />}
           </div>
         )}
@@ -1602,10 +1710,17 @@ function MusicLineView({
                 })}
               </div>
 
-              {/* End Barline */}
+              {/* End Barline (in Free Rhythm Honkyoku, regular '|' renders as a subtle breath-phrase break) */}
               {(measure.endBarline || !isLastInLine) && (
                 <div className="ml-2 shrink-0 self-end" style={{ marginBottom: `${barlineBottomOffset}px` }}>
-                  <BarlineGlyph type={measure.endBarline || '|'} inkClass={inkClass} />
+                  {isFreeRhythm && (!measure.endBarline || measure.endBarline === '|') ? (
+                    <div
+                      className={cn('h-[24px] border-l border-dashed opacity-30', inkClass)}
+                      title="Free-rhythm phrase division (散拍句切れ)"
+                    />
+                  ) : (
+                    <BarlineGlyph type={measure.endBarline || '|'} inkClass={inkClass} />
+                  )}
                 </div>
               )}
             </div>
@@ -1967,6 +2082,8 @@ export function MusoJianpuRenderer({
   resolvedTheme,
   fingeringStyle = 'chinese',
   guqinDisplayMode = 'dual',
+  shakuhachiDisplayMode = 'dual',
+  shakuhachiSchool,
   showMarkings = true,
   showLyrics = true,
   highlightMarkings = true,
@@ -1979,6 +2096,17 @@ export function MusoJianpuRenderer({
   const stringsLabel = document.header.strings || keyInfo.strings;
   const isPureJianzipuMode =
     guqinDisplayMode === 'pure-horizontal' || guqinDisplayMode === 'pure-vertical';
+  const isVerticalShakuhachiMode =
+    shakuhachiDisplayMode === 'kinko-vertical' || shakuhachiDisplayMode === 'tozan-vertical';
+  const resolvedShakuhachiSchool: ShakuhachiSchool =
+    shakuhachiDisplayMode === 'tozan-vertical'
+      ? 'tozan'
+      : shakuhachiDisplayMode === 'kinko-vertical'
+        ? 'kinko'
+        : (shakuhachiSchool || document.header.school || 'kinko');
+  const isFreeRhythm =
+    document.header.rhythmMode === 'free' ||
+    /^(?:free|散拍|散板|無拍子|无拍子|自由|honkyoku)$/i.test((document.header.time || '').trim());
 
   const [timeNum, timeDen] = (document.header.time || '4/4').split('/');
 
@@ -1999,8 +2127,8 @@ export function MusoJianpuRenderer({
             : 'bg-[#FFFEFA] border-neutral-200/90 text-[#161616] shadow-sm'
         )}
       >
-        {/* Classic Score Header (omitted in pure-vertical mode because the rightmost colophon column carries it) */}
-        {guqinDisplayMode !== 'pure-vertical' && (
+        {/* Classic Score Header (omitted in pure-vertical modes because the rightmost colophon column carries it) */}
+        {guqinDisplayMode !== 'pure-vertical' && !isVerticalShakuhachiMode && (
           <>
             <div className="text-center mb-6">
               <h1 className={cn(
@@ -2045,17 +2173,29 @@ export function MusoJianpuRenderer({
                         ? `古筝${document.header.strings ? ` (${document.header.strings})` : ''}`
                         : document.header.instrument === 'guqin'
                           ? `古琴 (${document.header.strings || '正调 5-6-1-2-3-5-6'})`
-                          : document.header.instrument === 'dizi'
-                            ? `${document.header.fluteKey || '笛子'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
-                            : document.header.instrument === 'xiao'
-                              ? `${document.header.fluteKey || '洞箫'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
-                              : `(${stringsLabel}弦)`}
+                          : document.header.instrument === 'shakuhachi'
+                            ? `尺八 ${getShakuhachiLengthInfo(document.header.fluteKey).label} · ${resolvedShakuhachiSchool === 'tozan' ? '都山流' : '琴古流'}`
+                            : document.header.instrument === 'dizi'
+                              ? `${document.header.fluteKey || '笛子'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
+                              : document.header.instrument === 'xiao'
+                                ? `${document.header.fluteKey || '洞箫'}${document.header.fingering ? ` · ${document.header.fingering}` : ''}`
+                                : `(${stringsLabel}弦)`}
                   </span>
                 </div>
 
-                {/* Stacked Time Signature (Dual / Jianpu mode only) */}
+                {/* Stacked Time Signature or Free Rhythm Honkyoku indicator */}
                 {!isPureJianzipuMode && (
-                  timeDen ? (
+                  isFreeRhythm ? (
+                    <span
+                      style={{ fontFamily: SHAKUHACHI_SERIF_FONT }}
+                      className={cn(
+                        'text-xs font-bold tracking-wide px-1.5 py-0.5 rounded border',
+                        isDarkSurface ? 'border-white/15 text-neutral-200' : 'border-neutral-300 text-neutral-800'
+                      )}
+                    >
+                      散拍 Free
+                    </span>
+                  ) : timeDen ? (
                     <div className="inline-flex flex-col items-center leading-none font-bold tabular-nums text-sm">
                       <span>{timeNum}</span>
                       <span className="w-3.5 h-[1.5px] bg-current my-[1.5px]" />
@@ -2068,7 +2208,7 @@ export function MusoJianpuRenderer({
 
                 {/* Tempo & Expression */}
                 <div className="flex items-baseline gap-2 text-sm">
-                  {!isPureJianzipuMode && (
+                  {!isPureJianzipuMode && !isFreeRhythm && (
                     <span className="font-mono tabular-nums font-semibold">
                       ♩= {document.header.tempo}
                     </span>
@@ -2105,6 +2245,17 @@ export function MusoJianpuRenderer({
           )}>
             Start typing Jianpu notes in the editor (e.g. <span className="font-mono">| 1 2 3 5 | 6_5_ 3 - |</span>) or pick a repertoire template above.
           </div>
+        ) : isVerticalShakuhachiMode ? (
+          <ShakuhachiVerticalView
+            document={document}
+            school={resolvedShakuhachiSchool}
+            isDarkSurface={isDarkSurface}
+            highlightMarkings={highlightMarkings}
+            showMarkings={showMarkings}
+            activeNoteId={activeNoteId}
+            selectedOffset={selectedOffset}
+            onNoteClick={onNoteClick}
+          />
         ) : isPureJianzipuMode ? (
           <PureJianzipuView
             document={document}
@@ -2151,6 +2302,10 @@ export function MusoJianpuRenderer({
                   key={line.id}
                   line={line}
                   instrument={document.header.instrument}
+                  keyName={document.header.key}
+                  fluteKey={document.header.fluteKey}
+                  shakuhachiSchool={resolvedShakuhachiSchool}
+                  isFreeRhythm={isFreeRhythm}
                   fingeringStyle={fingeringStyle}
                   showMarkings={showMarkings}
                   showLyrics={showLyrics}

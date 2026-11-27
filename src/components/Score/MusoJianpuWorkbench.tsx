@@ -35,6 +35,9 @@ import {
   macroSetFingering,
   macroSetInstrument,
   macroSetKey,
+  macroSetRhythmMode,
+  macroSetShakuhachiLength,
+  macroSetShakuhachiSchool,
   macroSetTempo,
   macroShiftOctave,
   macroShiftScaleDegrees,
@@ -57,14 +60,26 @@ import {
   GuqinRightStroke,
   GuqinSoundType,
   InstrumentType,
-  MusoJianpuNote
+  MusoJianpuNote,
+  ShakuhachiDisplayMode,
+  ShakuhachiMeriKari,
+  ShakuhachiPitchName,
+  ShakuhachiRegister,
+  ShakuhachiSchool
 } from '../../lib/musojianpu/types.ts';
 import { composeGuqinTokenText, GUQIN_STRING_CHINESE } from '../../lib/musojianpu/guqin.ts';
+import {
+  composeShakuhachiTokenText,
+  getShakuhachiLengthInfo,
+  SHAKUHACHI_LENGTHS
+} from '../../lib/musojianpu/shakuhachi.ts';
 import { MusoJianpuRenderer } from './MusoJianpuRenderer.tsx';
+import { GuqinJianziReferenceModal } from './GuqinJianziReferenceModal.tsx';
+import { ShakuhachiReferenceModal } from './ShakuhachiReferenceModal.tsx';
 import { cn } from '../../lib/utils.ts';
 import { useTheme } from '../../contexts/ThemeContext.tsx';
 
-type MacroTab = 'bowing' | 'pipa' | 'guzheng' | 'guqin' | 'dizi' | 'fingering' | 'ornaments' | 'rhythm' | 'structure';
+type MacroTab = 'bowing' | 'pipa' | 'guzheng' | 'guqin' | 'dizi' | 'shakuhachi' | 'fingering' | 'ornaments' | 'rhythm' | 'structure';
 
 export interface MusoJianpuWorkbenchProps {
   content: string;
@@ -104,10 +119,14 @@ export function MusoJianpuWorkbench({
 
   const [activeMacroTab, setActiveMacroTab] = useState<MacroTab>('bowing');
   const [guqinDisplayMode, setGuqinDisplayMode] = useState<GuqinDisplayMode>('dual');
+  const [shakuhachiDisplayMode, setShakuhachiDisplayMode] = useState<ShakuhachiDisplayMode>('dual');
+  const [shakuhachiSchool, setShakuhachiSchool] = useState<ShakuhachiSchool>('kinko');
   const [showMarkings, setShowMarkings] = useState(true);
   const [showLyrics, setShowLyrics] = useState(true);
   const [highlightMarkings, setHighlightMarkings] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
+  const [isJianziRefOpen, setIsJianziRefOpen] = useState(false);
+  const [isShakuhachiRefOpen, setIsShakuhachiRefOpen] = useState(false);
 
   // Inline Guqin Jianzi Builder state
   const [jzMode, setJzMode] = useState<'san' | 'fan' | GuqinLeftFinger>('ming');
@@ -115,6 +134,11 @@ export function MusoJianpuWorkbench({
   const [jzStroke, setJzStroke] = useState<GuqinRightStroke>('gou');
   const [jzString1, setJzString1] = useState<number>(6);
   const [jzString2, setJzString2] = useState<number>(1);
+
+  // Inline Shakuhachi Note Builder state
+  const [shReg, setShReg] = useState<ShakuhachiRegister>('otsu');
+  const [shPitch, setShPitch] = useState<ShakuhachiPitchName>('ro');
+  const [shMeriKari, setShMeriKari] = useState<ShakuhachiMeriKari | ''>('');
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -149,7 +173,36 @@ export function MusoJianpuWorkbench({
       ),
     [parsedDoc]
   );
+  const hasShakuhachiInDoc = useMemo(
+    () =>
+      parsedDoc.lines.some(
+        l => l.kind === 'music' && l.measures.some(m => m.groups.some(g => g.notes.some(n => Boolean(n.markings.shakuhachi))))
+      ),
+    [parsedDoc]
+  );
   const showGuqinViews = activeInstrument === 'guqin' || hasJianziInDoc;
+  const showShakuhachiViews = activeInstrument === 'shakuhachi' || hasShakuhachiInDoc;
+  const isFreeRhythm =
+    parsedDoc.header.rhythmMode === 'free' ||
+    /^(?:free|散拍|散板|無拍子|无拍子|自由|honkyoku)$/i.test((parsedDoc.header.time || '').trim());
+  const activeShakuhachiLength = useMemo(
+    () => getShakuhachiLengthInfo(parsedDoc.header.fluteKey),
+    [parsedDoc.header.fluteKey]
+  );
+
+  // Keep local school preference synchronized when @school header changes in source
+  useEffect(() => {
+    if (parsedDoc.header.school) {
+      setShakuhachiSchool(parsedDoc.header.school);
+    }
+  }, [parsedDoc.header.school]);
+
+  const effectiveShakuhachiSchool: ShakuhachiSchool =
+    shakuhachiDisplayMode === 'tozan-vertical'
+      ? 'tozan'
+      : shakuhachiDisplayMode === 'kinko-vertical'
+        ? 'kinko'
+        : shakuhachiSchool;
 
   const builtJianziToken = useMemo(() => {
     const soundType: GuqinSoundType = jzMode === 'san' ? 'san' : jzMode === 'fan' ? 'fan' : 'an';
@@ -165,6 +218,17 @@ export function MusoJianpuWorkbench({
     });
   }, [jzMode, jzHui, jzStroke, jzString1, jzString2]);
 
+  const builtShakuhachiToken = useMemo(
+    () =>
+      composeShakuhachiTokenText({
+        fingering: shPitch,
+        register: shReg,
+        meriKari: shMeriKari,
+        school: effectiveShakuhachiSchool
+      }),
+    [shPitch, shReg, shMeriKari, effectiveShakuhachiSchool]
+  );
+
   const instrumentPlayLabel =
     activeInstrument === 'pipa'
       ? 'Pipa'
@@ -172,11 +236,13 @@ export function MusoJianpuWorkbench({
         ? 'Guzheng'
         : activeInstrument === 'guqin'
           ? 'Guqin'
-          : activeInstrument === 'dizi'
-            ? 'Dizi'
-            : activeInstrument === 'xiao'
-              ? 'Xiao'
-              : 'Erhu';
+          : activeInstrument === 'shakuhachi'
+            ? 'Shakuhachi'
+            : activeInstrument === 'dizi'
+              ? 'Dizi'
+              : activeInstrument === 'xiao'
+                ? 'Xiao'
+                : 'Erhu';
 
   // Cleanup player on unmount
   useEffect(() => {
@@ -554,12 +620,17 @@ ${collectedCss}
                     ? 'guzheng'
                     : nextInst === 'guqin'
                       ? 'guqin'
-                      : nextInst === 'dizi' || nextInst === 'xiao'
-                        ? 'dizi'
-                        : 'bowing'
+                      : nextInst === 'shakuhachi'
+                        ? 'shakuhachi'
+                        : nextInst === 'dizi' || nextInst === 'xiao'
+                          ? 'dizi'
+                          : 'bowing'
               );
               if (nextInst !== 'guqin') {
                 setGuqinDisplayMode('dual');
+              }
+              if (nextInst !== 'shakuhachi') {
+                setShakuhachiDisplayMode('dual');
               }
             }}
             className={cn(
@@ -574,6 +645,7 @@ ${collectedCss}
             <option value="guqin" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>古琴 Guqin</option>
             <option value="dizi" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>笛子 Dizi</option>
             <option value="xiao" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>洞箫 Xiao</option>
+            <option value="shakuhachi" className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>尺八 Shakuhachi</option>
           </select>
 
           {/* Guqin Display Mode Switcher: Dual (简谱+减字) | Pure Horizontal (横排) | Pure Vertical Scroll (竖排) */}
@@ -609,24 +681,113 @@ ${collectedCss}
             </div>
           )}
 
-          {/* Key & String / Fingering Macro Picker */}
+          {/* Shakuhachi Display Mode Switcher: Dual (簡譜+運指) | Kinko-ryu Vertical (琴古縦譜) | Tozan-ryu Vertical (都山縦譜) */}
+          {showShakuhachiViews && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div
+                className={cn(
+                  'flex items-center p-0.5 rounded-lg border text-[11px] font-medium',
+                  isDark ? 'bg-white/[0.04] border-white/[0.08]' : 'bg-neutral-100 border-neutral-200'
+                )}
+                title="Switch Shakuhachi score between Dual Jianpu+Fingerings, Kinko-ryū Vertical, and Tozan-ryū Vertical"
+              >
+                {(
+                  [
+                    { id: 'dual', label: '双行 Dual' },
+                    { id: 'kinko-vertical', label: '琴古 Kinko' },
+                    { id: 'tozan-vertical', label: '都山 Tozan' }
+                  ] as const
+                ).map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setShakuhachiDisplayMode(opt.id);
+                      if (opt.id === 'kinko-vertical') {
+                        setShakuhachiSchool('kinko');
+                      } else if (opt.id === 'tozan-vertical') {
+                        setShakuhachiSchool('tozan');
+                      }
+                    }}
+                    className={cn(
+                      'px-2 py-0.5 rounded-md transition-colors cursor-pointer whitespace-nowrap',
+                      shakuhachiDisplayMode === opt.id
+                        ? (isDark ? 'bg-[#E05A2B] text-white' : 'bg-white text-neutral-900 shadow-xs')
+                        : (isDark ? 'text-neutral-400 hover:text-neutral-200' : 'text-neutral-600 hover:text-neutral-900')
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Dual-mode Kinko / Tozan fingering school toggle */}
+              {shakuhachiDisplayMode === 'dual' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextSchool: ShakuhachiSchool = effectiveShakuhachiSchool === 'kinko' ? 'tozan' : 'kinko';
+                    setShakuhachiSchool(nextSchool);
+                    onChangeContent(macroSetShakuhachiSchool(content, nextSchool));
+                  }}
+                  className={macroBtnClass}
+                  title="Switch Dual-view Katakana fingerings between Kinko-ryū (リ/ウ) and Tozan-ryū (ハ/ピ)"
+                >
+                  <span>{effectiveShakuhachiSchool === 'tozan' ? '流派: 都山' : '流派: 琴古'}</span>
+                </button>
+              )}
+
+              {/* Free Rhythm (Honkyoku 散拍) vs Metrical Rhythm (拍子) Toggle */}
+              <button
+                type="button"
+                onClick={() => onChangeContent(macroSetRhythmMode(content, isFreeRhythm ? 'metrical' : 'free'))}
+                className={cn(
+                  macroBtnClass,
+                  isFreeRhythm && 'border-[#E05A2B]/50 text-[#E05A2B] bg-[#E05A2B]/10'
+                )}
+                title="Toggle between Free Rhythm Honkyoku (@time: free) and Metrical Rhythm (@time: 4/4)"
+              >
+                <span>{isFreeRhythm ? '散拍 Free' : `拍子 ${parsedDoc.header.time || '4/4'}`}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Key & String / Fingering / Tube Length Macro Picker */}
           <div className="flex items-center gap-1.5">
             <Music className="w-3.5 h-3.5 text-[#E05A2B] shrink-0" />
-            <select
-              value={keyInfo.key}
-              onChange={e => onChangeContent(macroSetKey(content, e.target.value))}
-              className={cn(
-                'h-7 px-2 rounded-md border text-xs font-semibold outline-none cursor-pointer',
-                isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
-              )}
-              title="Change key signature and tuning (e.g. 1=G)"
-            >
-              {ERHU_KEYS.map(k => (
-                <option key={k.key} value={k.key} className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>
-                  {activeInstrument === 'erhu' ? `${k.label} · ${k.strings}弦` : k.label}
-                </option>
-              ))}
-            </select>
+            {activeInstrument === 'shakuhachi' ? (
+              <select
+                value={activeShakuhachiLength.label}
+                onChange={e => onChangeContent(macroSetShakuhachiLength(content, e.target.value))}
+                className={cn(
+                  'h-7 px-2 rounded-md border text-xs font-semibold outline-none cursor-pointer',
+                  isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                )}
+                title="Select Shakuhachi tube length (@length)"
+              >
+                {SHAKUHACHI_LENGTHS.map(len => (
+                  <option key={len.code} value={len.label} className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>
+                    {len.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={keyInfo.key}
+                onChange={e => onChangeContent(macroSetKey(content, e.target.value))}
+                className={cn(
+                  'h-7 px-2 rounded-md border text-xs font-semibold outline-none cursor-pointer',
+                  isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                )}
+                title="Change key signature and tuning (e.g. 1=G)"
+              >
+                {ERHU_KEYS.map(k => (
+                  <option key={k.key} value={k.key} className={isDark ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'}>
+                    {activeInstrument === 'erhu' ? `${k.label} · ${k.strings}弦` : k.label}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {/* Dizi / Xiao 筒音作X Fingering System Picker */}
             {isWindInstrument && (
@@ -732,18 +893,33 @@ ${collectedCss}
                       if (/^@instrument\s*:\s*pipa/im.test(tpl.content)) {
                         setActiveMacroTab('pipa');
                         setGuqinDisplayMode('dual');
+                        setShakuhachiDisplayMode('dual');
                       } else if (/^@instrument\s*:\s*guzheng/im.test(tpl.content)) {
                         setActiveMacroTab('guzheng');
                         setGuqinDisplayMode('dual');
+                        setShakuhachiDisplayMode('dual');
                       } else if (/^@instrument\s*:\s*guqin/im.test(tpl.content)) {
                         setActiveMacroTab('guqin');
                         setGuqinDisplayMode(tpl.id === 'guqin-pure' ? 'pure-vertical' : 'dual');
+                        setShakuhachiDisplayMode('dual');
+                      } else if (/^@instrument\s*:\s*shakuhachi/im.test(tpl.content)) {
+                        setActiveMacroTab('shakuhachi');
+                        setGuqinDisplayMode('dual');
+                        if (tpl.id === 'shakuhachi-honkyoku') {
+                          setShakuhachiSchool('kinko');
+                          setShakuhachiDisplayMode('kinko-vertical');
+                        } else {
+                          setShakuhachiSchool('tozan');
+                          setShakuhachiDisplayMode('dual');
+                        }
                       } else if (/^@instrument\s*:\s*(?:dizi|xiao)/im.test(tpl.content)) {
                         setActiveMacroTab('dizi');
                         setGuqinDisplayMode('dual');
+                        setShakuhachiDisplayMode('dual');
                       } else {
                         setActiveMacroTab('bowing');
                         setGuqinDisplayMode('dual');
+                        setShakuhachiDisplayMode('dual');
                       }
                       setCursorOffset(null);
                       setIsTemplateMenuOpen(false);
@@ -835,6 +1011,32 @@ ${collectedCss}
             </button>
           </div>
 
+          {/* Guqin Jianzipu Visual Reference (减字谱图典) */}
+          {showGuqinViews && (
+            <button
+              type="button"
+              onClick={() => setIsJianziRefOpen(true)}
+              className={cn(macroBtnClass, isJianziRefOpen && 'border-[#E05A2B]/50 text-[#E05A2B] bg-[#E05A2B]/10')}
+              title="Open interactive Guqin Jianzipu reference & glyph glossary (减字谱图典)"
+            >
+              <span className="font-serif font-bold text-[#E05A2B] leading-none">谱</span>
+              <span className="hidden sm:inline">Jianzipu Ref</span>
+            </button>
+          )}
+
+          {/* Shakuhachi Notation Reference (尺八譜図典) */}
+          {showShakuhachiViews && (
+            <button
+              type="button"
+              onClick={() => setIsShakuhachiRefOpen(true)}
+              className={cn(macroBtnClass, isShakuhachiRefOpen && 'border-[#E05A2B]/50 text-[#E05A2B] bg-[#E05A2B]/10')}
+              title="Open interactive Shakuhachi Kinko/Tozan & Jin Nyodo reference (尺八譜図典)"
+            >
+              <span className="font-serif font-bold text-[#E05A2B] leading-none">竹</span>
+              <span className="hidden sm:inline">Shakuhachi Ref</span>
+            </button>
+          )}
+
           {/* Syntax & Macro Guide Toggle */}
           <button
             type="button"
@@ -902,10 +1104,31 @@ ${collectedCss}
               <div><code className="font-mono text-[#E05A2B]">^5/</code> or <code className="font-mono text-[#E05A2B]">{'^{5/6/}'}</code> grace note · <code className="font-mono text-[#E05A2B]">&lt;( ... )</code> / <code className="font-mono text-[#E05A2B]">&gt;( ... )</code> hairpins</div>
             </div>
             <div className="space-y-1">
-              <div className="font-semibold text-neutral-900 dark:text-neutral-100">Chinese Instrument Markings</div>
-              <div><code className="font-mono text-[#E05A2B]">@instrument:</code> <code className="font-mono">erhu</code> · <code className="font-mono">pipa</code> · <code className="font-mono">guzheng</code> · <code className="font-mono">guqin</code> · <code className="font-mono">dizi</code> · <code className="font-mono">xiao</code></div>
+              <div className="font-semibold text-neutral-900 dark:text-neutral-100">East Asian Instrument Markings</div>
+              <div><code className="font-mono text-[#E05A2B]">@instrument:</code> <code className="font-mono">erhu</code> · <code className="font-mono">pipa</code> · <code className="font-mono">guzheng</code> · <code className="font-mono">guqin</code> · <code className="font-mono">dizi</code> · <code className="font-mono">xiao</code> · <code className="font-mono">shakuhachi</code></div>
               <div><span className="font-semibold">Erhu / Pipa / Guzheng:</span> <code className="font-mono text-[#E05A2B]">{'{pull,push,vib}'}</code> · <code className="font-mono text-[#E05A2B]">{'{tan,lun,sao}'}</code> · <code className="font-mono text-[#E05A2B]">{'{tuo,cuo,yao,gua}'}</code></div>
-              <div><span className="font-semibold">Guqin 减字谱:</span> <code className="font-mono text-[#E05A2B]">{'{散勾一}'}</code> · <code className="font-mono text-[#E05A2B]">{'{名九勾六,绰,吟}'}</code> · <code className="font-mono text-[#E05A2B]">{'{泛七挑五}'}</code> · <code className="font-mono text-[#E05A2B]">{'{散撮一六}'}</code></div>
+              <div>
+                <span className="font-semibold">Guqin 减字谱:</span>{' '}
+                <code className="font-mono text-[#E05A2B]">{'{散勾一}'}</code> · <code className="font-mono text-[#E05A2B]">{'{名九勾六,绰,吟}'}</code> ·{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsJianziRefOpen(true)}
+                  className="text-[#E05A2B] hover:underline font-medium cursor-pointer"
+                >
+                  Jianzipu Ref →
+                </button>
+              </div>
+              <div>
+                <span className="font-semibold">Shakuhachi 尺八:</span>{' '}
+                <code className="font-mono text-[#E05A2B]">@school: kinko|tozan</code> · <code className="font-mono text-[#E05A2B]">@time: free</code> · <code className="font-mono text-[#E05A2B]">{'{ロ,萎し,長,"静かに"}'}</code> ·{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsShakuhachiRefOpen(true)}
+                  className="text-[#E05A2B] hover:underline font-medium cursor-pointer"
+                >
+                  Shakuhachi Ref →
+                </button>
+              </div>
               <div><span className="font-semibold">Dizi / Xiao:</span> <code className="font-mono text-[#E05A2B]">@fingering: 筒音作5</code> · <code className="font-mono text-[#E05A2B]">{'{breath,tu,dtu,huashe,qizhen,die,da,zeng,li,duo,bo}'}</code></div>
             </div>
             <div className="space-y-1">
@@ -947,6 +1170,7 @@ ${collectedCss}
                     { id: 'guzheng', label: 'Guzheng 古筝' },
                     { id: 'guqin', label: 'Guqin 古琴' },
                     { id: 'dizi', label: 'Dizi/Xiao 笛箫' },
+                    { id: 'shakuhachi', label: 'Shakuhachi 尺八' },
                     { id: 'fingering', label: 'Fingers 指法' },
                     { id: 'ornaments', label: 'Ornaments 技巧' },
                     { id: 'rhythm', label: 'Pitch & Chords' },
@@ -1222,6 +1446,21 @@ ${collectedCss}
                       {act.k}
                     </button>
                   ))}
+
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+
+                  <button
+                    type="button"
+                    onClick={() => setIsJianziRefOpen(true)}
+                    className={cn(
+                      macroBtnClass,
+                      'border-[#E05A2B]/40 text-[#E05A2B] hover:bg-[#E05A2B]/10'
+                    )}
+                    title="Open visual Guqin Jianzipu Reference (减字谱图典)"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>减字谱图典 Reference</span>
+                  </button>
                 </>
               )}
 
@@ -1251,6 +1490,175 @@ ${collectedCss}
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'duo'))} className={macroBtnClass} title="Percussive chop 剁音 {duo}">剁 剁音</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'feizhi'))} className={macroBtnClass} title="Flying-finger rapid sweep 飞指 {feizhi}">飞 飞指</button>
                   <button type="button" onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, 'bo'))} className={macroBtnClass} title="Mordent 波音 {bo}">〰 波音</button>
+                </>
+              )}
+
+              {activeMacroTab === 'shakuhachi' && (
+                <>
+                  {/* Compact Inline Shakuhachi Note Builder (Register + Katakana + Meri/Kari) */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <select
+                      value={shReg}
+                      onChange={e => setShReg(e.target.value as ShakuhachiRegister)}
+                      className={cn(
+                        'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                        isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                      )}
+                      title="Register (乙 Otsu / 甲 Kan / 大甲 Dai-kan)"
+                    >
+                      <option value="otsu" className={isDark ? 'bg-neutral-900' : 'bg-white'}>乙 (Otsu)</option>
+                      <option value="kan" className={isDark ? 'bg-neutral-900' : 'bg-white'}>甲 (Kan)</option>
+                      <option value="daikan" className={isDark ? 'bg-neutral-900' : 'bg-white'}>大甲 (Dai-kan)</option>
+                    </select>
+
+                    <select
+                      value={shPitch}
+                      onChange={e => setShPitch(e.target.value as ShakuhachiPitchName)}
+                      className={cn(
+                        'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                        isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                      )}
+                      title="Shakuhachi fingering syllable"
+                    >
+                      <option value="ro" className={isDark ? 'bg-neutral-900' : 'bg-white'}>ロ (Ro · D)</option>
+                      <option value="tsu" className={isDark ? 'bg-neutral-900' : 'bg-white'}>ツ (Tsu · F)</option>
+                      <option value="re" className={isDark ? 'bg-neutral-900' : 'bg-white'}>レ (Re · G)</option>
+                      <option value="chi" className={isDark ? 'bg-neutral-900' : 'bg-white'}>チ (Chi · A)</option>
+                      <option value={effectiveShakuhachiSchool === 'tozan' ? 'ha' : 'ri'} className={isDark ? 'bg-neutral-900' : 'bg-white'}>
+                        {effectiveShakuhachiSchool === 'tozan' ? 'ハ (Ha · C)' : 'リ (Ri · C)'}
+                      </option>
+                      <option value="hi" className={isDark ? 'bg-neutral-900' : 'bg-white'}>ヒ (Hi · D)</option>
+                      <option value="u" className={isDark ? 'bg-neutral-900' : 'bg-white'}>ウ (U · Kinko)</option>
+                      <option value="i" className={isDark ? 'bg-neutral-900' : 'bg-white'}>イ (I · Kinko)</option>
+                      <option value="pi" className={isDark ? 'bg-neutral-900' : 'bg-white'}>ピ (Pi · Tozan)</option>
+                    </select>
+
+                    <select
+                      value={shMeriKari}
+                      onChange={e => setShMeriKari(e.target.value as ShakuhachiMeriKari | '')}
+                      className={cn(
+                        'h-7 px-1.5 rounded-md border text-xs font-medium outline-none cursor-pointer',
+                        isDark ? 'bg-white/[0.04] border-white/[0.08] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                      )}
+                      title="Meri / Kari pitch shading"
+                    >
+                      <option value="" className={isDark ? 'bg-neutral-900' : 'bg-white'}>本音 (Natural)</option>
+                      <option value="meri" className={isDark ? 'bg-neutral-900' : 'bg-white'}>メ (Meri -1)</option>
+                      <option value="chumeri" className={isDark ? 'bg-neutral-900' : 'bg-white'}>中メ (Chū-meri)</option>
+                      <option value="daimeri" className={isDark ? 'bg-neutral-900' : 'bg-white'}>大メ (Dai-meri -2)</option>
+                      <option value="kari" className={isDark ? 'bg-neutral-900' : 'bg-white'}>カ (Kari +1)</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (shakuhachiDisplayMode === 'dual' && !isFreeRhythm) {
+                          runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, builtShakuhachiToken));
+                        } else {
+                          runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, `{${builtShakuhachiToken}} `));
+                        }
+                      }}
+                      className="h-7 px-2.5 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap bg-[#E05A2B] hover:bg-[#c8491c] text-white"
+                      title={
+                        shakuhachiDisplayMode === 'dual' && !isFreeRhythm
+                          ? `Attach {${builtShakuhachiToken}} to the note under cursor`
+                          : `Insert standalone Shakuhachi note {${builtShakuhachiToken}}`
+                      }
+                    >
+                      + {builtShakuhachiToken}
+                    </button>
+                  </div>
+
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+
+                  {/* Pitch Bends & Glides */}
+                  {(
+                    [
+                      { k: '萎し', l: '萎し', t: 'Nayashi: bloom up from meri {萎し}' },
+                      { k: '擦り上げ', l: '↗擦上', t: 'Suri-age upward glide {擦り上げ}' },
+                      { k: '擦り下げ', l: '↘擦下', t: 'Suri-sage downward glide {擦り下げ}' },
+                      { k: 'メリ込み', l: 'メ込', t: 'Merikomi tail dip into meri {メリ込み}' },
+                      { k: '反り', l: '反り', t: 'Sori upward scoop {反り}' },
+                      { k: '落とし', l: '落とし', t: 'Jin Nyodo Otoshi sharp drop-off {落とし}' }
+                    ] as const
+                  ).map(b => (
+                    <button
+                      key={b.k}
+                      type="button"
+                      onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, b.k))}
+                      className={macroBtnClass}
+                      title={b.t}
+                    >
+                      {b.l}
+                    </button>
+                  ))}
+
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+
+                  {/* Honkyoku Techniques, Sustains & Jin Nyodo Annotation */}
+                  {(
+                    [
+                      { k: '当り', l: '当り', t: 'Atari finger accent {当り}' },
+                      { k: '打ち', l: '打ち', t: 'Uchi finger tap {打ち}' },
+                      { k: 'ユリ', l: 'ユリ', t: 'Yuri head vibrato {ユリ}' },
+                      { k: 'コロコロ', l: 'コロ', t: 'Korokoro bamboo warble {コロコロ}' },
+                      { k: 'コミ吹き', l: 'コミ', t: 'Komi-buki breath pulse {コミ吹き}' },
+                      { k: 'ムラ息', l: 'ムラ息', t: 'Muraiki breathy wind-rush {ムラ息}' },
+                      { k: '玉音', l: '玉音', t: 'Tamane flutter-tongue {玉音}' },
+                      { k: '長', l: '長', t: 'Extended free-rhythm sustain {長}' },
+                      { k: '長長', l: '長長', t: 'Deep extended sustain {長長}' }
+                    ] as const
+                  ).map(tech => (
+                    <button
+                      key={tech.k}
+                      type="button"
+                      onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, tech.k))}
+                      className={macroBtnClass}
+                      title={tech.t}
+                    >
+                      {tech.l}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, '息'))}
+                    className={macroBtnClass}
+                    title="Attach breath notch (息継ぎ ∨) to note, or insert standalone breath mark"
+                  >
+                    ∨ 息
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, '{間} '))}
+                    className={macroBtnClass}
+                    title="Insert Contemplative Silence / Ma (間 〇)"
+                  >
+                    〇 間
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, '"静かに息を澄ませて"'))}
+                    className={macroBtnClass}
+                    title='Attach a Jin Nyodo verbal performance instruction ("...") to the current note'
+                  >
+                    「傍注」
+                  </button>
+
+                  <div className={cn('h-4 w-[1px] mx-0.5', isDark ? 'bg-white/10' : 'bg-neutral-200')} />
+
+                  <button
+                    type="button"
+                    onClick={() => setIsShakuhachiRefOpen(true)}
+                    className={cn(
+                      macroBtnClass,
+                      'border-[#E05A2B]/40 text-[#E05A2B] hover:bg-[#E05A2B]/10'
+                    )}
+                    title="Open visual Shakuhachi Notation Reference (尺八譜図典)"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>尺八譜図典 Reference</span>
+                  </button>
                 </>
               )}
 
@@ -1461,6 +1869,8 @@ ${collectedCss}
             resolvedTheme={resolvedTheme}
             fingeringStyle={fingeringStyle}
             guqinDisplayMode={showGuqinViews ? guqinDisplayMode : 'dual'}
+            shakuhachiDisplayMode={showShakuhachiViews ? shakuhachiDisplayMode : 'dual'}
+            shakuhachiSchool={effectiveShakuhachiSchool}
             showMarkings={showMarkings}
             showLyrics={showLyrics}
             highlightMarkings={highlightMarkings}
@@ -1569,6 +1979,42 @@ ${collectedCss}
           </form>
         </div>
       )}
+
+      {/* Interactive Guqin Jianzipu Reference Modal (减字谱图典) */}
+      <GuqinJianziReferenceModal
+        isOpen={isJianziRefOpen}
+        onClose={() => setIsJianziRefOpen(false)}
+        isDark={isDark}
+        onInsertToken={(token, isModifier) => {
+          if (!isModifier && guqinDisplayMode !== 'dual') {
+            runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, `{${token}} `));
+            return;
+          }
+          const parts = token.split(',').map(p => p.trim()).filter(Boolean);
+          runEditorMacro((t, f, e) => {
+            let cur = { text: t, selectionStart: f, selectionEnd: e };
+            for (const part of parts) {
+              cur = macroToggleMarking(cur.text, cur.selectionStart, cur.selectionEnd, part);
+            }
+            return cur;
+          });
+        }}
+      />
+
+      {/* Interactive Shakuhachi Notation Reference Modal (尺八譜図典) */}
+      <ShakuhachiReferenceModal
+        isOpen={isShakuhachiRefOpen}
+        onClose={() => setIsShakuhachiRefOpen(false)}
+        isDark={isDark}
+        school={effectiveShakuhachiSchool}
+        onInsertToken={(token, isModifier) => {
+          if (!isModifier && (shakuhachiDisplayMode !== 'dual' || isFreeRhythm)) {
+            runEditorMacro((t, f, e) => macroInsertSnippet(t, f, e, `{${token}} `));
+            return;
+          }
+          runEditorMacro((t, f, e) => macroToggleMarking(t, f, e, token));
+        }}
+      />
     </div>
   );
 }

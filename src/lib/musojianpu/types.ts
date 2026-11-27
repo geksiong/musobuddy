@@ -3,9 +3,65 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type InstrumentType = 'erhu' | 'pipa' | 'guzheng' | 'dizi' | 'xiao' | 'guqin';
+export type InstrumentType = 'erhu' | 'pipa' | 'guzheng' | 'dizi' | 'xiao' | 'guqin' | 'shakuhachi';
 
 export type GuqinDisplayMode = 'dual' | 'pure-horizontal' | 'pure-vertical';
+
+export type ShakuhachiSchool = 'kinko' | 'tozan';
+
+export type ShakuhachiDisplayMode = 'dual' | 'kinko-vertical' | 'tozan-vertical';
+
+export type ShakuhachiPitchName =
+  | 'ro' | 'tsu' | 're' | 'chi' | 'ri' | 'ha' | 'hi' | 'u' | 'i' | 'ru' | 'pi' | 'ta';
+
+export type ShakuhachiRegister = 'otsu' | 'kan' | 'daikan';
+
+export type ShakuhachiMeriKari = 'meri' | 'chumeri' | 'daimeri' | 'kari';
+
+export type ShakuhachiBendType =
+  | 'nayashi'    // 萎し (start flat in meri and bloom smoothly up into pitch)
+  | 'suri-up'    // 擦り上げ (smooth upward finger/embouchure glide)
+  | 'suri-down'  // 擦り下げ (smooth downward glide)
+  | 'merikomi'   // メリ込み (dip smoothly down into meri at tail of tone)
+  | 'sori'       // 反り (pitch scoop upward then drop)
+  | 'otoshi';    // 落とし (Jin Nyodo sharp downward drop-off)
+
+export type ShakuhachiTechnique =
+  | 'atari'      // 当り (crisp finger articulation / accent)
+  | 'uchi'       // 打ち (quick finger tap on hole)
+  | 'oshi'       // 押し (finger press/pop from above)
+  | 'yuri'       // ユリ (head vibrato)
+  | 'yokoyuri'   // 横ユリ (horizontal head vibrato)
+  | 'tateyuri'   // 縦ユリ (vertical head vibrato / meri-kari wave)
+  | 'mawashi'    // 回しユリ (circular head vibrato)
+  | 'korokoro'   // コロコロ (finger warble on holes 1 & 2)
+  | 'karakara'   // カラカラ (finger rattle on hole 1)
+  | 'komi'       // コミ吹き (pulsating abdominal breath push)
+  | 'muraiki'    // ムラ息 (explosive breathy wind-rush tone)
+  | 'tamane'     // 玉音 (flutter-tongue / throat roll)
+  | 'kiri'       // 切り (crisp breath cutoff)
+  | 'breath'     // 息継ぎ / ∨ (breath intake)
+  | 'ma'         // 間 / 〇 (contemplative silence / resonant pause)
+  | 'suri';      // スリ (legato slide connector)
+
+export interface ShakuhachiNoteData {
+  /** Canonical fingering syllable (ロ, ツ, レ, チ, リ/ハ, ヒ, ウ, イ, etc.) */
+  fingering?: ShakuhachiPitchName;
+  /** Octave register: 乙 (otsu), 甲 (kan), 大甲 (daikan) */
+  register?: ShakuhachiRegister;
+  /** Embouchure / chin pitch adjustment: メ, 中メ, 大メ, カ */
+  meriKari?: ShakuhachiMeriKari;
+  /** Explicit pitch bend / glide gestures */
+  bends?: ShakuhachiBendType[];
+  /** Optional glide target fingering (e.g. スリレ) */
+  bendTarget?: ShakuhachiPitchName;
+  /** Traditional shakuhachi techniques & breath gestures */
+  techniques?: ShakuhachiTechnique[];
+  /** Jin Nyodo style performance & expressive annotations */
+  instructions?: string[];
+  /** Free-rhythm relative visual & playback hold multiplier (0.5=短, 1=normal, 2=長, 3=長長) */
+  holdLength?: number;
+}
 
 export type GuqinSoundType = 'san' | 'an' | 'fan';
 
@@ -132,6 +188,7 @@ export interface ErhuMarkings {
   ornaments: OrnamentType[];
   techniques?: PluckTechniqueType[];
   jianzi?: GuqinJianzi;
+  shakuhachi?: ShakuhachiNoteData;
   dynamic?: DynamicType;
   customText?: string;
 }
@@ -269,9 +326,11 @@ export interface MusoJianpuHeader {
   instrument?: InstrumentType;
   key: string;        // e.g. "D", "G", "F", "C", "Bb", "A", "Eb"
   strings?: string;   // e.g. "1-5", "5-2", "6-3", "A-d-e-a"
-  fluteKey?: string;  // e.g. "曲笛 C调", "梆笛 G调", "G调洞箫"
+  fluteKey?: string;  // e.g. "曲笛 C调", "梆笛 G调", "G调洞箫", "1.8尺 (D)"
   fingering?: string; // e.g. "筒音作5", "筒音作2", "筒音作1"
-  time: string;       // e.g. "4/4", "2/4", "3/4", "6/8"
+  school?: ShakuhachiSchool; // e.g. "kinko" | "tozan"
+  rhythmMode?: 'metrical' | 'free'; // "free" for traditional honkyoku (散拍 / 無拍子)
+  time: string;       // e.g. "4/4", "2/4", "3/4", "6/8", "free"
   tempo: number;      // BPM, e.g. 72
   expression?: string; // e.g. "如歌地 Adagio"
   columns?: number;   // optional measures per row hint

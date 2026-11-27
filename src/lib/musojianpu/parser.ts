@@ -28,6 +28,7 @@ import {
 } from './types.ts';
 import { getErhuKeyInfo, normalizeKeyName } from './erhuKeys.ts';
 import { mergeGuqinJianzi, parseGuqinToken } from './guqin.ts';
+import { mergeShakuhachiData, parseShakuhachiToken } from './shakuhachi.ts';
 
 const BOWING_ALIASES: Record<string, BowingType> = {
   pull: 'pull', down: 'pull', la: 'pull', '拉': 'pull', '拉弓': 'pull', 'π': 'pull',
@@ -138,6 +139,15 @@ const DYNAMIC_ALIASES: Record<string, DynamicType> = {
 
 function normalizeInstrumentName(raw: string): InstrumentType {
   const lower = raw.trim().toLowerCase();
+  if (
+    lower.includes('shakuhachi') ||
+    lower.includes('尺八') ||
+    lower.includes('しゃくはち') ||
+    lower === 'kinko' ||
+    lower === 'tozan'
+  ) {
+    return 'shakuhachi';
+  }
   if (lower.includes('guqin') || lower.includes('qin') || lower.includes('古琴') || lower === '琴') return 'guqin';
   if (lower.includes('pipa') || lower.includes('琵琶')) return 'pipa';
   if (lower.includes('guzheng') || lower.includes('zheng') || lower.includes('古筝') || lower.includes('古箏') || lower === '筝') {
@@ -146,6 +156,22 @@ function normalizeInstrumentName(raw: string): InstrumentType {
   if (lower.includes('xiao') || lower.includes('箫') || lower.includes('簫')) return 'xiao';
   if (lower.includes('dizi') || lower.includes('flute') || lower.includes('笛')) return 'dizi';
   return 'erhu';
+}
+
+function isFreeRhythmToken(raw: string): boolean {
+  const lower = raw.trim().toLowerCase();
+  return (
+    lower === 'free' ||
+    lower === 'freely' ||
+    lower === 'honkyoku' ||
+    lower === 'sanban' ||
+    lower === 'sanhaku' ||
+    lower.includes('散拍') ||
+    lower.includes('散板') ||
+    lower.includes('無拍子') ||
+    lower.includes('无拍子') ||
+    lower.includes('自由')
+  );
 }
 
 function normalizeFingeringLabel(raw: string): string {
@@ -217,18 +243,111 @@ function parseNavMarkerTag(rawInner: string): NavMarkerType | null {
   }
 }
 
-function parseMarkingsBlock(raw: string, target: ErhuMarkings) {
-  const parts = raw.split(/[,，;\s]+/).map(s => s.trim()).filter(Boolean);
+/**
+ * Splits a `{...}` markings block by commas/semicolons/whitespace while preserving quoted strings
+ * (`"..."`, `'...'`, `「...」`, `『...』`, `“...”`) and `jin:...` / `注:...` annotations.
+ * Mid-word apostrophes (`don't`) or unclosed quotes never swallow following pitch tokens.
+ */
+function splitMarkingsTokens(raw: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let closeQuote: string | null = null;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (closeQuote) {
+      current += ch;
+      if (ch === closeQuote) {
+        closeQuote = null;
+      }
+      continue;
+    }
+
+    const atTokenStart = current.trim().length === 0 || /[:：]\s*$/.test(current);
+    if ((ch === '"' || ch === "'") && atTokenStart && raw.indexOf(ch, i + 1) !== -1) {
+      closeQuote = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === '「' && raw.indexOf('」', i + 1) !== -1) {
+      closeQuote = '」';
+      current += ch;
+      continue;
+    }
+    if (ch === '『' && raw.indexOf('』', i + 1) !== -1) {
+      closeQuote = '』';
+      current += ch;
+      continue;
+    }
+    if (ch === '“' && raw.indexOf('”', i + 1) !== -1) {
+      closeQuote = '”';
+      current += ch;
+      continue;
+    }
+
+    const isJinPrefix = /^(?:jin|nyodo|inst|note|注|傍注|指示)[:：]/i.test(current.trim());
+    if (ch === ',' || ch === '，' || ch === ';' || ch === '；' || (!isJinPrefix && /\s/.test(ch))) {
+      const trimmed = current.trim();
+      if (trimmed) tokens.push(trimmed);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  const trailing = current.trim();
+  if (trailing) tokens.push(trailing);
+  return tokens;
+}
+
+function mergeErhuMarkingsInto(target: ErhuMarkings, source: ErhuMarkings) {
+  if (source.bowing && !target.bowing) target.bowing = source.bowing;
+  if (source.finger && !target.finger) target.finger = source.finger;
+  if (source.string && !target.string) target.string = source.string;
+  if (source.position && !target.position) target.position = source.position;
+  if (source.dynamic && !target.dynamic) target.dynamic = source.dynamic;
+  if (source.customText) {
+    target.customText = target.customText ? `${target.customText} ${source.customText}` : source.customText;
+  }
+  if (source.ornaments.length > 0) {
+    for (const orn of source.ornaments) {
+      if (!target.ornaments.includes(orn)) target.ornaments.push(orn);
+    }
+  }
+  if (source.techniques && source.techniques.length > 0) {
+    if (!target.techniques) target.techniques = [];
+    for (const tech of source.techniques) {
+      if (!target.techniques.includes(tech)) target.techniques.push(tech);
+    }
+  }
+  if (source.jianzi) {
+    target.jianzi = mergeGuqinJianzi(target.jianzi, source.jianzi);
+  }
+  if (source.shakuhachi) {
+    target.shakuhachi = mergeShakuhachiData(target.shakuhachi, source.shakuhachi);
+  }
+}
+
+function parseMarkingsBlock(raw: string, target: ErhuMarkings, isShakuhachiContext: boolean = false) {
+  const parts = splitMarkingsTokens(raw);
   for (const part of parts) {
+    const lower = part.toLowerCase();
+    const shContext = isShakuhachiContext || Boolean(target.shakuhachi);
+
+    // Check Shakuhachi tokens (Katakana ロ/ツ/レ/チ/リ/ハ, bends, techniques, Jin Nyodo instructions)
+    const shPatch = parseShakuhachiToken(part, shContext);
+    if (shPatch) {
+      target.shakuhachi = mergeShakuhachiData(target.shakuhachi, shPatch);
+      continue;
+    }
+
     // Quoted custom text e.g. "渐强" or '换把'
     if ((part.startsWith('"') && part.endsWith('"')) || (part.startsWith("'") && part.endsWith("'"))) {
       target.customText = part.slice(1, -1);
       continue;
     }
 
-    const lower = part.toLowerCase();
-    // Check Guqin Jianzipu compound tokens & left-hand actions first (unambiguous multi-char or gq: prefix)
-    const guqinPatch = parseGuqinToken(part);
+    // Check Guqin Jianzipu compound tokens & left-hand actions (skip bare kanji collision in shakuhachi mode)
+    const guqinPatch = !isShakuhachiContext || /^gq[:：]/i.test(part) ? parseGuqinToken(part) : null;
     if (guqinPatch) {
       target.jianzi = mergeGuqinJianzi(target.jianzi, guqinPatch);
     } else if (BOWING_ALIASES[lower] || BOWING_ALIASES[part]) {
@@ -253,8 +372,12 @@ function parseMarkingsBlock(raw: string, target: ErhuMarkings) {
     } else if (DYNAMIC_ALIASES[lower] || DYNAMIC_ALIASES[part]) {
       target.dynamic = DYNAMIC_ALIASES[lower] || DYNAMIC_ALIASES[part];
     } else {
-      // Unrecognized tag renders cleanly as custom performance text
-      target.customText = target.customText ? `${target.customText} ${part}` : part;
+      // Unrecognized tag renders cleanly as custom performance text (or Jin Nyodo instruction in shakuhachi mode)
+      if (shContext) {
+        target.shakuhachi = mergeShakuhachiData(target.shakuhachi, { instructions: [part] });
+      } else {
+        target.customText = target.customText ? `${target.customText} ${part}` : part;
+      }
     }
   }
 }
@@ -404,10 +527,19 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
       else if (k === 'instrument' || k === 'inst') header.instrument = normalizeInstrumentName(v);
       else if (k === 'key' || k === 'k') header.key = normalizeKeyName(v);
       else if (k === 'strings' || k === 'tuning' || k === 'str') header.strings = v.replace(/弦$/u, '').trim();
-      else if (k === 'flute' || k === 'tube' || k === 'flutekey') header.fluteKey = v;
+      else if (k === 'flute' || k === 'tube' || k === 'flutekey' || k === 'length' || k === 'shaku') header.fluteKey = v;
       else if (k === 'fingering' || k === 'tongyin' || k === 'finger') header.fingering = normalizeFingeringLabel(v);
-      else if (k === 'time' || k === 'meter' || k === 'm') header.time = v || '4/4';
-      else if (k === 'tempo' || k === 'bpm' || k === 'q') {
+      else if (k === 'school' || k === 'notation' || k === 'ryu') {
+        const low = v.toLowerCase();
+        header.school = low.includes('tozan') || v.includes('都山') ? 'tozan' : 'kinko';
+      } else if (k === 'rhythm') {
+        header.rhythmMode = isFreeRhythmToken(v) ? 'free' : 'metrical';
+      } else if (k === 'time' || k === 'meter' || k === 'm') {
+        header.time = v || '4/4';
+        if (isFreeRhythmToken(v)) {
+          header.rhythmMode = 'free';
+        }
+      } else if (k === 'tempo' || k === 'bpm' || k === 'q') {
         const num = parseInt(v.replace(/[^\d]/g, ''), 10);
         if (!isNaN(num) && num >= 20 && num <= 320) header.tempo = num;
       } else if (k === 'expression' || k === 'mood' || k === 'style') {
@@ -787,22 +919,29 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
         continue;
       }
 
-      // Stray {markings} block before a main note (e.g. ^5/{pull}6): capture cleanly for the upcoming note
+      // Stray {markings} block before a main note (e.g. ^5/{pull}6), OR standalone Pure Guqin / Pure Shakuhachi token
       if (ch === '{') {
         const closeIdx = rawLine.indexOf('}', i + 1);
         if (closeIdx !== -1) {
+          const isShCtx = header.instrument === 'shakuhachi';
           const blockStart = lineStart + i;
           const blockInner = rawLine.slice(i + 1, closeIdx);
           const probe = createEmptyMarkings();
-          parseMarkingsBlock(blockInner, probe);
+          parseMarkingsBlock(blockInner, probe, isShCtx);
 
-          // Pure Jianzipu standalone token (e.g. `{散勾一}` or `{名九勾六,绰,吟}` without a preceding/attached digit)
+          // Pure Jianzipu (`{散勾一}`) or Pure Shakuhachi (`{ロ,萎し}`, `{甲ツ,ユリ}`, `{間}`, `{息}`) standalone node
           const nextChar = rawLine[closeIdx + 1] || '';
           const attachedToNote = /^[#b=0-7<]/.test(nextChar);
-          if (probe.jianzi && !attachedToNote) {
+          const isStandaloneSh = Boolean(
+            probe.shakuhachi &&
+            (probe.shakuhachi.fingering ||
+              probe.shakuhachi.techniques?.includes('ma') ||
+              probe.shakuhachi.techniques?.includes('breath'))
+          );
+          if ((probe.jianzi || isStandaloneSh) && !attachedToNote) {
             ensureMeasure(blockStart);
             i = closeIdx + 1;
-            // Consume optional duration suffixes (/ _ .) after pure Jianzipu block
+            // Consume optional duration suffixes (/ _ . ~) after pure Guqin / Shakuhachi block
             let underlines = 0;
             while (i < len && (rawLine[i] === '_' || rawLine[i] === '/')) {
               underlines = Math.min(3, underlines + 1);
@@ -813,20 +952,44 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
               dots = Math.min(2, dots + 1);
               i++;
             }
+            let tiedToNext = false;
+            if (i < len && rawLine[i] === '~') {
+              tiedToNext = true;
+              i++;
+            }
+            // Also consume any immediately chained modifier-only `{...}` blocks (e.g. `{ロ}{"静かに"}` or `{ロ}{ユリ}`)
+            while (i < len && rawLine[i] === '{') {
+              const nextClose = rawLine.indexOf('}', i + 1);
+              if (nextClose === -1) break;
+              const nextInner = rawLine.slice(i + 1, nextClose);
+              const nextProbe = createEmptyMarkings();
+              parseMarkingsBlock(nextInner, nextProbe, isShCtx);
+              const isOwnStandalonePitch = Boolean(
+                nextProbe.shakuhachi?.fingering ||
+                nextProbe.shakuhachi?.techniques?.includes('ma') ||
+                nextProbe.jianzi?.rightStroke
+              );
+              if (isOwnStandalonePitch) break;
+              mergeErhuMarkingsInto(probe, nextProbe);
+              i = nextClose + 1;
+            }
             if (pendingMarkings) {
-              if (pendingMarkings.dynamic && !probe.dynamic) probe.dynamic = pendingMarkings.dynamic;
-              if (pendingMarkings.customText && !probe.customText) probe.customText = pendingMarkings.customText;
+              const merged = createEmptyMarkings();
+              mergeErhuMarkingsInto(merged, pendingMarkings);
+              mergeErhuMarkingsInto(merged, probe);
+              Object.assign(probe, merged);
               pendingMarkings = null;
             }
             totalNotes++;
-            const jzNote: MusoJianpuNote = {
+            const pureNote: MusoJianpuNote = {
               kind: 'note',
               id: `n-${totalNotes}`,
-              degree: -2, // Pure Jianzipu node (pitch computed from Guqin string/hui physics)
+              degree: -2, // Pure Guqin/Shakuhachi node (pitch computed from instrument physics)
               octave: 0,
               accidental: null,
               underlines,
               dots,
+              tiedToNext: tiedToNext || undefined,
               graceNotes: pendingGraceNotes,
               markings: probe,
               startOffset: blockStart,
@@ -834,28 +997,41 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
               lineNumber
             };
             pendingGraceNotes = [];
-            attachActiveSlurs(jzNote);
+            attachActiveSlurs(pureNote);
             if (inHairpin && activeHairpinId !== undefined && activeHairpinType) {
-              jzNote.hairpinId = activeHairpinId;
-              jzNote.hairpinType = activeHairpinType;
+              pureNote.hairpinId = activeHairpinId;
+              pureNote.hairpinType = activeHairpinType;
               if (pendingHairpinStart) {
-                jzNote.hairpinStart = true;
+                pureNote.hairpinStart = true;
                 pendingHairpinStart = false;
               }
-              lastNoteInHairpin = jzNote;
+              lastNoteInHairpin = pureNote;
             }
-            flushGroup();
-            currentMeasure!.groups.push({
-              kind: 'group',
-              id: `g-${totalNotes}`,
-              notes: [jzNote]
-            });
-            lastPitchedNote = jzNote;
+            if (underlines > 0) {
+              if (!currentGroup) {
+                currentGroup = {
+                  kind: 'group',
+                  id: `g-${totalNotes}`,
+                  notes: [pureNote]
+                };
+              } else {
+                currentGroup.notes.push(pureNote);
+              }
+            } else {
+              flushGroup();
+              currentMeasure!.groups.push({
+                kind: 'group',
+                id: `g-${totalNotes}`,
+                notes: [pureNote]
+              });
+            }
+            currentMeasure!.endOffset = lineStart + i;
+            lastPitchedNote = pureNote;
             continue;
           }
 
           if (!pendingMarkings) pendingMarkings = createEmptyMarkings();
-          parseMarkingsBlock(blockInner, pendingMarkings);
+          parseMarkingsBlock(blockInner, pendingMarkings, isShCtx);
           i = closeIdx + 1;
           continue;
         }
@@ -879,7 +1055,7 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
         while (i < len && rawLine[i] === '{') {
           const closeIdx = rawLine.indexOf('}', i + 1);
           if (closeIdx === -1) break;
-          parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), markings);
+          parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), markings, header.instrument === 'shakuhachi');
           i = closeIdx + 1;
         }
 
@@ -942,7 +1118,7 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
           while (i < len && rawLine[i] === '{') {
             const closeIdx = rawLine.indexOf('}', i + 1);
             if (closeIdx === -1) break;
-            parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), markings);
+            parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), markings, header.instrument === 'shakuhachi');
             i = closeIdx + 1;
           }
 
@@ -1042,7 +1218,7 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
         while (i < len && rawLine[i] === '{') {
           const closeIdx = rawLine.indexOf('}', i + 1);
           if (closeIdx === -1) break;
-          parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), markings);
+          parseMarkingsBlock(rawLine.slice(i + 1, closeIdx), markings, header.instrument === 'shakuhachi');
           i = closeIdx + 1;
         }
 
@@ -1130,6 +1306,12 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
       pendingGraceNotes = [];
     }
 
+    // Attach any trailing end-of-line annotation block (e.g. `{ロ} {"静かに"}`) onto the last pitched note
+    if (pendingMarkings && lastPitchedNote) {
+      mergeErhuMarkingsInto(lastPitchedNote.markings, pendingMarkings);
+      pendingMarkings = null;
+    }
+
     flushGroup();
 
     // Filter out completely empty trailing measures created by trailing barline
@@ -1158,13 +1340,17 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
     }
   }
 
-  // Ensure default strings derived from key & instrument if not explicitly set
+  // Ensure default strings/fluteKey/school derived from key & instrument if not explicitly set
   if (!header.strings) {
     if (header.instrument === 'pipa') {
       header.strings = 'A-d-e-a';
     } else if (!header.instrument || header.instrument === 'erhu') {
       header.strings = getErhuKeyInfo(header.key).strings;
     }
+  }
+  if (header.instrument === 'shakuhachi') {
+    if (!header.fluteKey) header.fluteKey = '1.8尺 (D)';
+    if (!header.school) header.school = 'kinko';
   }
 
   return {
@@ -1180,10 +1366,10 @@ export function parseMusoJianpuScore(text: string): MusoJianpuDocument {
  */
 export function detectMusoJianpuFormat(text: string): boolean {
   if (!text || typeof text !== 'string') return false;
-  const hasHeader = /^@(title|key|strings|time|tempo|instrument)\s*[:：]/im.test(text);
+  const hasHeader = /^@(title|key|strings|time|tempo|instrument|school|notation|flute)\s*[:：]/im.test(text);
   if (hasHeader) return true;
 
-  const hasInstrumentMarkings = /\{(pull|push|拉|推|内|外|in|out|vib|揉|su|sd|上滑|下滑|一|二|三|四|trem|stacc|pizz|tan|tiao|lun|sao|fu|tuo|mo|gou|cuo|yao|gua|arp|弹|挑|轮|扫|拂|托|抹|勾|撮|摇|刮|琶音)\b/i.test(text);
+  const hasInstrumentMarkings = /\{(pull|push|拉|推|内|外|in|out|vib|揉|su|sd|上滑|下滑|一|二|三|四|trem|stacc|pizz|tan|tiao|lun|sao|fu|tuo|mo|gou|cuo|yao|gua|arp|弹|挑|轮|扫|拂|托|抹|勾|撮|摇|刮|琶音|ロ|ツ|レ|チ|リ|ハ|ヒ|ウ|萎し|ムラ息|ユリ|コロ|sh:)/i.test(text);
   if (hasInstrumentMarkings) return true;
 
   // Check for multiple Jianpu measure bars containing digits 0-7
